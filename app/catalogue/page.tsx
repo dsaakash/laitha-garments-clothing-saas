@@ -39,14 +39,30 @@ export default function CataloguePage() {
       const response = await fetch('/api/inventory')
       const result = await response.json()
       if (result.success) {
-        const items: CatalogueItem[] = result.data.map((item: any) => ({
-          id: item.id,
-          name: item.dressName,
-          category: getCategory(item.dressType),
-          image: item.imageUrl || '/dress1.png',
-          description: `${item.dressType} - ${item.dressCode || ''}`,
-          price: 'Custom Pricing',
-        }))
+        const items: CatalogueItem[] = result.data
+          .map((item: any) => {
+            // Get the first available image from productImages array, then imageUrl, or null
+            const image = 
+              (item.productImages && Array.isArray(item.productImages) && item.productImages.length > 0)
+                ? item.productImages[0]
+                : (item.imageUrl && item.imageUrl.trim() !== '')
+                  ? item.imageUrl
+                  : null
+            
+            // Only include items that have an image
+            if (!image) return null
+            
+            return {
+              id: item.id,
+              name: item.dressName,
+              category: getCategory(item.dressType),
+              image: image,
+              description: `${item.dressType} - ${item.dressCode || ''}`,
+              price: 'Custom Pricing',
+            }
+          })
+          .filter((item: CatalogueItem | null) => item !== null) as CatalogueItem[]
+        
         setCatalogueItems(items)
       }
     } catch (error) {
