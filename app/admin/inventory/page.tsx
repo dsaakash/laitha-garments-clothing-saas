@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
 import { InventoryItem } from '@/lib/storage'
@@ -8,6 +8,8 @@ import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 
 export default function InventoryPage() {
+  const tableWrapperRef = useRef<HTMLDivElement>(null)
+  const topScrollbarRef = useRef<HTMLDivElement>(null)
   const [items, setItems] = useState<InventoryItem[]>([])
   const [showModal, setShowModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -98,6 +100,40 @@ export default function InventoryPage() {
       return () => window.removeEventListener('keydown', handleEsc)
     }
   }, [showModal, showDetailModal, showStockModal, showBulkStockModal])
+
+  // Sync top scrollbar with table scroll
+  useEffect(() => {
+    const tableWrapper = tableWrapperRef.current
+    const topScrollbar = topScrollbarRef.current
+
+    if (!tableWrapper || !topScrollbar) return
+
+    const syncScrollbars = () => {
+      // Sync top scrollbar with table scroll
+      topScrollbar.scrollLeft = tableWrapper.scrollLeft
+    }
+
+    const handleTableScroll = () => {
+      syncScrollbars()
+    }
+
+    const handleTopScrollbarScroll = () => {
+      // Sync table with top scrollbar
+      tableWrapper.scrollLeft = topScrollbar.scrollLeft
+    }
+
+    // Initial sync
+    syncScrollbars()
+
+    // Add event listeners
+    tableWrapper.addEventListener('scroll', handleTableScroll, { passive: true })
+    topScrollbar.addEventListener('scroll', handleTopScrollbarScroll, { passive: true })
+
+    return () => {
+      tableWrapper.removeEventListener('scroll', handleTableScroll)
+      topScrollbar.removeEventListener('scroll', handleTopScrollbarScroll)
+    }
+  }, [items])
 
   const loadItems = async () => {
     try {
@@ -710,26 +746,50 @@ export default function InventoryPage() {
             return (
               <div className="space-y-4">
                 {Object.entries(groupedItems).map(([supplier, supplierItems]) => (
-                  <div key={supplier} className="bg-white rounded-lg shadow-md overflow-hidden">
+                  <div key={supplier} className="bg-white rounded-lg shadow-md">
                     <div className="bg-purple-50 px-6 py-3 border-b border-purple-200">
                       <h3 className="text-lg font-semibold text-purple-900">
                         {supplier} ({supplierItems.length} {supplierItems.length === 1 ? 'item' : 'items'})
                       </h3>
                     </div>
-                    <div className="table-wrapper">
-                      <table className="min-w-full divide-y divide-gray-200">
+                    {/* Top Scrollbar for Grouped View */}
+                    <div 
+                      className="table-wrapper-top-scrollbar"
+                      style={{ overflowX: 'auto', overflowY: 'hidden', height: '20px', borderBottom: '2px solid #e2e8f0' }}
+                      onScroll={(e) => {
+                        const target = e.currentTarget
+                        const tableWrapper = target.nextElementSibling as HTMLElement
+                        if (tableWrapper) {
+                          tableWrapper.scrollLeft = target.scrollLeft
+                        }
+                      }}
+                    >
+                      <div style={{ height: '1px', minWidth: '3000px' }}></div>
+                    </div>
+                    <div 
+                      className="table-wrapper" 
+                      style={{ overflowX: 'auto', overflowY: 'visible' }}
+                      onScroll={(e) => {
+                        const target = e.currentTarget
+                        const topScrollbar = target.previousElementSibling as HTMLElement
+                        if (topScrollbar) {
+                          topScrollbar.scrollLeft = target.scrollLeft
+                        }
+                      }}
+                    >
+                      <table className="divide-y divide-gray-200" style={{ minWidth: '3000px', width: 'max-content' }}>
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dress Name</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Type</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Code</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Sizes</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wholesale</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selling</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Profit</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '100px' }}>Image</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '250px' }}>Dress Name</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Type</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Code</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Sizes</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Wholesale</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Selling</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Profit</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '200px' }}>Stock</th>
+                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Actions</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -765,12 +825,12 @@ export default function InventoryPage() {
                                   )}
                                 </td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.dressName}</td>
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{item.dressType}</td>
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">{item.dressCode}</td>
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{item.sizes.join(', ')}</td>
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressCode}</td>
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.sizes.join(', ')}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.wholesalePrice}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.sellingPrice}</td>
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 hidden sm:table-cell">₹{profit}</td>
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">₹{profit}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                                   <div className="flex flex-col gap-2">
                                     {/* Available Stock - Primary Control */}
@@ -848,22 +908,30 @@ export default function InventoryPage() {
             )
           })()
         ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="table-wrapper">
-              <table className="min-w-full divide-y divide-gray-200">
+          <div className="bg-white rounded-lg shadow-md">
+            {/* Top Scrollbar */}
+            <div 
+              ref={topScrollbarRef}
+              className="table-wrapper-top-scrollbar"
+              style={{ overflowX: 'auto', overflowY: 'hidden', height: '20px', borderBottom: '2px solid #e2e8f0' }}
+            >
+              <div style={{ height: '1px', minWidth: '3000px' }}></div>
+            </div>
+            <div className="table-wrapper" ref={tableWrapperRef} style={{ overflowX: 'auto', overflowY: 'visible' }}>
+              <table className="divide-y divide-gray-200" style={{ minWidth: '3000px', width: 'max-content' }}>
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dress Name</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Type</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Code</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Sizes</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Supplier</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wholesale</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selling</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Profit</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '100px' }}>Image</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '250px' }}>Dress Name</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Type</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Code</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Sizes</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '300px' }}>Supplier</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Wholesale</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Selling</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Profit</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '200px' }}>Stock</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -899,10 +967,10 @@ export default function InventoryPage() {
                         )}
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.dressName}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{item.dressType}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">{item.dressCode}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{item.sizes.join(', ')}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressCode}</td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.sizes.join(', ')}</td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.supplierName ? (
                           <div>
                             <p className="font-medium">{item.supplierName}</p>
@@ -916,7 +984,7 @@ export default function InventoryPage() {
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.wholesalePrice}</td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.sellingPrice}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 hidden sm:table-cell">₹{profit}</td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">₹{profit}</td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                         <div className="flex flex-col gap-2">
                           {/* Available Stock - Primary Control */}

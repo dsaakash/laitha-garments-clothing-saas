@@ -1,3 +1,4 @@
+/* Tailwind CSS directives - these warnings can be ignored as they are valid Tailwind syntax */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -165,13 +166,123 @@ body {
 
 /* Responsive table wrapper */
 .table-wrapper {
-  overflow-x: auto;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #4a5568 #e2e8f0;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  /* Force scrollbar to always show */
+  scrollbar-gutter: stable;
+  /* Ensure scrollbar is always visible */
+  display: block;
+  /* Ensure content can overflow */
+  min-width: 0;
+}
+
+/* Always show scrollbar - Webkit browsers (Chrome, Safari, Edge) */
+.table-wrapper::-webkit-scrollbar {
+  height: 18px;
+  -webkit-appearance: none;
+  display: block !important;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9px;
+  margin: 4px;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 9px;
+  border: 2px solid #f1f5f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  min-height: 30px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:active {
+  background: #334155;
+}
+
+/* Top Scrollbar Styling */
+.table-wrapper-top-scrollbar {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #64748b #f1f5f9;
+  width: 100%;
+  background: #ffffff;
+}
+
+.table-wrapper-top-scrollbar::-webkit-scrollbar {
+  height: 18px;
+  -webkit-appearance: none;
+  display: block !important;
+}
+
+.table-wrapper-top-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9px;
+  margin: 4px;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.table-wrapper-top-scrollbar::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 9px;
+  border: 2px solid #f1f5f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  min-height: 30px;
+}
+
+.table-wrapper-top-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.table-wrapper-top-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #334155;
+}
+
+/* Firefox - always show scrollbar */
+.table-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #4a5568 #e2e8f0;
+}
+
+.table-wrapper table {
+  min-width: 3000px !important;
+  width: max-content !important;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  display: table;
+}
+
+.table-wrapper table th,
+.table-wrapper table td {
+  white-space: nowrap !important;
 }
 
 @media (max-width: 768px) {
   .table-wrapper table {
-    min-width: 800px;
+    min-width: 2000px !important;
+  }
+  
+  .table-wrapper::-webkit-scrollbar {
+    height: 18px;
   }
 }
 
@@ -328,6 +439,7 @@ body {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
