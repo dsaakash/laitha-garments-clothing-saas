@@ -109,16 +109,25 @@ export async function GET(request: NextRequest) {
       }
       
       // Parse transport details from JSONB (PostgreSQL returns JSONB as object, not string)
-      let transportDetails: any = {}
+      interface TransportDetails {
+        logisticsName?: string
+        logisticsMobile?: string
+        transportAddress?: string
+        transportImage?: string
+        invoiceNumber?: string
+        invoiceDate?: string
+        contactPersons?: Array<{name: string, mobile: string}>
+      }
+      let transportDetails: TransportDetails = {}
       if (row.transport_details) {
         if (typeof row.transport_details === 'string') {
           try {
-            transportDetails = JSON.parse(row.transport_details)
+            transportDetails = JSON.parse(row.transport_details) as TransportDetails
           } catch (e) {
             transportDetails = {}
           }
         } else {
-          transportDetails = row.transport_details
+          transportDetails = (row.transport_details as TransportDetails) || {}
         }
       }
       
@@ -137,13 +146,13 @@ export async function GET(request: NextRequest) {
         gstPercentage: row.gst_percentage != null ? parseFloat(row.gst_percentage) : undefined,
         gstAmountRupees: row.gst_amount_rupees != null ? parseFloat(row.gst_amount_rupees) : undefined,
         transportCharges: row.transport_charges != null ? parseFloat(row.transport_charges) : 0,
-        logisticsName: transportDetails.logisticsName || '',
-        logisticsMobile: transportDetails.logisticsMobile || '',
-        transportAddress: transportDetails.transportAddress || '',
-        transportImage: transportDetails.transportImage || '',
-        invoiceNumber: transportDetails.invoiceNumber || '',
-        invoiceDate: transportDetails.invoiceDate || '',
-        contactPersons: transportDetails.contactPersons || [],
+        logisticsName: transportDetails?.logisticsName || '',
+        logisticsMobile: transportDetails?.logisticsMobile || '',
+        transportAddress: transportDetails?.transportAddress || '',
+        transportImage: transportDetails?.transportImage || '',
+        invoiceNumber: transportDetails?.invoiceNumber || '',
+        invoiceDate: transportDetails?.invoiceDate || '',
+        contactPersons: transportDetails?.contactPersons || [],
         notes: row.notes || '',
         createdAt: row.created_at.toISOString(),
         // Legacy fields for backward compatibility
