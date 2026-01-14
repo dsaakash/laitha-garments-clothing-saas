@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
       }
       
       // Parse transport details from JSONB (PostgreSQL returns JSONB as object, not string)
-      let transportDetails = {}
+      let transportDetails: any = {}
       if (row.transport_details) {
         if (typeof row.transport_details === 'string') {
           try {
