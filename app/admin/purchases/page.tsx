@@ -1515,7 +1515,7 @@ export default function PurchasesPage() {
                         </button>
                       </div>
                       {contactPersons.length === 0 && (
-                        <p className="text-xs text-gray-500 mb-2">No contact persons added. Click "Add Contact Person" to add one.</p>
+                        <p className="text-xs text-gray-500 mb-2">No contact persons added. Click &quot;Add Contact Person&quot; to add one.</p>
                       )}
                       {contactPersons.map((person, index) => (
                         <div key={index} className="border rounded-lg p-3 mb-2 bg-gray-50">
