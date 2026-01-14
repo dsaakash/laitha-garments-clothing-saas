@@ -48,7 +48,18 @@ export async function PUT(
     } else {
       gstAmount = (subtotal * gstPercentage) / 100
     }
-    const grandTotal = subtotal + gstAmount
+    const transportCharges = parseFloat(body.transportCharges) || 0
+    const grandTotal = subtotal + gstAmount + transportCharges
+    
+    // Prepare transport details JSONB
+    const transportDetails: any = {}
+    if (body.logisticsName) transportDetails.logisticsName = body.logisticsName
+    if (body.logisticsMobile) transportDetails.logisticsMobile = body.logisticsMobile
+    if (body.transportAddress) transportDetails.transportAddress = body.transportAddress
+    if (body.transportImage) transportDetails.transportImage = body.transportImage
+    if (body.invoiceNumber) transportDetails.invoiceNumber = body.invoiceNumber
+    if (body.invoiceDate) transportDetails.invoiceDate = body.invoiceDate
+    if (body.contactPersons && body.contactPersons.length > 0) transportDetails.contactPersons = body.contactPersons
     
     // Update purchase order
     const result = await query(
@@ -56,10 +67,11 @@ export async function PUT(
        SET date = $1, supplier_id = $2, supplier_name = $3, custom_po_number = $4, 
            invoice_image = $5, subtotal = $6, gst_amount = $7, grand_total = $8, 
            gst_type = $9, gst_percentage = $10, gst_amount_rupees = $11, notes = $12,
+           transport_charges = $13, transport_details = $14,
            -- Legacy fields
-           product_name = $13, product_image = $14, sizes = $15, fabric_type = $16, 
-           quantity = $17, price_per_piece = $18, total_amount = $19
-       WHERE id = $20
+           product_name = $15, product_image = $16, sizes = $17, fabric_type = $18, 
+           quantity = $19, price_per_piece = $20, total_amount = $21
+       WHERE id = $22
        RETURNING *`,
       [
         body.date,
@@ -74,6 +86,8 @@ export async function PUT(
         gstPercentage || null,
         gstAmountRupees || null,
         body.notes || null,
+        transportCharges,
+        Object.keys(transportDetails).length > 0 ? JSON.stringify(transportDetails) : null,
         // Legacy fields
         items.length > 0 ? items[0].productName : '',
         items.length > 0 && items[0].productImages?.length > 0 ? items[0].productImages[0] : null,
@@ -209,16 +223,18 @@ export async function PUT(
           `UPDATE inventory 
            SET sizes = $1, 
                dress_code = $2,
-               wholesale_price = $3, selling_price = $4,
-               fabric_type = COALESCE($5, fabric_type),
-               supplier_name = COALESCE($6, supplier_name),
-               quantity_in = $7,
-               current_stock = $8,
+               dress_type = COALESCE($3, dress_type),
+               wholesale_price = $4, selling_price = $5,
+               fabric_type = COALESCE($6, fabric_type),
+               supplier_name = COALESCE($7, supplier_name),
+               quantity_in = $8,
+               current_stock = $9,
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = $9`,
+           WHERE id = $10`,
           [
             mergedSizes,
             updateDressCode,
+            item.category || existing.dress_type, // Sync category to dress_type
             item.pricePerPiece,
             (parseFloat(item.pricePerPiece) * 2).toFixed(2),
             item.fabricType,
@@ -345,7 +361,7 @@ export async function PUT(
       FROM purchase_orders po
       LEFT JOIN purchase_order_items poi ON po.id = poi.purchase_order_id
       WHERE po.id = $1
-      GROUP BY po.id`,
+      GROUP BY po.id, po.transport_charges, po.transport_details`,
       [id]
     )
     
@@ -378,6 +394,14 @@ export async function PUT(
         gstType: updatedOrder.gst_type || 'percentage',
         gstPercentage: updatedOrder.gst_percentage != null ? parseFloat(updatedOrder.gst_percentage) : undefined,
         gstAmountRupees: updatedOrder.gst_amount_rupees != null ? parseFloat(updatedOrder.gst_amount_rupees) : undefined,
+        transportCharges: updatedOrder.transport_charges != null ? parseFloat(updatedOrder.transport_charges) : 0,
+        logisticsName: updatedOrder.transport_details?.logisticsName || '',
+        logisticsMobile: updatedOrder.transport_details?.logisticsMobile || '',
+        transportAddress: updatedOrder.transport_details?.transportAddress || '',
+        transportImage: updatedOrder.transport_details?.transportImage || '',
+        invoiceNumber: updatedOrder.transport_details?.invoiceNumber || '',
+        invoiceDate: updatedOrder.transport_details?.invoiceDate || '',
+        contactPersons: updatedOrder.transport_details?.contactPersons || [],
         notes: updatedOrder.notes || '',
         createdAt: updatedOrder.created_at.toISOString(),
       }

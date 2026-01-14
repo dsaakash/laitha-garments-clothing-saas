@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
+import ImageLightbox from '@/components/ImageLightbox'
 import { PurchaseOrder, PurchaseOrderItem, Supplier } from '@/lib/storage'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
@@ -11,7 +12,11 @@ export default function PurchasesPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [categories, setCategories] = useState<string[]>(['All'])
+  const [availableCategories, setAvailableCategories] = useState<Array<{id: string, name: string}>>([])
   const [showModal, setShowModal] = useState(false)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categoryModalItemIndex, setCategoryModalItemIndex] = useState<number | null>(null)
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null)
   const [filterSupplier, setFilterSupplier] = useState('')
   const [filterCategory, setFilterCategory] = useState('All')
@@ -28,7 +33,18 @@ export default function PurchasesPage() {
     gstType: 'percentage' as 'percentage' | 'rupees',
     gstPercentage: 0,
     gstAmountRupees: 0,
+    // Transport Details
+    logisticsName: '',
+    logisticsMobile: '',
+    transportAddress: '',
+    transportImage: '',
+    invoiceNumber: '',
+    invoiceDate: '',
+    transportCharges: 0,
   })
+  const [contactPersons, setContactPersons] = useState<Array<{name: string, mobile: string}>>([])
+  const [uploadingTransportImage, setUploadingTransportImage] = useState(false)
+  const transportImageFileInputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<PurchaseOrderItem[]>([
     {
       productName: '',
@@ -47,6 +63,9 @@ export default function PurchasesPage() {
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [uploadingInvoice, setUploadingInvoice] = useState(false)
   const invoiceFileInputRef = useRef<HTMLInputElement>(null)
+  const [showImageLightbox, setShowImageLightbox] = useState(false)
+  const [lightboxImages, setLightboxImages] = useState<string[]>([])
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   useEffect(() => {
     loadData()
@@ -80,9 +99,10 @@ export default function PurchasesPage() {
 
   const loadData = async () => {
     try {
-      const [suppliersRes, ordersRes] = await Promise.all([
+      const [suppliersRes, ordersRes, categoriesRes] = await Promise.all([
         fetch('/api/suppliers'),
-        fetch('/api/purchases')
+        fetch('/api/purchases'),
+        fetch('/api/categories')
       ])
       
       const suppliersResult = await suppliersRes.json()
@@ -94,6 +114,11 @@ export default function PurchasesPage() {
       if (ordersResult.success) {
         setCategories(ordersResult.categories || ['All'])
         await loadOrders()
+      }
+
+      const categoriesResult = await categoriesRes.json()
+      if (categoriesResult.success) {
+        setAvailableCategories(categoriesResult.data)
       }
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -248,6 +273,59 @@ export default function PurchasesPage() {
     }
   }
 
+  const handleTransportImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB')
+      return
+    }
+
+    setUploadingTransportImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setFormData(prev => ({ ...prev, transportImage: data.url }))
+      } else {
+        alert(data.message || 'Failed to upload transport image')
+      }
+    } catch (error) {
+      alert('Failed to upload transport image. Please try again.')
+    } finally {
+      setUploadingTransportImage(false)
+    }
+  }
+
+  const addContactPerson = () => {
+    setContactPersons(prev => [...prev, { name: '', mobile: '' }])
+  }
+
+  const removeContactPerson = (index: number) => {
+    setContactPersons(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const updateContactPerson = (index: number, field: 'name' | 'mobile', value: string) => {
+    setContactPersons(prev => {
+      const newPersons = [...prev]
+      newPersons[index] = { ...newPersons[index], [field]: value }
+      return newPersons
+    })
+  }
+
   const addItem = () => {
     setItems(prev => [...prev, {
       productName: '',
@@ -347,6 +425,17 @@ export default function PurchasesPage() {
         gstPercentage: totals.gstPercentage || undefined,
         gstAmountRupees: totals.gstAmountRupees || undefined,
         notes: formData.notes || undefined,
+        // Transport Details
+        logisticsName: formData.logisticsName || undefined,
+        logisticsMobile: formData.logisticsMobile || undefined,
+        transportAddress: formData.transportAddress || undefined,
+        transportImage: formData.transportImage || undefined,
+        invoiceNumber: formData.invoiceNumber || undefined,
+        invoiceDate: formData.invoiceDate || undefined,
+        transportCharges: formData.transportCharges || undefined,
+        contactPersons: contactPersons.filter(cp => cp.name.trim() || cp.mobile.trim()).length > 0 
+          ? contactPersons.filter(cp => cp.name.trim() || cp.mobile.trim())
+          : undefined,
       }
 
       let response
@@ -391,9 +480,17 @@ export default function PurchasesPage() {
       invoiceImage: order.invoiceImage || '',
       notes: order.notes || '',
       gstType: order.gstType || 'percentage',
-      gstPercentage: order.gstPercentage || 0,
-      gstAmountRupees: order.gstAmountRupees || 0,
+      gstPercentage: order.gstPercentage !== undefined && order.gstPercentage !== null ? order.gstPercentage : 0,
+      gstAmountRupees: order.gstAmountRupees !== undefined && order.gstAmountRupees !== null ? order.gstAmountRupees : 0,
+      logisticsName: (order as any).logisticsName || '',
+      logisticsMobile: (order as any).logisticsMobile || '',
+      transportAddress: (order as any).transportAddress || '',
+      transportImage: (order as any).transportImage || '',
+      invoiceNumber: (order as any).invoiceNumber || '',
+      invoiceDate: (order as any).invoiceDate || '',
+      transportCharges: (order as any).transportCharges || 0,
     })
+    setContactPersons((order as any).contactPersons || [])
     
     // Convert order to items format
     if (order.items && order.items.length > 0) {
@@ -459,6 +556,13 @@ export default function PurchasesPage() {
       gstType: 'percentage',
       gstPercentage: 0,
       gstAmountRupees: 0,
+      logisticsName: '',
+      logisticsMobile: '',
+      transportAddress: '',
+      transportImage: '',
+      invoiceNumber: '',
+      invoiceDate: '',
+      transportCharges: 0,
     })
     setItems([{
       productName: '',
@@ -470,6 +574,7 @@ export default function PurchasesPage() {
       totalAmount: 0,
       productImages: [],
     }])
+    setContactPersons([])
     setEditingOrder(null)
   }
 
@@ -504,9 +609,10 @@ export default function PurchasesPage() {
       }
     }
     
-    const grandTotal = subtotal + gstAmount
+    const transportCharges = formData.transportCharges || 0
+    const grandTotal = subtotal + gstAmount + transportCharges
     
-    return { subtotal, gstAmount, grandTotal, gstPercentage, gstAmountRupees, gstType }
+    return { subtotal, gstAmount, grandTotal, gstPercentage, gstAmountRupees, gstType, transportCharges }
   }
 
   const currentYear = new Date().getFullYear()
@@ -514,8 +620,65 @@ export default function PurchasesPage() {
   const totals = calculateTotals()
   const totalAmount = orders.reduce((sum, order) => sum + (order.grandTotal || order.totalAmount || 0), 0)
 
-  // Get available categories from inventory
-  const availableCategories = ['Custom', 'Kurtis', 'Dresses', 'Sarees', 'Tops', 'Bottoms']
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      alert('Please enter a category name')
+      return
+    }
+    
+    // Check if category already exists (case-insensitive)
+    const existingCat = availableCategories.find(cat => 
+      cat.name.toLowerCase() === newCategoryName.trim().toLowerCase()
+    )
+    
+    if (existingCat) {
+      alert(`Category "${existingCat.name}" already exists`)
+      // Auto-select the existing category for the item that opened the modal
+      if (categoryModalItemIndex !== null) {
+        const newItems = [...items]
+        newItems[categoryModalItemIndex].category = existingCat.name
+        setItems(newItems)
+      }
+      setNewCategoryName('')
+      setCategoryModalItemIndex(null)
+      setShowCategoryModal(false)
+      return
+    }
+    
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName.trim(), description: '' }),
+      })
+      const result = await response.json()
+      if (!result.success) {
+        alert(result.message || 'Failed to create category')
+        return
+      }
+      
+      // Refresh categories list
+      const categoriesRes = await fetch('/api/categories')
+      const categoriesResult = await categoriesRes.json()
+      if (categoriesResult.success) {
+        setAvailableCategories(categoriesResult.data)
+      }
+      
+      // Auto-select the newly created category for the item that opened the modal
+      if (categoryModalItemIndex !== null) {
+        const newItems = [...items]
+        newItems[categoryModalItemIndex].category = newCategoryName.trim()
+        setItems(newItems)
+      }
+      
+      setNewCategoryName('')
+      setCategoryModalItemIndex(null)
+      setShowCategoryModal(false)
+    } catch (error) {
+      console.error('Failed to create category:', error)
+      alert('Failed to create category')
+    }
+  }
 
   const exportToExcel = () => {
     try {
@@ -804,27 +967,58 @@ export default function PurchasesPage() {
                   </div>
                 </div>
                 
-                {order.items && order.items.length > 0 && order.items[0].productImages && order.items[0].productImages.length > 0 ? (
-                  <div className="relative w-full h-48 mb-4">
-                    <Image
-                      src={order.items[0].productImages[0]}
-                      alt={order.items[0].productName}
-                      fill
-                      className="object-cover rounded-lg"
-                      sizes="(max-width: 768px) 100vw, 33vw"
-                    />
-                  </div>
-                ) : order.productImage ? (
-                  <div className="relative w-full h-48 mb-4">
-                    <Image
-                      src={order.productImage}
-                      alt={order.productName || 'Product'}
-                      fill
-                      className="object-cover rounded-lg"
-                      sizes="(max-width: 768px) 100vw, 33vw"
-                    />
-                  </div>
-                ) : null}
+                {(() => {
+                  let images: string[] = []
+                  if (order.items && order.items.length > 0 && order.items[0].productImages && order.items[0].productImages.length > 0) {
+                    images = order.items[0].productImages
+                  } else if (order.productImage) {
+                    images = [order.productImage]
+                  }
+                  
+                  if (images.length === 0) return null
+                  
+                  return (
+                    <div className="mb-4">
+                      <div className="flex gap-2 flex-wrap">
+                        {images.slice(0, 3).map((img, idx) => (
+                          <div 
+                            key={idx} 
+                            className="relative w-full h-32 sm:h-40 flex-1 min-w-[100px] cursor-pointer hover:opacity-80 transition-opacity rounded-lg border border-gray-200 overflow-hidden"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setLightboxImages(images)
+                              setLightboxIndex(idx)
+                              setShowImageLightbox(true)
+                            }}
+                            title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
+                          >
+                            <Image
+                              src={img}
+                              alt={`Product Image ${idx + 1}`}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 50vw, 33vw"
+                            />
+                          </div>
+                        ))}
+                        {images.length > 3 && (
+                          <div 
+                            className="relative w-full h-32 sm:h-40 flex-1 min-w-[100px] cursor-pointer hover:opacity-80 transition-opacity rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center text-sm text-gray-600"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setLightboxImages(images)
+                              setLightboxIndex(0)
+                              setShowImageLightbox(true)
+                            }}
+                            title={`+${images.length - 3} more images - Click to view all`}
+                          >
+                            +{images.length - 3} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -954,16 +1148,44 @@ export default function PurchasesPage() {
 
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                          <select
-                            value={item.category}
-                            onChange={(e) => updateItem(index, 'category', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          >
-                            <option value="">Select Category</option>
-                            {availableCategories.map(cat => (
-                              <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                          </select>
+                          <div className="flex gap-2">
+                            <select
+                              value={item.category}
+                              onChange={(e) => updateItem(index, 'category', e.target.value)}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            >
+                              <option value="">Select a category...</option>
+                              {availableCategories.map(cat => (
+                                <option key={cat.id} value={cat.name}>
+                                  {cat.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewCategoryName('')
+                                setCategoryModalItemIndex(index)
+                                setShowCategoryModal(true)
+                              }}
+                              className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center min-w-[44px]"
+                              title="Add new category"
+                            >
+                              <span className="text-xl font-bold">+</span>
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <p className="text-xs text-gray-500">
+                              Select from dropdown or click + to add new
+                            </p>
+                            <a 
+                              href="/admin/categories" 
+                              target="_blank" 
+                              className="text-xs text-purple-600 hover:underline"
+                            >
+                              Manage categories
+                            </a>
+                          </div>
                         </div>
 
                         <div>
@@ -1027,25 +1249,41 @@ export default function PurchasesPage() {
                             <p className="text-sm text-gray-500 mt-1">Uploading...</p>
                           )}
                           {item.productImages && item.productImages.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {item.productImages.map((img, imgIndex) => (
-                                <div key={imgIndex} className="relative w-20 h-20">
-                                  <Image
-                                    src={img}
-                                    alt={`Product ${index + 1} - Image ${imgIndex + 1}`}
-                                    fill
-                                    className="object-cover rounded border"
-                                    sizes="80px"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeImage(index, imgIndex)}
-                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs z-10"
+                            <div className="mt-2">
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {item.productImages.map((img, imgIndex) => (
+                                  <div 
+                                    key={imgIndex} 
+                                    className="relative w-20 h-20 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden group"
+                                    onClick={() => {
+                                      setLightboxImages(item.productImages || [])
+                                      setLightboxIndex(imgIndex)
+                                      setShowImageLightbox(true)
+                                    }}
+                                    title="Click to view full size"
                                   >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
+                                    <Image
+                                      src={img}
+                                      alt={`Product ${index + 1} - Image ${imgIndex + 1}`}
+                                      fill
+                                      className="object-cover"
+                                      sizes="80px"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        removeImage(index, imgIndex)
+                                      }}
+                                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      title="Remove image"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              <p className="text-xs text-gray-500">Click any image to view full size</p>
                             </div>
                           )}
                         </div>
@@ -1104,8 +1342,10 @@ export default function PurchasesPage() {
                               min="0"
                               max="100"
                               step="0.01"
-                              value={formData.gstPercentage || selectedSupplier?.gstPercentage || ''}
-                              onChange={(e) => setFormData({ ...formData, gstPercentage: parseFloat(e.target.value) || 0 })}
+                              value={editingOrder 
+                                ? (formData.gstPercentage !== undefined && formData.gstPercentage !== null ? formData.gstPercentage : '')
+                                : (formData.gstPercentage || selectedSupplier?.gstPercentage || '')}
+                              onChange={(e) => setFormData({ ...formData, gstPercentage: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })}
                               placeholder={selectedSupplier?.gstPercentage ? `${selectedSupplier.gstPercentage}` : 'Enter GST %'}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                             />
@@ -1120,8 +1360,10 @@ export default function PurchasesPage() {
                               type="number"
                               min="0"
                               step="0.01"
-                              value={formData.gstAmountRupees || selectedSupplier?.gstAmountRupees || ''}
-                              onChange={(e) => setFormData({ ...formData, gstAmountRupees: parseFloat(e.target.value) || 0 })}
+                              value={editingOrder 
+                                ? (formData.gstAmountRupees !== undefined && formData.gstAmountRupees !== null ? formData.gstAmountRupees : '')
+                                : (formData.gstAmountRupees || selectedSupplier?.gstAmountRupees || '')}
+                              onChange={(e) => setFormData({ ...formData, gstAmountRupees: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })}
                               placeholder={selectedSupplier?.gstAmountRupees ? `${selectedSupplier.gstAmountRupees}` : 'Enter GST amount'}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                             />
@@ -1131,6 +1373,188 @@ export default function PurchasesPage() {
                       </div>
                     )
                   })()}
+                </div>
+
+                {/* Transport Details Section */}
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-bold mb-4">Transport Details</h3>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Logistics Name</label>
+                        <input
+                          type="text"
+                          value={formData.logisticsName}
+                          onChange={(e) => setFormData({ ...formData, logisticsName: e.target.value })}
+                          placeholder="Enter logistics name"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+                        <input
+                          type="tel"
+                          value={formData.logisticsMobile}
+                          onChange={(e) => setFormData({ ...formData, logisticsMobile: e.target.value })}
+                          placeholder="Enter mobile number"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Transport Address</label>
+                      <textarea
+                        rows={3}
+                        value={formData.transportAddress}
+                        onChange={(e) => setFormData({ ...formData, transportAddress: e.target.value })}
+                        placeholder="Enter transport address"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Upload Image (optional)</label>
+                      <input
+                        ref={transportImageFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleTransportImageUpload}
+                        disabled={uploadingTransportImage}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
+                      />
+                      {uploadingTransportImage && (
+                        <p className="text-sm text-gray-500 mt-1">Uploading...</p>
+                      )}
+                      {formData.transportImage && (
+                        <div className="mt-2">
+                          <div className="relative inline-block max-w-xs">
+                            <div 
+                              className="relative w-full h-32 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden group"
+                              onClick={() => {
+                                setLightboxImages([formData.transportImage])
+                                setLightboxIndex(0)
+                                setShowImageLightbox(true)
+                              }}
+                              title="Click to view full size"
+                            >
+                              <Image
+                                src={formData.transportImage}
+                                alt="Transport Image"
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 100vw, 384px"
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setFormData(prev => ({ ...prev, transportImage: '' }))
+                                  if (transportImageFileInputRef.current) {
+                                    transportImageFileInputRef.current.value = ''
+                                  }
+                                }}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-sm flex items-center justify-center hover:bg-red-600 transition-colors z-10 opacity-0 group-hover:opacity-100"
+                                title="Remove Image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">Click image to view full size</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+                        <input
+                          type="text"
+                          value={formData.invoiceNumber}
+                          onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+                          placeholder="Enter invoice number"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Date</label>
+                        <input
+                          type="date"
+                          value={formData.invoiceDate}
+                          onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Transport Charges (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.transportCharges || ''}
+                        onChange={(e) => setFormData({ ...formData, transportCharges: parseFloat(e.target.value) || 0 })}
+                        placeholder="Enter transport charges"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    {/* Contact Persons */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-medium text-gray-700">Contact Persons</label>
+                        <button
+                          type="button"
+                          onClick={addContactPerson}
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm flex items-center gap-1"
+                        >
+                          <span>+</span>
+                          <span>Add Contact Person</span>
+                        </button>
+                      </div>
+                      {contactPersons.length === 0 && (
+                        <p className="text-xs text-gray-500 mb-2">No contact persons added. Click "Add Contact Person" to add one.</p>
+                      )}
+                      {contactPersons.map((person, index) => (
+                        <div key={index} className="border rounded-lg p-3 mb-2 bg-gray-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-medium text-gray-700">Contact Person {index + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeContactPerson(index)}
+                              className="text-red-600 hover:text-red-700 text-sm"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Contact Person Name</label>
+                              <input
+                                type="text"
+                                value={person.name}
+                                onChange={(e) => updateContactPerson(index, 'name', e.target.value)}
+                                placeholder="Enter name"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Mobile Number</label>
+                              <input
+                                type="tel"
+                                value={person.mobile}
+                                onChange={(e) => updateContactPerson(index, 'mobile', e.target.value)}
+                                placeholder="Enter mobile number"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Invoice Image */}
@@ -1150,30 +1574,40 @@ export default function PurchasesPage() {
                   {formData.invoiceImage && (
                     <div className="mt-2">
                       <div className="relative inline-block max-w-xs">
-                        <div className="relative w-full h-32">
+                        <div 
+                          className="relative w-full h-32 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden group"
+                          onClick={() => {
+                            setLightboxImages([formData.invoiceImage])
+                            setLightboxIndex(0)
+                            setShowImageLightbox(true)
+                          }}
+                          title="Click to view full size"
+                        >
                           <Image
                             src={formData.invoiceImage}
                             alt="Invoice"
                             fill
-                            className="object-cover rounded border"
+                            className="object-cover"
                             sizes="(max-width: 768px) 100vw, 384px"
                           />
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               setFormData(prev => ({ ...prev, invoiceImage: '' }))
                               // Reset the file input
                               if (invoiceFileInputRef.current) {
                                 invoiceFileInputRef.current.value = ''
                               }
                             }}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-sm flex items-center justify-center hover:bg-red-600 transition-colors z-10"
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-sm flex items-center justify-center hover:bg-red-600 transition-colors z-10 opacity-0 group-hover:opacity-100"
                             title="Remove Invoice"
                           >
                             ×
                           </button>
                         </div>
                       </div>
+                      <p className="text-xs text-gray-500 mt-1">Click image to view full size</p>
                     </div>
                   )}
                 </div>
@@ -1191,6 +1625,12 @@ export default function PurchasesPage() {
                           GST {totals.gstType === 'percentage' ? `(${totals.gstPercentage}%)` : '(Fixed)'}:
                         </span>
                         <span className="text-lg font-bold text-gray-900">₹{totals.gstAmount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {totals.transportCharges > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-700">Transport Charges:</span>
+                        <span className="text-lg font-bold text-gray-900">₹{totals.transportCharges.toLocaleString()}</span>
                       </div>
                     )}
                     <div className="flex justify-between pt-2 border-t border-purple-300">
@@ -1300,18 +1740,30 @@ export default function PurchasesPage() {
                           <span className="text-sm text-gray-500">{item.category}</span>
                         </div>
                         {item.productImages && item.productImages.length > 0 && (
-                          <div className="flex gap-2 mb-2">
-                            {item.productImages.map((img, imgIndex) => (
-                              <div key={imgIndex} className="relative w-24 h-24">
-                                <Image
-                                  src={img}
-                                  alt={`${item.productName} - Image ${imgIndex + 1}`}
-                                  fill
-                                  className="object-cover rounded border"
-                                  sizes="96px"
-                                />
-                              </div>
-                            ))}
+                          <div className="mb-2">
+                            <div className="flex gap-2 flex-wrap mb-2">
+                              {item.productImages.map((img, imgIndex) => (
+                                <div 
+                                  key={imgIndex} 
+                                  className="relative w-24 h-24 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden"
+                                  onClick={() => {
+                                    setLightboxImages(item.productImages || [])
+                                    setLightboxIndex(imgIndex)
+                                    setShowImageLightbox(true)
+                                  }}
+                                  title="Click to view full size"
+                                >
+                                  <Image
+                                    src={img}
+                                    alt={`${item.productName} - Image ${imgIndex + 1}`}
+                                    fill
+                                    className="object-cover"
+                                    sizes="96px"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500">Click any image to view full size</p>
                           </div>
                         )}
                         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1343,12 +1795,20 @@ export default function PurchasesPage() {
                   <div className="border rounded-lg p-4">
                     <h4 className="font-bold text-gray-900">{selectedOrder.productName || 'Product'}</h4>
                     {selectedOrder.productImage && (
-                      <div className="relative w-full h-64 my-4">
+                      <div 
+                        className="relative w-full h-64 my-4 cursor-pointer hover:opacity-80 transition-opacity rounded-lg border-2 border-gray-200 overflow-hidden"
+                        onClick={() => {
+                          setLightboxImages([selectedOrder.productImage!])
+                          setLightboxIndex(0)
+                          setShowImageLightbox(true)
+                        }}
+                        title="Click to view full size"
+                      >
                         <Image
                           src={selectedOrder.productImage}
                           alt={selectedOrder.productName || 'Product'}
                           fill
-                          className="object-cover rounded-lg"
+                          className="object-cover"
                           sizes="(max-width: 768px) 100vw, 50vw"
                         />
                       </div>
@@ -1370,14 +1830,124 @@ export default function PurchasesPage() {
                 {selectedOrder.invoiceImage && (
                   <div>
                     <label className="text-sm font-medium text-gray-500 mb-2 block">Invoice</label>
-                    <div className="relative w-full max-w-md aspect-auto">
+                    <div 
+                      className="relative w-full max-w-md aspect-auto cursor-pointer hover:opacity-80 transition-opacity rounded-lg border-2 border-gray-200 overflow-hidden"
+                      onClick={() => {
+                        setLightboxImages([selectedOrder.invoiceImage!])
+                        setLightboxIndex(0)
+                        setShowImageLightbox(true)
+                      }}
+                      title="Click to view full size"
+                    >
                       <Image
                         src={selectedOrder.invoiceImage}
                         alt="Invoice"
                         fill
-                        className="object-contain rounded-lg border"
+                        className="object-contain"
                         sizes="(max-width: 768px) 100vw, 50vw"
                       />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Click image to view full size</p>
+                  </div>
+                )}
+
+                {/* Transport Details */}
+                {((selectedOrder as any).logisticsName || (selectedOrder as any).logisticsMobile || (selectedOrder as any).transportAddress || (selectedOrder as any).transportImage || (selectedOrder as any).invoiceNumber || (selectedOrder as any).invoiceDate || (selectedOrder as any).transportCharges || ((selectedOrder as any).contactPersons && (selectedOrder as any).contactPersons.length > 0)) && (
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-bold mb-4">Transport Details</h3>
+                    <div className="space-y-4">
+                      {((selectedOrder as any).logisticsName || (selectedOrder as any).logisticsMobile || (selectedOrder as any).transportAddress) && (
+                        <div className="grid grid-cols-2 gap-4">
+                          {(selectedOrder as any).logisticsName && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Logistics Name</label>
+                              <p className="text-lg text-gray-900">{(selectedOrder as any).logisticsName}</p>
+                            </div>
+                          )}
+                          {(selectedOrder as any).logisticsMobile && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Mobile Number</label>
+                              <p className="text-lg text-gray-900">{(selectedOrder as any).logisticsMobile}</p>
+                            </div>
+                          )}
+                          {(selectedOrder as any).transportAddress && (
+                            <div className="col-span-2">
+                              <label className="text-sm font-medium text-gray-500">Transport Address</label>
+                              <p className="text-sm text-gray-900">{(selectedOrder as any).transportAddress}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {((selectedOrder as any).invoiceNumber || (selectedOrder as any).invoiceDate) && (
+                        <div className="grid grid-cols-2 gap-4">
+                          {(selectedOrder as any).invoiceNumber && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Invoice Number</label>
+                              <p className="text-lg text-gray-900">{(selectedOrder as any).invoiceNumber}</p>
+                            </div>
+                          )}
+                          {(selectedOrder as any).invoiceDate && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Invoice Date</label>
+                              <p className="text-lg text-gray-900">{format(new Date((selectedOrder as any).invoiceDate), 'dd MMM yyyy')}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {(selectedOrder as any).transportImage && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 mb-2 block">Transport Image</label>
+                          <div 
+                            className="relative w-full max-w-md aspect-auto cursor-pointer hover:opacity-80 transition-opacity rounded-lg border-2 border-gray-200 overflow-hidden"
+                            onClick={() => {
+                              setLightboxImages([(selectedOrder as any).transportImage])
+                              setLightboxIndex(0)
+                              setShowImageLightbox(true)
+                            }}
+                            title="Click to view full size"
+                          >
+                            <Image
+                              src={(selectedOrder as any).transportImage}
+                              alt="Transport Image"
+                              fill
+                              className="object-contain"
+                              sizes="(max-width: 768px) 100vw, 50vw"
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">Click image to view full size</p>
+                        </div>
+                      )}
+
+                      {(selectedOrder as any).transportCharges && (selectedOrder as any).transportCharges > 0 && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Transport Charges</label>
+                          <p className="text-lg font-bold text-gray-900">₹{(selectedOrder as any).transportCharges.toLocaleString()}</p>
+                        </div>
+                      )}
+
+                      {(selectedOrder as any).contactPersons && (selectedOrder as any).contactPersons.length > 0 && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 mb-2 block">Contact Persons</label>
+                          <div className="space-y-2">
+                            {(selectedOrder as any).contactPersons.map((person: {name: string, mobile: string}, index: number) => (
+                              <div key={index} className="border rounded-lg p-3 bg-gray-50">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="text-xs font-medium text-gray-500">Name</label>
+                                    <p className="text-sm text-gray-900">{person.name || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-medium text-gray-500">Mobile</label>
+                                    <p className="text-sm text-gray-900">{person.mobile || 'N/A'}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1393,16 +1963,35 @@ export default function PurchasesPage() {
                     </div>
                     {selectedOrder.gstAmount && selectedOrder.gstAmount > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-sm font-medium text-gray-700">GST:</span>
+                        <span className="text-sm font-medium text-gray-700">
+                          GST {selectedOrder.gstType === 'percentage' && selectedOrder.gstPercentage 
+                            ? `(${selectedOrder.gstPercentage}%)` 
+                            : selectedOrder.gstType === 'rupees' || (selectedOrder as any).gstAmountRupees
+                            ? '(Fixed)'
+                            : ''}:
+                        </span>
                         <span className="text-lg font-bold text-gray-900">
                           ₹{selectedOrder.gstAmount.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {(selectedOrder as any).transportCharges && (selectedOrder as any).transportCharges > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-700">Transport Charges:</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          ₹{(selectedOrder as any).transportCharges.toLocaleString()}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between pt-2 border-t border-purple-300">
                       <span className="text-xl font-bold text-gray-900">Grand Total:</span>
                       <span className="text-2xl font-bold text-purple-600">
-                        ₹{(selectedOrder.grandTotal || selectedOrder.totalAmount || 0).toLocaleString()}
+                        ₹{(() => {
+                          const subtotal = selectedOrder.subtotal || selectedOrder.totalAmount || 0
+                          const gst = selectedOrder.gstAmount || 0
+                          const transport = (selectedOrder as any).transportCharges || 0
+                          return (subtotal + gst + transport).toLocaleString()
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -1433,6 +2022,63 @@ export default function PurchasesPage() {
                     className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                   >
                     Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Image Lightbox */}
+        {showImageLightbox && (
+          <ImageLightbox
+            images={lightboxImages}
+            currentIndex={lightboxIndex}
+            onClose={() => setShowImageLightbox(false)}
+          />
+        )}
+
+        {/* Create Category Modal */}
+        {showCategoryModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+              <h2 className="text-2xl font-bold mb-6">Create New Category</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category Name *</label>
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="e.g., Kurtis, Dresses, Sarees"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleCreateCategory()
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewCategoryName('')
+                      setCategoryModalItemIndex(null)
+                      setShowCategoryModal(false)
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                  >
+                    Create Category
                   </button>
                 </div>
               </div>

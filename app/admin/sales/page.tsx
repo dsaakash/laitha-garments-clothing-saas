@@ -11,6 +11,7 @@ export default function SalesPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [showModal, setShowModal] = useState(false)
+  const [editingSale, setEditingSale] = useState<Sale | null>(null)
   const [useCustomer, setUseCustomer] = useState(false)
   const [filterMonth, setFilterMonth] = useState('')
   const [filterYear, setFilterYear] = useState('')
@@ -82,6 +83,7 @@ export default function SalesPage() {
       gstPercentage: 0,
       gstAmount: 0,
     })
+    setEditingSale(null)
     setUseCustomer(false)
     setCapturedImage(null)
     setShowCamera(false)
@@ -329,8 +331,11 @@ export default function SalesPage() {
       // Calculate final total
       const finalTotal = amountAfterDiscount + gstAmount
       
-      const response = await fetch('/api/sales', {
-        method: 'POST',
+      const url = editingSale ? `/api/sales/${editingSale.id}` : '/api/sales'
+      const method = editingSale ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: formData.date,
@@ -355,16 +360,67 @@ export default function SalesPage() {
       
       const result = await response.json()
       if (!result.success) {
-        alert('Failed to add sale')
+        alert(`Failed to ${editingSale ? 'update' : 'add'} sale`)
         return
       }
       
       resetForm()
       await loadSales()
       setShowModal(false)
+      setEditingSale(null)
     } catch (error) {
       console.error('Failed to save sale:', error)
       alert('Failed to save sale')
+    }
+  }
+
+  const handleEdit = (sale: Sale) => {
+    setEditingSale(sale)
+    setFormData({
+      date: sale.date,
+      partyName: sale.partyName,
+      customerId: sale.customerId || '',
+      billNumber: sale.billNumber,
+      paymentMode: sale.paymentMode,
+      upiTransactionId: sale.upiTransactionId || '',
+      saleImage: sale.saleImage || '',
+      items: sale.items.map(item => ({
+        inventoryId: item.inventoryId || '',
+        size: item.size,
+        quantity: item.quantity,
+        usePerMeter: item.usePerMeter || false,
+        meters: item.meters,
+      })),
+      discountType: sale.discountType || '',
+      discountPercentage: sale.discountPercentage || 0,
+      discountAmount: sale.discountAmount || 0,
+      gstType: sale.gstType || '',
+      gstPercentage: sale.gstPercentage || 0,
+      gstAmount: sale.gstAmount || 0,
+    })
+    setUseCustomer(!!sale.customerId)
+    setCapturedImage(sale.saleImage || null)
+    setShowModal(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this sale? This will restore inventory stock.')) {
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/sales/${id}`, {
+        method: 'DELETE',
+      })
+      const result = await response.json()
+      if (!result.success) {
+        alert('Failed to delete sale')
+        return
+      }
+      await loadSales()
+    } catch (error) {
+      console.error('Failed to delete sale:', error)
+      alert('Failed to delete sale')
     }
   }
 
@@ -474,9 +530,27 @@ export default function SalesPage() {
                         {format(new Date(sale.date), 'dd MMM yyyy')} • Bill: {sale.billNumber}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-green-600">₹{sale.totalAmount.toLocaleString()}</p>
-                      <p className="text-sm text-gray-500">Profit: ₹{totalProfit.toLocaleString()}</p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-green-600">₹{sale.totalAmount.toLocaleString()}</p>
+                        <p className="text-sm text-gray-500">Profit: ₹{totalProfit.toLocaleString()}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit(sale)}
+                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-all border border-blue-200"
+                          title="Edit Sale"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(sale.id)}
+                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-md text-sm font-medium transition-all border border-red-200"
+                          title="Delete Sale"
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                   
@@ -565,7 +639,9 @@ export default function SalesPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
                   </div>
-                  <h2 className="text-2xl font-bold text-white">Record New Sale</h2>
+                  <h2 className="text-2xl font-bold text-white">
+                    {editingSale ? 'Edit Sale' : 'Record New Sale'}
+                  </h2>
                 </div>
                 <button
                   type="button"
@@ -1286,7 +1362,7 @@ export default function SalesPage() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Record Sale
+                    {editingSale ? 'Update Sale' : 'Record Sale'}
                   </button>
                 </div>
               </form>

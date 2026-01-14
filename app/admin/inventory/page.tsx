@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
+import ImageLightbox from '@/components/ImageLightbox'
 import { InventoryItem } from '@/lib/storage'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
@@ -52,6 +53,9 @@ export default function InventoryPage() {
     quantity: string
     type: 'in' | 'out' | 'set'
   }[]>([])
+  const [showImageLightbox, setShowImageLightbox] = useState(false)
+  const [lightboxImages, setLightboxImages] = useState<string[]>([])
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   useEffect(() => {
     loadItems()
@@ -805,24 +809,57 @@ export default function InventoryPage() {
                                 }}
                               >
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                                  {(item.productImages && item.productImages.length > 0) || item.imageUrl ? (
-                                    <div className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity">
-                                      <Image 
-                                        src={item.productImages && item.productImages.length > 0 ? item.productImages[0] : item.imageUrl || ''} 
-                                        alt={item.dressName} 
-                                        fill
-                                        className="object-cover rounded"
-                                        sizes="(max-width: 640px) 48px, 64px"
-                                        onClick={() => {
-                                          setSelectedItem(item)
-                                          setShowDetailModal(true)
-                                        }}
-                                        title={item.productImages && item.productImages.length > 1 ? `${item.productImages.length} images` : ''}
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No Image</div>
-                                  )}
+                                  {(() => {
+                                    const images = item.productImages && item.productImages.length > 0 
+                                      ? item.productImages 
+                                      : (item.imageUrl ? [item.imageUrl] : [])
+                                    
+                                    if (images.length === 0) {
+                                      return (
+                                        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No Image</div>
+                                      )
+                                    }
+                                    
+                                    return (
+                                      <div className="flex gap-1 items-center">
+                                        {images.slice(0, 3).map((img, idx) => (
+                                          <div 
+                                            key={idx} 
+                                            className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setLightboxImages(images)
+                                              setLightboxIndex(idx)
+                                              setShowImageLightbox(true)
+                                            }}
+                                            title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
+                                          >
+                                            <Image 
+                                              src={img} 
+                                              alt={`${item.dressName} - Image ${idx + 1}`} 
+                                              fill
+                                              className="object-cover rounded"
+                                              sizes="(max-width: 640px) 48px, 64px"
+                                            />
+                                          </div>
+                                        ))}
+                                        {images.length > 3 && (
+                                          <div 
+                                            className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-600"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setLightboxImages(images)
+                                              setLightboxIndex(0)
+                                              setShowImageLightbox(true)
+                                            }}
+                                            title={`+${images.length - 3} more images - Click to view all`}
+                                          >
+                                            +{images.length - 3}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })()}
                                 </td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.dressName}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
@@ -947,24 +984,57 @@ export default function InventoryPage() {
                       }}
                     >
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        {(item.productImages && item.productImages.length > 0) || item.imageUrl ? (
-                          <div className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity">
-                            <Image 
-                              src={item.productImages && item.productImages.length > 0 ? item.productImages[0] : item.imageUrl || ''} 
-                              alt={item.dressName} 
-                              fill
-                              className="object-cover rounded"
-                              sizes="(max-width: 640px) 48px, 64px"
-                              onClick={() => {
-                                setSelectedItem(item)
-                                setShowDetailModal(true)
-                              }}
-                              title={item.productImages && item.productImages.length > 1 ? `${item.productImages.length} images` : ''}
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No Image</div>
-                        )}
+                        {(() => {
+                          const images = item.productImages && item.productImages.length > 0 
+                            ? item.productImages 
+                            : (item.imageUrl ? [item.imageUrl] : [])
+                          
+                          if (images.length === 0) {
+                            return (
+                              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No Image</div>
+                            )
+                          }
+                          
+                          return (
+                            <div className="flex gap-1 items-center">
+                              {images.slice(0, 3).map((img, idx) => (
+                                <div 
+                                  key={idx} 
+                                  className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setLightboxImages(images)
+                                    setLightboxIndex(idx)
+                                    setShowImageLightbox(true)
+                                  }}
+                                  title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
+                                >
+                                  <Image 
+                                    src={img} 
+                                    alt={`${item.dressName} - Image ${idx + 1}`} 
+                                    fill
+                                    className="object-cover rounded"
+                                    sizes="(max-width: 640px) 48px, 64px"
+                                  />
+                                </div>
+                              ))}
+                              {images.length > 3 && (
+                                <div 
+                                  className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setLightboxImages(images)
+                                    setLightboxIndex(0)
+                                    setShowImageLightbox(true)
+                                  }}
+                                  title={`+${images.length - 3} more images - Click to view all`}
+                                >
+                                  +{images.length - 3}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.dressName}</td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
@@ -1341,32 +1411,83 @@ export default function InventoryPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Images Section */}
                 <div>
-                  {(selectedItem.productImages && selectedItem.productImages.length > 0) || selectedItem.imageUrl ? (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {((selectedItem.productImages && selectedItem.productImages.length > 0) ? selectedItem.productImages : [selectedItem.imageUrl]).map((imageUrl, index) => (
-                          <div key={index} className="relative w-full h-96">
-                            <Image
-                              src={imageUrl || ''}
-                              alt={`${selectedItem.dressName} - Image ${index + 1}`}
-                              fill
-                              className="object-cover rounded-lg border-2 border-gray-200"
-                              sizes="(max-width: 640px) 100vw, 50vw"
-                            />
+                  {(() => {
+                    const images = (selectedItem.productImages && selectedItem.productImages.length > 0) 
+                      ? selectedItem.productImages 
+                      : (selectedItem.imageUrl ? [selectedItem.imageUrl] : [])
+                    
+                    if (images.length === 0) {
+                      return (
+                        <div className="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
+                          No Image Available
+                        </div>
+                      )
+                    }
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Main Large Image */}
+                        <div 
+                          className="relative w-full h-96 sm:h-[500px] cursor-pointer hover:opacity-90 transition-opacity rounded-lg border-2 border-gray-300 overflow-hidden bg-gray-100"
+                          onClick={() => {
+                            setLightboxImages(images)
+                            setLightboxIndex(0)
+                            setShowImageLightbox(true)
+                          }}
+                        >
+                          <Image
+                            src={images[0] || ''}
+                            alt={`${selectedItem.dressName} - Main Image`}
+                            fill
+                            className="object-contain"
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                            priority
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all flex items-center justify-center">
+                            <div className="opacity-0 hover:opacity-100 transition-opacity text-white bg-black bg-opacity-50 px-4 py-2 rounded-lg text-sm font-medium">
+                              Click to view full size {images.length > 1 && `(${images.length} images)`}
+                            </div>
                           </div>
-                        ))}
+                        </div>
+                        
+                        {/* Thumbnail Grid for Multiple Images */}
+                        {images.length > 1 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-gray-700">Additional Images ({images.length} total):</p>
+                            <div className="grid grid-cols-4 gap-2">
+                              {images.map((imageUrl, index) => (
+                                <div 
+                                  key={index} 
+                                  className="relative w-full h-24 sm:h-32 cursor-pointer hover:opacity-80 transition-opacity rounded-lg border-2 border-gray-200 overflow-hidden hover:border-purple-500"
+                                  onClick={() => {
+                                    setLightboxImages(images)
+                                    setLightboxIndex(index)
+                                    setShowImageLightbox(true)
+                                  }}
+                                >
+                                  <Image
+                                    src={imageUrl || ''}
+                                    alt={`${selectedItem.dressName} - Image ${index + 1}`}
+                                    fill
+                                    className="object-cover"
+                                    sizes="(max-width: 640px) 25vw, 12.5vw"
+                                  />
+                                  {index === 0 && (
+                                    <div className="absolute top-1 left-1 bg-purple-600 text-white text-xs px-1.5 py-0.5 rounded">
+                                      Main
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 text-center">
+                              Click any image to view full size with navigation
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      {selectedItem.productImages && selectedItem.productImages.length > 1 && (
-                        <p className="text-sm text-gray-500 text-center">
-                          {selectedItem.productImages.length} images
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
-                      No Image Available
-                    </div>
-                  )}
+                    )
+                  })()}
                 </div>
 
                 {/* Details Section */}
@@ -1705,6 +1826,15 @@ export default function InventoryPage() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* Image Lightbox */}
+        {showImageLightbox && (
+          <ImageLightbox
+            images={lightboxImages}
+            currentIndex={lightboxIndex}
+            onClose={() => setShowImageLightbox(false)}
+          />
         )}
       </div>
     </AdminLayout>

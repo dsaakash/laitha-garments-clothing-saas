@@ -6,8 +6,10 @@ import { Customer } from '@/lib/storage'
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -18,6 +20,19 @@ export default function CustomersPage() {
   useEffect(() => {
     loadCustomers()
   }, [])
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredCustomers(customers)
+    } else {
+      const query = searchQuery.toLowerCase().trim()
+      const filtered = customers.filter(customer => 
+        customer.name.toLowerCase().includes(query) ||
+        customer.phone.includes(query)
+      )
+      setFilteredCustomers(filtered)
+    }
+  }, [searchQuery, customers])
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -40,6 +55,7 @@ export default function CustomersPage() {
       const result = await response.json()
       if (result.success) {
         setCustomers(result.data)
+        setFilteredCustomers(result.data)
       }
     } catch (error) {
       console.error('Failed to load customers:', error)
@@ -139,6 +155,23 @@ export default function CustomersPage() {
           </button>
         </div>
 
+        {/* Search Bar */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Search Customers</label>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by party name or phone number..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <p className="text-sm text-gray-500 mt-2">
+              Found {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+
         {customers.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <p className="text-gray-500 text-lg mb-4">No customers yet. Add your first customer!</p>
@@ -147,6 +180,16 @@ export default function CustomersPage() {
               className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
             >
               Add Customer
+            </button>
+          </div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+            <p className="text-gray-500 text-lg mb-4">No customers found matching your search.</p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
+            >
+              Clear Search
             </button>
           </div>
         ) : (
@@ -162,7 +205,7 @@ export default function CustomersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {customers.map((customer) => (
+                {filteredCustomers.map((customer) => (
                   <tr key={customer.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{customer.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{customer.phone}</td>

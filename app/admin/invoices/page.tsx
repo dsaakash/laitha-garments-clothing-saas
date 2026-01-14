@@ -540,6 +540,41 @@ export default function InvoicesPage() {
                         >
                           💬 WhatsApp
                         </button>
+                        <button
+                          onClick={() => {
+                            window.location.href = `/admin/sales`
+                          }}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Edit Sale"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Are you sure you want to delete this sale? This will restore inventory stock.')) {
+                              return
+                            }
+                            try {
+                              const response = await fetch(`/api/sales/${sale.id}`, {
+                                method: 'DELETE',
+                              })
+                              const result = await response.json()
+                              if (!result.success) {
+                                alert('Failed to delete sale')
+                                return
+                              }
+                              // Reload the page to refresh the list
+                              window.location.reload()
+                            } catch (error) {
+                              console.error('Failed to delete sale:', error)
+                              alert('Failed to delete sale')
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete Sale"
+                        >
+                          🗑️ Delete
+                        </button>
                       </div>
                     </td>
                   </tr>

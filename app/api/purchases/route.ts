@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
         po.gst_percentage,
         po.gst_amount_rupees,
         po.notes,
+        po.transport_charges,
+        po.transport_details,
         po.created_at,
         po.product_name,
         po.product_image,
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest) {
     
     ordersQuery += ` GROUP BY po.id, po.date, po.supplier_id, po.supplier_name, po.custom_po_number, 
       po.invoice_image, po.subtotal, po.gst_amount, po.grand_total, po.gst_type, po.gst_percentage, po.gst_amount_rupees,
-      po.notes, po.created_at, po.product_name, po.product_image, po.sizes, po.fabric_type, po.quantity, po.price_per_piece, po.total_amount
+      po.notes, po.transport_charges, po.transport_details, po.created_at, po.product_name, po.product_image, po.sizes, po.fabric_type, po.quantity, po.price_per_piece, po.total_amount
       ORDER BY po.date DESC, po.created_at DESC`
     
     const result = await query(ordersQuery, params)
@@ -106,6 +108,20 @@ export async function GET(request: NextRequest) {
         }]
       }
       
+      // Parse transport details from JSONB (PostgreSQL returns JSONB as object, not string)
+      let transportDetails = {}
+      if (row.transport_details) {
+        if (typeof row.transport_details === 'string') {
+          try {
+            transportDetails = JSON.parse(row.transport_details)
+          } catch (e) {
+            transportDetails = {}
+          }
+        } else {
+          transportDetails = row.transport_details
+        }
+      }
+      
       return {
         id: row.id.toString(),
         date: row.date.toISOString().split('T')[0],
@@ -117,6 +133,17 @@ export async function GET(request: NextRequest) {
         subtotal: row.subtotal != null ? parseFloat(row.subtotal) : (row.total_amount ? parseFloat(row.total_amount) : 0),
         gstAmount: row.gst_amount != null ? parseFloat(row.gst_amount) : 0,
         grandTotal: row.grand_total != null ? parseFloat(row.grand_total) : (row.total_amount ? parseFloat(row.total_amount) : 0),
+        gstType: row.gst_type || 'percentage',
+        gstPercentage: row.gst_percentage != null ? parseFloat(row.gst_percentage) : undefined,
+        gstAmountRupees: row.gst_amount_rupees != null ? parseFloat(row.gst_amount_rupees) : undefined,
+        transportCharges: row.transport_charges != null ? parseFloat(row.transport_charges) : 0,
+        logisticsName: transportDetails.logisticsName || '',
+        logisticsMobile: transportDetails.logisticsMobile || '',
+        transportAddress: transportDetails.transportAddress || '',
+        transportImage: transportDetails.transportImage || '',
+        invoiceNumber: transportDetails.invoiceNumber || '',
+        invoiceDate: transportDetails.invoiceDate || '',
+        contactPersons: transportDetails.contactPersons || [],
         notes: row.notes || '',
         createdAt: row.created_at.toISOString(),
         // Legacy fields for backward compatibility
@@ -130,17 +157,25 @@ export async function GET(request: NextRequest) {
       }
     })
     
-    // Get unique categories for filter
-    const categoriesResult = await query(
+    // Get categories from categories table and merge with existing categories from orders/inventory
+    const categoriesTableResult = await query('SELECT name FROM categories ORDER BY name ASC')
+    const categoriesFromTable = categoriesTableResult.rows.map((r: any) => r.name)
+    
+    // Also get categories from existing purchase orders and inventory for backward compatibility
+    const existingCategoriesResult = await query(
       `SELECT DISTINCT category FROM purchase_order_items WHERE category IS NOT NULL UNION 
        SELECT DISTINCT dress_type FROM inventory WHERE dress_type IS NOT NULL`
     )
-    const categories = ['All', ...categoriesResult.rows.map((r: any) => r.category || r.dress_type).filter(Boolean)]
+    const existingCategories = existingCategoriesResult.rows.map((r: any) => r.category || r.dress_type).filter(Boolean)
+    
+    // Merge and deduplicate
+    const allCategories = Array.from(new Set([...categoriesFromTable, ...existingCategories]))
+    const categories = ['All', ...allCategories.sort()]
     
     return NextResponse.json({ 
       success: true, 
       data: orders,
-      categories: Array.from(new Set(categories))
+      categories: categories
     })
   } catch (error: any) {
     console.error('Purchase orders fetch error:', error)
@@ -191,16 +226,28 @@ export async function POST(request: NextRequest) {
     } else {
       gstAmount = (subtotal * gstPercentage) / 100
     }
-    const grandTotal = subtotal + gstAmount
+    const transportCharges = parseFloat(body.transportCharges) || 0
+    const grandTotal = subtotal + gstAmount + transportCharges
+    
+    // Prepare transport details JSONB
+    const transportDetails: any = {}
+    if (body.logisticsName) transportDetails.logisticsName = body.logisticsName
+    if (body.logisticsMobile) transportDetails.logisticsMobile = body.logisticsMobile
+    if (body.transportAddress) transportDetails.transportAddress = body.transportAddress
+    if (body.transportImage) transportDetails.transportImage = body.transportImage
+    if (body.invoiceNumber) transportDetails.invoiceNumber = body.invoiceNumber
+    if (body.invoiceDate) transportDetails.invoiceDate = body.invoiceDate
+    if (body.contactPersons && body.contactPersons.length > 0) transportDetails.contactPersons = body.contactPersons
     
     // Insert purchase order
     const result = await query(
       `INSERT INTO purchase_orders 
        (date, supplier_id, supplier_name, custom_po_number, invoice_image,
         subtotal, gst_amount, grand_total, gst_type, gst_percentage, gst_amount_rupees, notes,
+        transport_charges, transport_details,
         -- Legacy fields for backward compatibility
         product_name, product_image, sizes, fabric_type, quantity, price_per_piece, total_amount)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
        RETURNING *`,
       [
         body.date,
@@ -215,6 +262,8 @@ export async function POST(request: NextRequest) {
         gstPercentage || null,
         gstAmountRupees || null,
         body.notes || null,
+        transportCharges,
+        Object.keys(transportDetails).length > 0 ? JSON.stringify(transportDetails) : null,
         // Legacy fields - use first item or empty
         items.length > 0 ? items[0].productName : '',
         items.length > 0 && items[0].productImages?.length > 0 ? items[0].productImages[0] : null,
@@ -313,16 +362,18 @@ export async function POST(request: NextRequest) {
           `UPDATE inventory 
            SET sizes = $1, 
                dress_code = $2,
-               wholesale_price = $3, selling_price = $4,
-               fabric_type = COALESCE($5, fabric_type),
-               supplier_name = COALESCE($6, supplier_name),
-               quantity_in = $7,
-               current_stock = $8,
+               dress_type = COALESCE($3, dress_type),
+               wholesale_price = $4, selling_price = $5,
+               fabric_type = COALESCE($6, fabric_type),
+               supplier_name = COALESCE($7, supplier_name),
+               quantity_in = $8,
+               current_stock = $9,
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = $9`,
+           WHERE id = $10`,
           [
             mergedSizes,
             updateDressCode,
+            item.category || existing.dress_type, // Sync category to dress_type
             item.pricePerPiece,
             (parseFloat(item.pricePerPiece) * 2).toFixed(2),
             item.fabricType,
@@ -417,6 +468,14 @@ export async function POST(request: NextRequest) {
         gstType: newOrder.gst_type || 'percentage',
         gstPercentage: newOrder.gst_percentage != null ? parseFloat(newOrder.gst_percentage) : undefined,
         gstAmountRupees: newOrder.gst_amount_rupees != null ? parseFloat(newOrder.gst_amount_rupees) : undefined,
+        transportCharges: newOrder.transport_charges != null ? parseFloat(newOrder.transport_charges) : 0,
+        logisticsName: newOrder.transport_details?.logisticsName || '',
+        logisticsMobile: newOrder.transport_details?.logisticsMobile || '',
+        transportAddress: newOrder.transport_details?.transportAddress || '',
+        transportImage: newOrder.transport_details?.transportImage || '',
+        invoiceNumber: newOrder.transport_details?.invoiceNumber || '',
+        invoiceDate: newOrder.transport_details?.invoiceDate || '',
+        contactPersons: newOrder.transport_details?.contactPersons || [],
         notes: newOrder.notes || '',
         createdAt: newOrder.created_at.toISOString(),
       }
