@@ -25,6 +25,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [userRole, setUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [businessName, setBusinessName] = useState<string>('Lalitha Garments')
 
   useEffect(() => {
     checkAuth().then((auth) => {
@@ -76,6 +77,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             // Default to superadmin on error to ensure all menu items are visible
             setUserRole('superadmin')
           })
+        
+        // Fetch business profile for sidebar name
+        fetch('/api/business')
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data && data.data.businessName) {
+              setBusinessName(data.data.businessName)
+            }
+          })
+          .catch(err => {
+            console.error('Failed to fetch business profile:', err)
+            // Keep default 'Lalitha Garments' if fetch fails
+          })
       }
     })
   }, [router])
@@ -84,6 +98,100 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   useEffect(() => {
     setSidebarOpen(false)
   }, [pathname])
+
+  // Refresh business name when navigating to/from business setup page
+  useEffect(() => {
+    if (authenticated) {
+      fetch('/api/business')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data && data.data.businessName) {
+            setBusinessName(data.data.businessName)
+          }
+        })
+        .catch(err => {
+          console.error('Failed to refresh business profile:', err)
+        })
+    }
+  }, [pathname, authenticated])
+
+  // Listen for business profile updates in real-time
+  useEffect(() => {
+    let lastCheckedTimestamp = 0
+
+    const handleBusinessProfileUpdate = (event: CustomEvent) => {
+      // Update business name immediately if provided in event
+      if (event.detail?.businessName) {
+        setBusinessName(event.detail.businessName)
+        lastCheckedTimestamp = Date.now()
+      } else {
+        // Otherwise, fetch the latest from API
+        fetch('/api/business')
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data && data.data.businessName) {
+              setBusinessName(data.data.businessName)
+              lastCheckedTimestamp = Date.now()
+            }
+          })
+          .catch(err => {
+            console.error('Failed to refresh business profile:', err)
+          })
+      }
+    }
+
+    // Check localStorage for updates (backup mechanism)
+    const checkForUpdates = () => {
+      if (typeof window !== 'undefined') {
+        const lastUpdated = localStorage.getItem('businessProfileLastUpdated')
+        if (lastUpdated) {
+          const lastUpdatedTime = parseInt(lastUpdated, 10)
+          // Only check if this is a new update (not the one we already processed)
+          if (lastUpdatedTime > lastCheckedTimestamp) {
+            fetch('/api/business')
+              .then(res => res.json())
+              .then(data => {
+                if (data.success && data.data && data.data.businessName) {
+                  setBusinessName(data.data.businessName)
+                  lastCheckedTimestamp = Date.now()
+                }
+              })
+              .catch(err => {
+                console.error('Failed to refresh business profile:', err)
+              })
+          }
+        }
+      }
+    }
+
+    // Add event listener for immediate updates
+    window.addEventListener('businessProfileUpdated', handleBusinessProfileUpdate as EventListener)
+    
+    // Check for updates on window focus (in case user switches tabs or windows)
+    window.addEventListener('focus', checkForUpdates)
+    
+    // Periodic check every 3 seconds (as backup, only if there's a recent update)
+    const intervalId = setInterval(() => {
+      if (typeof window !== 'undefined') {
+        const lastUpdated = localStorage.getItem('businessProfileLastUpdated')
+        if (lastUpdated) {
+          const lastUpdatedTime = parseInt(lastUpdated, 10)
+          const now = Date.now()
+          // Only check if updated within last 10 seconds
+          if (now - lastUpdatedTime < 10000 && lastUpdatedTime > lastCheckedTimestamp) {
+            checkForUpdates()
+          }
+        }
+      }
+    }, 3000)
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('businessProfileUpdated', handleBusinessProfileUpdate as EventListener)
+      window.removeEventListener('focus', checkForUpdates)
+      clearInterval(intervalId)
+    }
+  }, [])
 
   // Persist sidebar collapsed state
   useEffect(() => {
@@ -167,7 +275,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <div className="flex items-start justify-between gap-2">
               {!sidebarCollapsed && (
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl font-bold tracking-tight">Lalitha Garments</h1>
+                  <h1 className="text-2xl font-bold tracking-tight">{businessName}</h1>
                   <p className="text-purple-200 text-sm mt-1 font-medium">
                     {userRole === 'user' ? 'User Portal' : 'Admin Portal'}
                   </p>
@@ -185,7 +293,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               )}
               {sidebarCollapsed && (
                 <div className="flex-1 flex justify-center">
-                  <h1 className="text-xl font-bold">LG</h1>
+                  <h1 className="text-xl font-bold">
+                    {businessName.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)}
+                  </h1>
                 </div>
               )}
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -292,7 +402,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-lg font-bold text-gray-900">Lalitha Garments</h1>
+          <h1 className="text-lg font-bold text-gray-900">{businessName}</h1>
           <div className="w-10"></div> {/* Spacer for centering */}
         </div>
 

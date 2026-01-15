@@ -117,29 +117,177 @@ export default function InvoicesPage() {
     return customers.find(c => c.id === sale.customerId) || null
   }
 
-  const generatePDF = (sale: Sale, returnBlob: boolean = false): Blob | void => {
-    if (!businessProfile) {
-      alert('Please set up your business profile first!')
-      return
-    }
-
+  // View PDF in new tab
+  const viewPDF = async (sale: Sale) => {
     try {
+      // API will always fetch the latest business profile from database
+      // Pass it if available for faster response, but API will use database version
+      const response = await fetch('/api/invoice/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sale,
+          businessProfile: businessProfile || undefined, // Optional - API will fetch latest from database
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF')
+      }
+
+      // Convert response to blob and create object URL
+      const pdfBlob = await response.blob()
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      
+      // Open PDF in new tab for viewing
+      window.open(pdfUrl, '_blank')
+      
+      // Clean up the object URL after a delay (browser will handle it when tab closes)
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 100)
+    } catch (error) {
+      console.error('PDF viewing error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Error viewing PDF: ${errorMessage}`)
+    }
+  }
+
+  // Print PDF
+  const printPDF = async (sale: Sale) => {
+    try {
+      // API will always fetch the latest business profile from database
+      // Pass it if available for faster response, but API will use database version
+      const response = await fetch('/api/invoice/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sale,
+          businessProfile: businessProfile || undefined, // Optional - API will fetch latest from database
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF')
+      }
+
+      // Convert response to blob and create object URL
+      const pdfBlob = await response.blob()
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      
+      // Open PDF in new window and trigger print
+      const printWindow = window.open(pdfUrl, '_blank')
+      
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print()
+            // Clean up after printing
+            setTimeout(() => {
+              URL.revokeObjectURL(pdfUrl)
+            }, 1000)
+          }, 500)
+        }
+      } else {
+        // Fallback: if popup blocked, open in new tab
+        window.open(pdfUrl, '_blank')
+        alert('Please use the browser print button (Ctrl+P / Cmd+P) to print the PDF')
+      }
+    } catch (error) {
+      console.error('PDF printing error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Error printing PDF: ${errorMessage}`)
+    }
+  }
+
+  // Download PDF
+  const downloadPDF = async (sale: Sale) => {
+    try {
+      // API will always fetch the latest business profile from database
+      // Pass it if available for faster response, but API will use database version
+      const response = await fetch('/api/invoice/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sale,
+          businessProfile: businessProfile || undefined, // Optional - API will fetch latest from database
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF')
+      }
+
+      // Convert response to blob
+      const pdfBlob = await response.blob()
+      const fileName = `Invoice_${sale.billNumber}_${format(new Date(sale.date), 'yyyyMMdd')}.pdf`
+      
+      // Create download link
+      const url = URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(url), 100)
+    } catch (error) {
+      console.error('PDF download error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Error downloading PDF: ${errorMessage}`)
+    }
+  }
+
+  const generatePDF = (sale: Sale, returnBlob: boolean = false): Blob | void => {
+    try {
+      // Use business profile if available, otherwise use defaults
+      // Note: For server-side PDF generation, the API always fetches the latest from database
+      const profile = businessProfile || {
+        businessName: 'Business Name',
+        ownerName: '',
+        email: '',
+        phone: '',
+        address: '',
+        gstNumber: '',
+        whatsappNumber: '',
+      }
+
       const doc = new jsPDF()
       
       // Header
       doc.setFontSize(20)
       doc.setFont('helvetica', 'bold')
-      doc.text(businessProfile.businessName, 14, 20)
+      doc.text(profile.businessName || 'Business Name', 14, 20)
       
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       let yPos = 28
-      doc.text(businessProfile.address, 14, yPos)
-      yPos += 6
-      doc.text(`Phone: ${businessProfile.phone} | Email: ${businessProfile.email}`, 14, yPos)
-      if (businessProfile.gstNumber) {
+      
+      // Only show address if provided
+      if (profile.address) {
+        doc.text(profile.address, 14, yPos)
         yPos += 6
-        doc.text(`GST: ${businessProfile.gstNumber}`, 14, yPos)
+      }
+      
+      // Only show contact info if provided
+      const contactInfo = []
+      if (profile.phone) contactInfo.push(`Phone: ${profile.phone}`)
+      if (profile.email) contactInfo.push(`Email: ${profile.email}`)
+      if (contactInfo.length > 0) {
+        doc.text(contactInfo.join(' | '), 14, yPos)
+        yPos += 6
+      }
+      
+      // Only show GST if provided
+      if (profile.gstNumber) {
+        doc.text(`GST: ${profile.gstNumber}`, 14, yPos)
+        yPos += 6
       }
 
       // Invoice Details
@@ -167,55 +315,199 @@ export default function InvoicesPage() {
         }
       }
 
-      // Table data
-      const tableData = sale.items.map(item => [
-        item.dressName,
-        item.dressType,
-        item.dressCode,
-        item.size,
-        item.quantity.toString(),
-        `₹${item.sellingPrice}`,
-        `₹${(item.sellingPrice * item.quantity).toLocaleString()}`,
-      ])
+      // Helper function to calculate text width and wrap accordingly - optimized for codes and readability
+      const wrapTextForCell = (text: string, maxChars: number): string => {
+        if (!text) return ''
+        if (text.length <= maxChars) return text
+        
+        // For codes, prefer breaking at underscores, dashes, slashes, parentheses
+        // For regular text, prefer breaking at spaces
+        const breakPoints = ['_', '-', '/', '(', ')', ' ', '.']
+        let result = ''
+        let remaining = text
+        
+        while (remaining.length > 0) {
+          if (remaining.length <= maxChars) {
+            result += (result ? '\n' : '') + remaining
+            break
+          }
+          
+          // Find a good break point - search backwards from maxChars
+          let breakIndex = maxChars
+          let found = false
+          // Search backwards from maxChars up to 10 characters back for better wrapping
+          // This ensures we find break points even in long codes
+          for (let i = maxChars; i > maxChars - 10 && i > 0; i--) {
+            if (breakPoints.includes(remaining[i])) {
+              breakIndex = i + 1
+              found = true
+              break
+            }
+          }
+          
+          // If no break point found, force break at maxChars (hard break)
+          // This ensures long codes without break points still wrap
+          if (!found) {
+            breakIndex = maxChars
+          }
+          
+          result += (result ? '\n' : '') + remaining.substring(0, breakIndex)
+          remaining = remaining.substring(breakIndex).trim()
+        }
+        
+        return result
+      }
+
+      // Validate that sale has items
+      if (!sale.items || !Array.isArray(sale.items) || sale.items.length === 0) {
+        console.error('No items found in sale:', sale)
+        alert('This sale has no items. Cannot generate invoice.')
+        return
+      }
+
+      // Table data - pre-wrap long codes and dress names BEFORE passing to autoTable
+      // Use consistent template: Item, Type, Code, Size, Qty, Price (Total column removed)
+      // IMPORTANT: Always use dress_code from inventory if available
+      const tableData = sale.items.map(item => {
+        const dressName = item.dressName || ''
+        // Always try to get dress_code - prefer from item, but will be fetched from inventory if missing
+        let dressCode = item.dressCode || (item as any).dress_code || ''
+        // Pre-wrap code at 20 characters per line (very aggressive wrapping for long codes)
+        const wrappedCode = dressCode.length > 20 ? wrapTextForCell(dressCode, 20) : dressCode
+        // Pre-wrap dress name at 40 characters per line (ensures full item names like "SAREE MUL COTTON (MOU/22/1-3/26)" are visible)
+        const wrappedDressName = dressName.length > 40 ? wrapTextForCell(dressName, 40) : dressName
+        
+        // Use "Rs." prefix for better font compatibility (₹ symbol may not render correctly)
+        const priceText = `Rs. ${item.sellingPrice.toLocaleString()}`
+        
+        return [
+          wrappedDressName,
+          item.dressType || '',
+          wrappedCode || dressCode || '[NO CODE]', // Always show code
+          item.size || '',
+          item.quantity.toString(),
+          priceText,
+        ]
+      })
 
       let finalY = yPos + 10
 
       // Try to use autoTable, fallback to manual table if it fails
       try {
         if (typeof (doc as any).autoTable === 'function') {
+          // A4 page width: 210mm, margins: 14mm each side = 182mm usable width
+          // Use tighter column widths and manual text wrapping
           doc.autoTable({
             startY: yPos + 10,
-            head: [['Dress Name', 'Type', 'Code', 'Size', 'Qty', 'Price', 'Total']],
+            head: [['Item', 'Type', 'Code', 'Size', 'Qty', 'Price']],
             body: tableData,
             theme: 'striped',
-            headStyles: { fillColor: [128, 0, 128], textColor: [255, 255, 255], fontStyle: 'bold' },
-            styles: { fontSize: 9 },
+            headStyles: { 
+              fillColor: [70, 70, 70], 
+              textColor: [255, 255, 255], 
+              fontStyle: 'bold', 
+              fontSize: 8,
+              halign: 'left'
+            },
+            styles: { 
+              fontSize: 7,
+              cellPadding: { top: 4, right: 3, bottom: 4, left: 3 },
+              overflow: 'linebreak',
+              cellWidth: 'wrap',
+              halign: 'left',
+              valign: 'top',
+              lineWidth: 0.1,
+              textColor: [0, 0, 0],
+              lineColor: [220, 220, 220]
+            },
             columnStyles: {
-              0: { cellWidth: 40 },
-              1: { cellWidth: 25 },
-              2: { cellWidth: 25 },
-              3: { cellWidth: 20 },
-              4: { cellWidth: 15 },
-              5: { cellWidth: 25 },
-              6: { cellWidth: 25 },
+              0: { cellWidth: 34, cellPadding: { top: 4, right: 2, bottom: 4, left: 3 }, overflow: 'linebreak', fontSize: 7, halign: 'left' }, // Item - reduced to make room for Code
+              1: { cellWidth: 10, cellPadding: { top: 4, right: 1, bottom: 4, left: 3 }, fontSize: 7, halign: 'left' }, // Type
+              2: { cellWidth: 44, cellPadding: { top: 4, right: 2, bottom: 4, left: 1 }, overflow: 'linebreak', fontSize: 6.5, halign: 'left', minCellHeight: 10 }, // Code - increased width significantly for full visibility
+              3: { cellWidth: 12, cellPadding: { top: 4, right: 2, bottom: 4, left: 2 }, fontSize: 7, halign: 'left' }, // Size
+              4: { cellWidth: 10, cellPadding: { top: 4, right: 2, bottom: 4, left: 2 }, halign: 'center', fontSize: 7 }, // Qty
+              5: { cellWidth: 18, cellPadding: { top: 4, right: 3, bottom: 4, left: 2 }, halign: 'right', fontSize: 7 }, // Price
+            },
+            margin: { left: 14, right: 14 },
+            tableWidth: 128, // Total: 34+10+44+12+10+18 = 128mm, fits well in A4 (182mm usable)
+            didParseCell: function(data: any) {
+              // Skip processing if this is a header row
+              if (data.row.index < 0) {
+                return
+              }
+              
+              // Ensure text is properly formatted as array for multi-line support
+              if (data.cell.text) {
+                if (typeof data.cell.text === 'string') {
+                  // If it contains newlines, split it (already pre-wrapped)
+                  if (data.cell.text.includes('\n')) {
+                    data.cell.text = data.cell.text.split('\n').filter((line: string) => line.trim() !== '')
+                  } else {
+                    data.cell.text = [data.cell.text]
+                  }
+                } else if (Array.isArray(data.cell.text)) {
+                  // Already an array, filter out empty strings and ensure it's not empty
+                  data.cell.text = data.cell.text.filter((line: string) => line.trim() !== '')
+                  if (data.cell.text.length === 0) {
+                    data.cell.text = ['']
+                  }
+                } else {
+                  data.cell.text = [String(data.cell.text || '')]
+                }
+              } else {
+                data.cell.text = ['']
+              }
+              
+              // Don't re-wrap if text already contains newlines (it's been pre-wrapped)
+              // Only ensure proper formatting - prevent duplication
+              if (data.column.index === 2 && data.cell.text && Array.isArray(data.cell.text)) {
+                // Code column - ensure proper wrapping for long codes (CRITICAL: prevent truncation)
+                const fullText = data.cell.text.join(' ').trim()
+                // Only wrap if not already wrapped (single element) and text is long
+                // Use 20 characters for very aggressive wrapping to prevent truncation
+                if (data.cell.text.length === 1 && fullText.length > 20) {
+                  data.cell.text = wrapTextForCell(fullText, 20).split('\n').filter((line: string) => line.trim() !== '')
+                }
+                // Ensure all wrapped lines are preserved
+                if (data.cell.text.length > 1) {
+                  data.cell.text = data.cell.text.filter((line: string) => line.trim() !== '')
+                  // If we filtered out all lines, restore the original text
+                  if (data.cell.text.length === 0 && fullText) {
+                    data.cell.text = [fullText]
+                  }
+                }
+              }
+              if (data.column.index === 0 && data.cell.text && Array.isArray(data.cell.text)) {
+                // Item column - check if already wrapped by checking if array has multiple elements
+                const fullText = data.cell.text.join(' ').trim()
+                // Only wrap if not already wrapped (single element) and text is long
+                if (data.cell.text.length === 1 && fullText.length > 40) {
+                  data.cell.text = wrapTextForCell(fullText, 40).split('\n').filter((line: string) => line.trim() !== '')
+                }
+              }
             },
           })
           finalY = doc.lastAutoTable?.finalY || yPos + 10 + (tableData.length * 8)
+          
+          // Verify table was created
+          if (!doc.lastAutoTable || doc.lastAutoTable.finalY === undefined) {
+            console.warn('autoTable may not have rendered correctly, using fallback')
+            throw new Error('autoTable rendering issue')
+          }
         } else {
-          throw new Error('autoTable not available')
+          throw new Error('autoTable function not available')
         }
       } catch (tableError) {
         // Fallback: Create table manually
         console.warn('autoTable failed, using manual table:', tableError)
         doc.setFontSize(9)
         doc.setFont('helvetica', 'bold')
-        doc.text('Dress Name', 14, finalY)
+        doc.text('Item', 14, finalY)
         doc.text('Type', 60, finalY)
         doc.text('Code', 90, finalY)
         doc.text('Size', 120, finalY)
         doc.text('Qty', 145, finalY)
-        doc.text('Price', 160, finalY)
-        doc.text('Total', 185, finalY)
+        doc.text('Price', 170, finalY)
         
         doc.setFont('helvetica', 'normal')
         finalY += 6
@@ -230,14 +522,13 @@ export default function InvoicesPage() {
           doc.text(item.dressCode, 90, finalY)
           doc.text(item.size, 120, finalY)
           doc.text(item.quantity.toString(), 145, finalY)
-          doc.text(`₹${item.sellingPrice}`, 160, finalY)
-          doc.text(`₹${(item.sellingPrice * item.quantity).toLocaleString()}`, 185, finalY)
+          doc.text(`Rs. ${item.sellingPrice.toLocaleString()}`, 170, finalY)
           finalY += 6
         })
       }
       doc.setFontSize(12)
       doc.setFont('helvetica', 'bold')
-      doc.text(`Total Amount: ₹${sale.totalAmount.toLocaleString()}`, 14, finalY + 10)
+      doc.text(`Total Amount: Rs. ${sale.totalAmount.toLocaleString()}`, 14, finalY + 10)
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(10)
       doc.text(`Payment Mode: ${sale.paymentMode}`, 14, finalY + 16)
@@ -264,12 +555,21 @@ export default function InvoicesPage() {
   }
 
   const sendViaWhatsApp = async (sale: Sale) => {
-    if (!businessProfile) {
-      alert('Please set up your business profile first!')
-      return
-    }
-
     try {
+      // Fetch latest business profile if not available (API will also fetch it, but we need it for the message)
+      let profile = businessProfile
+      if (!profile) {
+        try {
+          const profileRes = await fetch('/api/business')
+          const profileResult = await profileRes.json()
+          if (profileResult.success && profileResult.data) {
+            profile = profileResult.data
+          }
+        } catch (err) {
+          console.warn('Failed to fetch business profile:', err)
+        }
+      }
+
       // Get customer phone number or use business WhatsApp number
       const customer = getCustomer(sale)
       let phoneNumber = ''
@@ -288,7 +588,7 @@ export default function InvoicesPage() {
         return
       }
 
-      // Generate PDF on server and get shareable link
+      // Generate PDF on server - API will always fetch latest business profile from database
       const response = await fetch('/api/invoice/pdf', {
         method: 'POST',
         headers: {
@@ -296,7 +596,7 @@ export default function InvoicesPage() {
         },
         body: JSON.stringify({
           sale,
-          businessProfile,
+          businessProfile: profile || undefined, // Optional - API will fetch latest from database
         }),
       })
 
@@ -310,7 +610,8 @@ export default function InvoicesPage() {
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' })
 
       // Create invoice message
-      let message = `*Invoice - ${businessProfile.businessName}*\n\n`
+      const businessName = profile?.businessName || 'Business'
+      let message = `*Invoice - ${businessName}*\n\n`
       message += `Bill Number: ${sale.billNumber}\n`
       message += `Date: ${format(new Date(sale.date), 'dd MMM yyyy')}\n`
       message += `Party: ${sale.partyName}\n\n`
@@ -469,8 +770,14 @@ export default function InvoicesPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Invoices</h1>
 
         {!businessProfile && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded mb-6">
-            Please set up your business profile first to generate invoices. <a href="/admin/business" className="underline">Go to Business Setup</a>
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
+            💡 <strong>Tip:</strong> Set up your business profile to customize invoice headers. <a href="/admin/business" className="underline font-semibold">Go to Business Setup</a> (The system will use the latest profile from database)
+          </div>
+        )}
+
+        {businessProfile && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
+            ✅ <strong>Business Profile Active:</strong> All invoices will use the latest business profile from the database. Any updates made in <a href="/admin/business" className="underline font-semibold">Business Setup</a> will be automatically reflected in all future invoices.
           </div>
         )}
 
@@ -520,18 +827,46 @@ export default function InvoicesPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             try {
-                              generatePDF(sale)
+                              await viewPDF(sale)
                             } catch (err) {
-                              console.error('PDF generation failed:', err)
-                              alert('Failed to generate PDF. Please try again.')
+                              console.error('PDF viewing failed:', err)
+                              alert('Failed to view PDF. Please try again.')
                             }
                           }}
                           className="text-blue-600 hover:text-blue-900"
+                          title="View PDF"
+                        >
+                          👁️ View
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await printPDF(sale)
+                            } catch (err) {
+                              console.error('PDF printing failed:', err)
+                              alert('Failed to print PDF. Please try again.')
+                            }
+                          }}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Print PDF"
+                        >
+                          🖨️ Print
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await downloadPDF(sale)
+                            } catch (err) {
+                              console.error('PDF download failed:', err)
+                              alert('Failed to download PDF. Please try again.')
+                            }
+                          }}
+                          className="text-green-600 hover:text-green-900"
                           title="Download PDF"
                         >
-                          📄 PDF
+                          📥 Download
                         </button>
                         <button
                           onClick={() => sendViaWhatsApp(sale)}

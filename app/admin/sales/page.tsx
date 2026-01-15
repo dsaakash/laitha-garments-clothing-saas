@@ -276,6 +276,13 @@ export default function SalesPage() {
         const invItem = inventory.find(i => i.id === itemForm.inventoryId)
         if (!invItem) throw new Error('Inventory item not found')
         
+        // Ensure dressCode is always present - this is critical for invoices
+        const dressCode = invItem.dressCode || invItem.dress_code || ''
+        if (!dressCode || dressCode.trim() === '') {
+          console.warn(`⚠️ Warning: Inventory item "${invItem.dressName}" (ID: ${invItem.id}) has no dress_code`)
+          alert(`Warning: Item "${invItem.dressName}" has no dress code. Please update the inventory item first.`)
+        }
+        
         const purchasePrice = invItem.wholesalePrice
         let sellingPrice = invItem.sellingPrice
         let quantity = itemForm.quantity
@@ -294,7 +301,7 @@ export default function SalesPage() {
           inventoryId: itemForm.inventoryId,
           dressName: invItem.dressName,
           dressType: invItem.dressType,
-          dressCode: invItem.dressCode,
+          dressCode: dressCode, // Always include dressCode - API will fetch from inventory if missing
           size: itemForm.size,
           quantity,
           usePerMeter,
@@ -360,7 +367,9 @@ export default function SalesPage() {
       
       const result = await response.json()
       if (!result.success) {
-        alert(`Failed to ${editingSale ? 'update' : 'add'} sale`)
+        const errorMsg = result.error || result.message || 'Unknown error'
+        console.error('Sale update error:', result)
+        alert(`Failed to ${editingSale ? 'update' : 'add'} sale: ${errorMsg}`)
         return
       }
       
@@ -599,7 +608,8 @@ export default function SalesPage() {
                     <table className="min-w-full">
                       <thead>
                         <tr className="text-left text-xs font-medium text-gray-500 uppercase">
-                          <th className="pb-2">Dress</th>
+                          <th className="pb-2">Item</th>
+                          <th className="pb-2">Type</th>
                           <th className="pb-2">Code</th>
                           <th className="pb-2">Size</th>
                           <th className="pb-2">Qty</th>
@@ -610,7 +620,8 @@ export default function SalesPage() {
                       <tbody>
                         {sale.items.map((item, idx) => (
                           <tr key={idx} className="border-b">
-                            <td className="py-2 text-sm">{item.dressName} ({item.dressType})</td>
+                            <td className="py-2 text-sm">{item.dressName}</td>
+                            <td className="py-2 text-sm text-gray-500">{item.dressType}</td>
                             <td className="py-2 text-sm text-gray-500">{item.dressCode}</td>
                             <td className="py-2 text-sm text-gray-500">{item.size}</td>
                             <td className="py-2 text-sm text-gray-500">{item.quantity}</td>
@@ -797,7 +808,7 @@ export default function SalesPage() {
                                   onChange={(e) => handleItemChange(index, 'inventoryId', e.target.value)}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                                 >
-                                  <option value="">Select Dress</option>
+                                  <option value="">Select Item</option>
                                   {inventory.map(inv => (
                                     <option key={inv.id} value={inv.id}>
                                       {inv.dressName} ({inv.dressType}) - {inv.dressCode}

@@ -1,27 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query } from '@/lib/db'
+import { getPool } from '@/lib/db'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  let client: any = null
   try {
+    client = await getPool().connect()
     const id = parseInt(params.id)
     const body = await request.json()
+    console.log('Updating sale:', id, 'with body:', JSON.stringify(body, null, 2))
     
     if (isNaN(id)) {
+      client.release()
       return NextResponse.json(
         { success: false, message: 'Invalid sale ID' },
         { status: 400 }
       )
     }
 
-    // Start transaction
-    await query('BEGIN')
+    // Start transaction using the same client
+    await client.query('BEGIN')
 
     try {
       // Get old sale items to reverse stock changes
-      const oldSaleResult = await query(
+      const oldSaleResult = await client.query(
         `SELECT si.* FROM sale_items si WHERE si.sale_id = $1`,
         [id]
       )
@@ -30,7 +34,7 @@ export async function PUT(
       // Reverse stock changes for old items
       for (const oldItem of oldItems) {
         if (oldItem.inventory_id) {
-          const inventoryResult = await query(
+          const inventoryResult = await client.query(
             'SELECT quantity_out, current_stock, quantity_in FROM inventory WHERE id = $1',
             [oldItem.inventory_id]
           )
@@ -43,7 +47,7 @@ export async function PUT(
             const newQuantityOut = Math.max(0, currentQuantityOut - quantityToRestore)
             const newCurrentStock = currentQuantityIn - newQuantityOut
             
-            await query(
+            await client.query(
               `UPDATE inventory 
                SET quantity_out = $1, 
                    current_stock = $2,
@@ -56,17 +60,16 @@ export async function PUT(
       }
 
       // Delete old sale items
-      await query('DELETE FROM sale_items WHERE sale_id = $1', [id])
+      await client.query('DELETE FROM sale_items WHERE sale_id = $1', [id])
 
       // Update sale
-      await query(
+      await client.query(
         `UPDATE sales 
          SET date = $1, party_name = $2, customer_id = $3, bill_number = $4,
              subtotal = $5, discount_type = $6, discount_percentage = $7, discount_amount = $8,
              gst_type = $9, gst_percentage = $10, gst_amount = $11,
              total_amount = $12, final_total = $13, payment_mode = $14,
-             upi_transaction_id = $15, sale_image = $16,
-             updated_at = CURRENT_TIMESTAMP
+             upi_transaction_id = $15, sale_image = $16
          WHERE id = $17`,
         [
           body.date,
@@ -92,31 +95,61 @@ export async function PUT(
       // Insert new sale items and update inventory stock
       if (body.items && body.items.length > 0) {
         for (const item of body.items) {
-          await query(
+          // Validate required fields
+          if (!item.dressName || !item.dressType || item.quantity === undefined || item.quantity === null) {
+            throw new Error(`Missing required fields for item: ${JSON.stringify(item)}`)
+          }
+          
+          // ALWAYS ensure dress_code is present - fetch from inventory if missing
+          let dressCode = item.dressCode || ''
+          let inventoryId = item.inventoryId ? parseInt(item.inventoryId) : null
+          let finalDressName = item.dressName || ''
+          let finalDressType = item.dressType || ''
+          
+          // If inventoryId is provided, always fetch the latest dress_code from inventory
+          if (inventoryId) {
+            const inventoryResult = await client.query(
+              'SELECT dress_code, dress_name, dress_type FROM inventory WHERE id = $1',
+              [inventoryId]
+            )
+            if (inventoryResult.rows.length > 0) {
+              const inventory = inventoryResult.rows[0]
+              // Always use the latest dress_code from inventory to ensure consistency
+              if (inventory.dress_code) {
+                dressCode = inventory.dress_code
+                console.log(`📝 Using dress_code from inventory ${inventoryId}: ${dressCode}`)
+              }
+              // Also ensure dress_name and dress_type match inventory if not provided
+              finalDressName = finalDressName || inventory.dress_name || ''
+              finalDressType = finalDressType || inventory.dress_type || ''
+            }
+          }
+          
+          await client.query(
             `INSERT INTO sale_items 
              (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
               quantity, use_per_meter, meters, price_per_meter, purchase_price, selling_price, profit)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
             [
               id,
-              item.inventoryId ? parseInt(item.inventoryId) : null,
-              item.dressName,
-              item.dressType,
-              item.dressCode,
-              item.size,
-              item.quantity,
+              inventoryId,
+              finalDressName,
+              finalDressType,
+              dressCode || null, // Always use the latest from inventory
+              item.size || null,
+              item.quantity || 0,
               item.usePerMeter || false,
               item.meters || null,
               item.pricePerMeter || null,
-              item.purchasePrice,
-              item.sellingPrice,
-              item.profit,
+              item.purchasePrice || 0,
+              item.sellingPrice || 0,
+              item.profit || 0,
             ]
           )
           
           // Update inventory stock
           if (item.inventoryId) {
-            const inventoryResult = await query(
+            const inventoryResult = await client.query(
               'SELECT quantity_out, current_stock, quantity_in FROM inventory WHERE id = $1',
               [parseInt(item.inventoryId)]
             )
@@ -129,7 +162,7 @@ export async function PUT(
               const newQuantityOut = currentQuantityOut + quantityToDeduct
               const newCurrentStock = Math.max(0, currentQuantityIn - newQuantityOut)
               
-              await query(
+              await client.query(
                 `UPDATE inventory 
                  SET quantity_out = $1, 
                      current_stock = $2,
@@ -142,15 +175,18 @@ export async function PUT(
         }
       }
 
-      await query('COMMIT')
+      await client.query('COMMIT')
     } catch (transactionError) {
-      await query('ROLLBACK').catch((rollbackError) => {
+      await client.query('ROLLBACK').catch((rollbackError) => {
         console.error('Error rolling back transaction:', rollbackError)
       })
       throw transactionError
+    } finally {
+      client.release()
     }
 
-    // Fetch updated sale
+    // Fetch updated sale (use query function for this as transaction is complete)
+    const { query } = await import('@/lib/db')
     const updatedSaleResult = await query(
       `SELECT s.*, 
               COALESCE(
@@ -159,7 +195,7 @@ export async function PUT(
                     'inventoryId', si.inventory_id::text,
                     'dressName', si.dress_name,
                     'dressType', si.dress_type,
-                    'dressCode', si.dress_code,
+                    'dressCode', COALESCE(si.dress_code, ''),
                     'size', si.size,
                     'quantity', si.quantity,
                     'usePerMeter', si.use_per_meter,
@@ -206,8 +242,28 @@ export async function PUT(
     })
   } catch (error: any) {
     console.error('Sale update error:', error)
+    console.error('Error stack:', error?.stack)
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      detail: error?.detail,
+      hint: error?.hint
+    })
+    // Make sure client is released even if error occurs before transaction
+    if (client) {
+      try {
+        client.release()
+      } catch (releaseError) {
+        console.error('Error releasing client:', releaseError)
+      }
+    }
     return NextResponse.json(
-      { success: false, message: 'Failed to update sale', error: error?.message || String(error) },
+      { 
+        success: false, 
+        message: 'Failed to update sale', 
+        error: error?.message || String(error),
+        details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      },
       { status: 500 }
     )
   }
@@ -217,22 +273,25 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  let client: any = null
   try {
+    client = await getPool().connect()
     const id = parseInt(params.id)
     
     if (isNaN(id)) {
+      client.release()
       return NextResponse.json(
         { success: false, message: 'Invalid sale ID' },
         { status: 400 }
       )
     }
 
-    // Start transaction
-    await query('BEGIN')
+    // Start transaction using the same client
+    await client.query('BEGIN')
 
     try {
       // Get sale items to reverse stock changes
-      const saleItemsResult = await query(
+      const saleItemsResult = await client.query(
         `SELECT si.* FROM sale_items si WHERE si.sale_id = $1`,
         [id]
       )
@@ -241,7 +300,7 @@ export async function DELETE(
       // Reverse stock changes
       for (const item of saleItems) {
         if (item.inventory_id) {
-          const inventoryResult = await query(
+          const inventoryResult = await client.query(
             'SELECT quantity_out, current_stock, quantity_in FROM inventory WHERE id = $1',
             [item.inventory_id]
           )
@@ -254,7 +313,7 @@ export async function DELETE(
             const newQuantityOut = Math.max(0, currentQuantityOut - quantityToRestore)
             const newCurrentStock = currentQuantityIn - newQuantityOut
             
-            await query(
+            await client.query(
               `UPDATE inventory 
                SET quantity_out = $1, 
                    current_stock = $2,
@@ -267,22 +326,32 @@ export async function DELETE(
       }
 
       // Delete sale items (cascade should handle this, but being explicit)
-      await query('DELETE FROM sale_items WHERE sale_id = $1', [id])
+      await client.query('DELETE FROM sale_items WHERE sale_id = $1', [id])
       
       // Delete sale
-      await query('DELETE FROM sales WHERE id = $1', [id])
+      await client.query('DELETE FROM sales WHERE id = $1', [id])
 
-      await query('COMMIT')
+      await client.query('COMMIT')
     } catch (transactionError) {
-      await query('ROLLBACK').catch((rollbackError) => {
+      await client.query('ROLLBACK').catch((rollbackError) => {
         console.error('Error rolling back transaction:', rollbackError)
       })
       throw transactionError
+    } finally {
+      client.release()
     }
 
     return NextResponse.json({ success: true, message: 'Sale deleted successfully' })
   } catch (error: any) {
     console.error('Sale delete error:', error)
+    // Make sure client is released even if error occurs before transaction
+    if (client) {
+      try {
+        client.release()
+      } catch (releaseError) {
+        console.error('Error releasing client:', releaseError)
+      }
+    }
     return NextResponse.json(
       { success: false, message: 'Failed to delete sale', error: error?.message || String(error) },
       { status: 500 }

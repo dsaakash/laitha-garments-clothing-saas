@@ -52,7 +52,20 @@ export default function BusinessPage() {
       
       if (result.success) {
         setSaved(true)
-        setTimeout(() => setSaved(false), 3000)
+        setTimeout(() => setSaved(false), 5000)
+        // Update the saved data to reflect the latest from server
+        if (result.data) {
+          setFormData(result.data)
+        }
+        // Dispatch custom event to notify AdminLayout to refresh business name
+        if (typeof window !== 'undefined') {
+          // Store timestamp in localStorage to trigger refresh
+          localStorage.setItem('businessProfileLastUpdated', Date.now().toString())
+          // Dispatch custom event with business name
+          window.dispatchEvent(new CustomEvent('businessProfileUpdated', {
+            detail: { businessName: result.data?.businessName }
+          }))
+        }
       } else {
         setError(result.message || 'Failed to save business profile')
       }
@@ -71,7 +84,7 @@ export default function BusinessPage() {
 
         {saved && (
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
-            Business profile saved successfully!
+            ✅ <strong>Business profile saved successfully!</strong> All future invoices will use this updated information. The changes will be reflected immediately in all new invoice PDFs.
           </div>
         )}
 
@@ -80,6 +93,10 @@ export default function BusinessPage() {
             {error}
           </div>
         )}
+
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
+          💡 <strong>Note:</strong> Any changes you make here will be automatically reflected in all future invoices. The invoice PDF generation always uses the latest business profile from the database.
+        </div>
 
         <div className="bg-white rounded-lg shadow-md p-8">
           <form onSubmit={handleSubmit} className="space-y-6">

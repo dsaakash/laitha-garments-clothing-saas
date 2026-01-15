@@ -834,14 +834,14 @@ export default function InventoryPage() {
                                             }}
                                             title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
                                           >
-                                            <Image 
+                                      <Image 
                                               src={img} 
                                               alt={`${item.dressName} - Image ${idx + 1}`} 
-                                              fill
-                                              className="object-cover rounded"
-                                              sizes="(max-width: 640px) 48px, 64px"
-                                            />
-                                          </div>
+                                        fill
+                                        className="object-cover rounded"
+                                        sizes="(max-width: 640px) 48px, 64px"
+                                      />
+                                    </div>
                                         ))}
                                         {images.length > 3 && (
                                           <div 
@@ -856,7 +856,7 @@ export default function InventoryPage() {
                                           >
                                             +{images.length - 3}
                                           </div>
-                                        )}
+                                  )}
                                       </div>
                                     )
                                   })()}
@@ -1009,14 +1009,14 @@ export default function InventoryPage() {
                                   }}
                                   title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
                                 >
-                                  <Image 
+                            <Image 
                                     src={img} 
                                     alt={`${item.dressName} - Image ${idx + 1}`} 
-                                    fill
-                                    className="object-cover rounded"
-                                    sizes="(max-width: 640px) 48px, 64px"
-                                  />
-                                </div>
+                              fill
+                              className="object-cover rounded"
+                              sizes="(max-width: 640px) 48px, 64px"
+                            />
+                          </div>
                               ))}
                               {images.length > 3 && (
                                 <div 
@@ -1031,7 +1031,7 @@ export default function InventoryPage() {
                                 >
                                   +{images.length - 3}
                                 </div>
-                              )}
+                        )}
                             </div>
                           )
                         })()}
@@ -1425,7 +1425,7 @@ export default function InventoryPage() {
                     }
                     
                     return (
-                      <div className="space-y-4">
+                    <div className="space-y-4">
                         {/* Main Large Image */}
                         <div 
                           className="relative w-full h-96 sm:h-[500px] cursor-pointer hover:opacity-90 transition-opacity rounded-lg border-2 border-gray-300 overflow-hidden bg-gray-100"
@@ -1465,26 +1465,26 @@ export default function InventoryPage() {
                                     setShowImageLightbox(true)
                                   }}
                                 >
-                                  <Image
-                                    src={imageUrl || ''}
-                                    alt={`${selectedItem.dressName} - Image ${index + 1}`}
-                                    fill
+                            <Image
+                              src={imageUrl || ''}
+                              alt={`${selectedItem.dressName} - Image ${index + 1}`}
+                              fill
                                     className="object-cover"
                                     sizes="(max-width: 640px) 25vw, 12.5vw"
-                                  />
+                            />
                                   {index === 0 && (
                                     <div className="absolute top-1 left-1 bg-purple-600 text-white text-xs px-1.5 py-0.5 rounded">
                                       Main
                                     </div>
                                   )}
-                                </div>
-                              ))}
-                            </div>
+                          </div>
+                        ))}
+                      </div>
                             <p className="text-xs text-gray-500 text-center">
                               Click any image to view full size with navigation
-                            </p>
-                          </div>
-                        )}
+                        </p>
+                    </div>
+                  )}
                       </div>
                     )
                   })()}

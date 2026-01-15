@@ -16,6 +16,36 @@ export async function PUT(
       )
     }
     
+    // Get current inventory item to check if any fields changed
+    const currentItemResult = await query(
+      'SELECT dress_code, dress_name, dress_type, selling_price FROM inventory WHERE id = $1',
+      [id]
+    )
+    
+    if (currentItemResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Item not found' },
+        { status: 404 }
+      )
+    }
+    
+    const currentItem = currentItemResult.rows[0]
+    const oldDressCode = currentItem.dress_code
+    const oldDressName = currentItem.dress_name
+    const oldDressType = currentItem.dress_type
+    const oldSellingPrice = parseFloat(currentItem.selling_price || 0)
+    const newDressCode = body.dressCode
+    const newDressName = body.dressName
+    const newDressType = body.dressType
+    const newSellingPrice = parseFloat(body.sellingPrice || 0)
+    
+    // Check if any relevant fields changed
+    const dressCodeChanged = oldDressCode !== newDressCode
+    const dressNameChanged = oldDressName !== newDressName
+    const dressTypeChanged = oldDressType !== newDressType
+    const sellingPriceChanged = oldSellingPrice !== newSellingPrice
+    const anyFieldChanged = dressCodeChanged || dressNameChanged || dressTypeChanged || sellingPriceChanged
+    
     const productImages = body.productImages && body.productImages.length > 0 
       ? JSON.stringify(body.productImages) 
       : (body.imageUrl ? JSON.stringify([body.imageUrl]) : null)
@@ -48,6 +78,93 @@ export async function PUT(
         id,
       ]
     )
+    
+    // If any relevant field changed, update all related sale_items to reflect the changes
+    if (anyFieldChanged) {
+      try {
+        const updateFields = []
+        const updateValues = []
+        let paramIndex = 1
+        
+        if (dressCodeChanged) {
+          updateFields.push(`dress_code = $${paramIndex++}`)
+          updateValues.push(newDressCode)
+        }
+        if (dressNameChanged) {
+          updateFields.push(`dress_name = $${paramIndex++}`)
+          updateValues.push(newDressName)
+        }
+        if (dressTypeChanged) {
+          updateFields.push(`dress_type = $${paramIndex++}`)
+          updateValues.push(newDressType)
+        }
+        if (sellingPriceChanged) {
+          updateFields.push(`selling_price = $${paramIndex++}`)
+          updateValues.push(newSellingPrice)
+          // Recalculate profit: profit = new_selling_price - purchase_price
+          // Use the new selling price value directly in the calculation
+          updateFields.push(`profit = $${paramIndex++} - purchase_price`)
+          updateValues.push(newSellingPrice)
+        }
+        
+        if (updateFields.length > 0) {
+          // Add inventory_id as the last parameter
+          const whereParamIndex = paramIndex
+          updateValues.push(id)
+          
+          const updateQuery = `UPDATE sale_items 
+           SET ${updateFields.join(', ')}
+           WHERE inventory_id = $${whereParamIndex}`
+          
+          console.log(`🔄 Updating sale_items for inventory_id ${id}:`, {
+            query: updateQuery,
+            values: updateValues,
+            changes: {
+              dressCode: dressCodeChanged ? `${oldDressCode} → ${newDressCode}` : null,
+              dressName: dressNameChanged ? `${oldDressName} → ${newDressName}` : null,
+              dressType: dressTypeChanged ? `${oldDressType} → ${newDressType}` : null,
+              sellingPrice: sellingPriceChanged ? `${oldSellingPrice} → ${newSellingPrice}` : null,
+            }
+          })
+          
+          const updateResult = await query(updateQuery, updateValues)
+          
+          // Verify the update worked by checking a sample of updated records
+          const verifyResult = await query(
+            `SELECT COUNT(*) as count, 
+                    MAX(dress_code) as max_code,
+                    MIN(dress_code) as min_code
+             FROM sale_items 
+             WHERE inventory_id = $1`,
+            [id]
+          )
+          const affectedCount = parseInt(verifyResult.rows[0].count)
+          const maxCode = verifyResult.rows[0].max_code
+          const minCode = verifyResult.rows[0].min_code
+          
+          // If dress_code was updated, verify it matches
+          if (dressCodeChanged && affectedCount > 0) {
+            if (maxCode !== newDressCode || minCode !== newDressCode) {
+              console.warn(`⚠️ Dress code mismatch: Expected ${newDressCode}, but found min=${minCode}, max=${maxCode}`)
+            } else {
+              console.log(`✅ Verified: All ${affectedCount} sale_items now have dress_code = ${newDressCode}`)
+            }
+          }
+          
+          const changes = []
+          if (dressCodeChanged) changes.push(`code: ${oldDressCode} → ${newDressCode}`)
+          if (dressNameChanged) changes.push(`name: ${oldDressName} → ${newDressName}`)
+          if (dressTypeChanged) changes.push(`type: ${oldDressType} → ${newDressType}`)
+          if (sellingPriceChanged) changes.push(`selling_price: ${oldSellingPrice} → ${newSellingPrice}`)
+          
+          console.log(`✅ Updated ${affectedCount} sale_items for inventory_id ${id}: ${changes.join(', ')}`)
+        }
+      } catch (saleItemsUpdateError) {
+        console.error('❌ Error updating sale_items:', saleItemsUpdateError)
+        // Don't fail the entire update, but log the error
+        // The inventory update should still succeed even if sale_items update fails
+      }
+    }
     
     if (result.rows.length === 0) {
       return NextResponse.json(

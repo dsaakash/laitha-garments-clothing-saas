@@ -992,14 +992,14 @@ export default function PurchasesPage() {
                             }}
                             title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
                           >
-                            <Image
+                    <Image
                               src={img}
                               alt={`Product Image ${idx + 1}`}
-                              fill
+                      fill
                               className="object-cover"
                               sizes="(max-width: 768px) 50vw, 33vw"
-                            />
-                          </div>
+                    />
+                  </div>
                         ))}
                         {images.length > 3 && (
                           <div 
@@ -1013,7 +1013,7 @@ export default function PurchasesPage() {
                             title={`+${images.length - 3} more images - Click to view all`}
                           >
                             +{images.length - 3} more
-                          </div>
+                  </div>
                         )}
                       </div>
                     </div>
@@ -1149,18 +1149,18 @@ export default function PurchasesPage() {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                           <div className="flex gap-2">
-                            <select
-                              value={item.category}
-                              onChange={(e) => updateItem(index, 'category', e.target.value)}
+                          <select
+                            value={item.category}
+                            onChange={(e) => updateItem(index, 'category', e.target.value)}
                               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            >
+                          >
                               <option value="">Select a category...</option>
-                              {availableCategories.map(cat => (
+                            {availableCategories.map(cat => (
                                 <option key={cat.id} value={cat.name}>
                                   {cat.name}
                                 </option>
-                              ))}
-                            </select>
+                            ))}
+                          </select>
                             <button
                               type="button"
                               onClick={() => {
@@ -1251,7 +1251,7 @@ export default function PurchasesPage() {
                           {item.productImages && item.productImages.length > 0 && (
                             <div className="mt-2">
                               <div className="flex flex-wrap gap-2 mb-2">
-                                {item.productImages.map((img, imgIndex) => (
+                              {item.productImages.map((img, imgIndex) => (
                                   <div 
                                     key={imgIndex} 
                                     className="relative w-20 h-20 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden group"
@@ -1262,26 +1262,26 @@ export default function PurchasesPage() {
                                     }}
                                     title="Click to view full size"
                                   >
-                                    <Image
-                                      src={img}
-                                      alt={`Product ${index + 1} - Image ${imgIndex + 1}`}
-                                      fill
+                                  <Image
+                                    src={img}
+                                    alt={`Product ${index + 1} - Image ${imgIndex + 1}`}
+                                    fill
                                       className="object-cover"
-                                      sizes="80px"
-                                    />
-                                    <button
-                                      type="button"
+                                    sizes="80px"
+                                  />
+                                  <button
+                                    type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         removeImage(index, imgIndex)
                                       }}
                                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                                       title="Remove image"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ))}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
                               </div>
                               <p className="text-xs text-gray-500">Click any image to view full size</p>
                             </div>
@@ -1742,7 +1742,7 @@ export default function PurchasesPage() {
                         {item.productImages && item.productImages.length > 0 && (
                           <div className="mb-2">
                             <div className="flex gap-2 flex-wrap mb-2">
-                              {item.productImages.map((img, imgIndex) => (
+                            {item.productImages.map((img, imgIndex) => (
                                 <div 
                                   key={imgIndex} 
                                   className="relative w-24 h-24 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden"
@@ -1753,15 +1753,15 @@ export default function PurchasesPage() {
                                   }}
                                   title="Click to view full size"
                                 >
-                                  <Image
-                                    src={img}
-                                    alt={`${item.productName} - Image ${imgIndex + 1}`}
-                                    fill
+                                <Image
+                                  src={img}
+                                  alt={`${item.productName} - Image ${imgIndex + 1}`}
+                                  fill
                                     className="object-cover"
-                                    sizes="96px"
-                                  />
-                                </div>
-                              ))}
+                                  sizes="96px"
+                                />
+                              </div>
+                            ))}
                             </div>
                             <p className="text-xs text-gray-500">Click any image to view full size</p>
                           </div>

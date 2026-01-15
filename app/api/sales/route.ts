@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
                    'inventoryId', si.inventory_id::text,
                    'dressName', si.dress_name,
                    'dressType', si.dress_type,
-                   'dressCode', si.dress_code,
+                   'dressCode', COALESCE(si.dress_code, ''),
                    'size', si.size,
                    'quantity', si.quantity,
                    'usePerMeter', si.use_per_meter,
@@ -132,27 +132,97 @@ export async function POST(request: NextRequest) {
     // Insert sale items and update inventory stock
     if (body.items && body.items.length > 0) {
       for (const item of body.items) {
-        await query(
-          `INSERT INTO sale_items 
-           (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
-            quantity, use_per_meter, meters, price_per_meter, purchase_price, selling_price, profit)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [
-            saleId,
-            item.inventoryId ? parseInt(item.inventoryId) : null,
-            item.dressName,
-            item.dressType,
-            item.dressCode,
-            item.size,
-            item.quantity,
-            item.usePerMeter || false,
-            item.meters || null,
-            item.pricePerMeter || null,
-            item.purchasePrice,
-            item.sellingPrice,
-            item.profit,
-          ]
-        )
+        // ALWAYS ensure dress_code is present - fetch from inventory if missing
+        let dressCode = item.dressCode || ''
+        let inventoryId = item.inventoryId ? parseInt(item.inventoryId) : null
+        
+        // If inventoryId is provided, always fetch the latest dress_code from inventory
+        if (inventoryId) {
+          const inventoryResult = await query(
+            'SELECT dress_code, dress_name, dress_type FROM inventory WHERE id = $1',
+            [inventoryId]
+          )
+          if (inventoryResult.rows.length > 0) {
+            const inventory = inventoryResult.rows[0]
+            // Always use the latest dress_code from inventory to ensure consistency
+            if (inventory.dress_code) {
+              dressCode = inventory.dress_code
+              console.log(`📝 Using dress_code from inventory ${inventoryId}: ${dressCode}`)
+            }
+            // Also ensure dress_name and dress_type match inventory if not provided
+            const finalDressName = item.dressName || inventory.dress_name || ''
+            const finalDressType = item.dressType || inventory.dress_type || ''
+            
+            await query(
+              `INSERT INTO sale_items 
+               (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
+                quantity, use_per_meter, meters, price_per_meter, purchase_price, selling_price, profit)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              [
+                saleId,
+                inventoryId,
+                finalDressName,
+                finalDressType,
+                dressCode || null, // Always use the latest from inventory
+                item.size,
+                item.quantity,
+                item.usePerMeter || false,
+                item.meters || null,
+                item.pricePerMeter || null,
+                item.purchasePrice,
+                item.sellingPrice,
+                item.profit,
+              ]
+            )
+          } else {
+            // Inventory not found, but still insert with provided data
+            console.warn(`⚠️ Inventory ${inventoryId} not found, using provided data`)
+            await query(
+              `INSERT INTO sale_items 
+               (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
+                quantity, use_per_meter, meters, price_per_meter, purchase_price, selling_price, profit)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              [
+                saleId,
+                inventoryId,
+                item.dressName,
+                item.dressType,
+                dressCode || null,
+                item.size,
+                item.quantity,
+                item.usePerMeter || false,
+                item.meters || null,
+                item.pricePerMeter || null,
+                item.purchasePrice,
+                item.sellingPrice,
+                item.profit,
+              ]
+            )
+          }
+        } else {
+          // No inventoryId provided, use provided data
+          await query(
+            `INSERT INTO sale_items 
+             (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
+              quantity, use_per_meter, meters, price_per_meter, purchase_price, selling_price, profit)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [
+              saleId,
+              null,
+              item.dressName,
+              item.dressType,
+              dressCode || null,
+              item.size,
+              item.quantity,
+              item.usePerMeter || false,
+              item.meters || null,
+              item.pricePerMeter || null,
+              item.purchasePrice,
+              item.sellingPrice,
+              item.profit,
+            ]
+          )
+        }
         
         // Update inventory stock: decrease quantity_out and current_stock
         if (item.inventoryId) {
@@ -219,7 +289,7 @@ export async function POST(request: NextRequest) {
                     'inventoryId', si.inventory_id::text,
                     'dressName', si.dress_name,
                     'dressType', si.dress_type,
-                    'dressCode', si.dress_code,
+                    'dressCode', COALESCE(si.dress_code, ''),
                     'size', si.size,
                     'quantity', si.quantity,
                     'purchasePrice', si.purchase_price,
