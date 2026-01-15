@@ -177,7 +177,7 @@ export async function PUT(
 
       await client.query('COMMIT')
     } catch (transactionError) {
-      await client.query('ROLLBACK').catch((rollbackError) => {
+      await client.query('ROLLBACK').catch((rollbackError: unknown) => {
         console.error('Error rolling back transaction:', rollbackError)
       })
       throw transactionError
@@ -333,7 +333,7 @@ export async function DELETE(
 
       await client.query('COMMIT')
     } catch (transactionError) {
-      await client.query('ROLLBACK').catch((rollbackError) => {
+      await client.query('ROLLBACK').catch((rollbackError: unknown) => {
         console.error('Error rolling back transaction:', rollbackError)
       })
       throw transactionError
