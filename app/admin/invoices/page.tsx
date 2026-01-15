@@ -24,6 +24,7 @@ export default function InvoicesPage() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const [userRole, setUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [searchPartyName, setSearchPartyName] = useState<string>('')
 
   useEffect(() => {
     // Fetch user info first, then load data
@@ -781,13 +782,60 @@ export default function InvoicesPage() {
           </div>
         )}
 
-        {sales.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <p className="text-gray-500 text-lg">No sales recorded yet. Record a sale to generate invoices!</p>
+        {/* Search Bar */}
+        {sales.length > 0 && (
+          <div className="mb-6">
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label htmlFor="search-party" className="block text-sm font-medium text-gray-700 mb-2">
+                    Search by Party Name
+                  </label>
+                  <input
+                    id="search-party"
+                    type="text"
+                    value={searchPartyName}
+                    onChange={(e) => setSearchPartyName(e.target.value)}
+                    placeholder="Enter party name to search..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                {searchPartyName && (
+                  <button
+                    onClick={() => setSearchPartyName('')}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors mt-6"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
+        )}
+
+        {(() => {
+          // Filter sales based on search
+          const filteredSales = searchPartyName
+            ? sales.filter(sale => 
+                sale.partyName.toLowerCase().includes(searchPartyName.toLowerCase())
+              )
+            : sales
+
+          if (filteredSales.length === 0) {
+            return (
+              <div className="bg-white rounded-lg shadow-md p-12 text-center">
+                <p className="text-gray-500 text-lg">
+                  {searchPartyName 
+                    ? `No invoices found for "${searchPartyName}"` 
+                    : 'No sales recorded yet. Record a sale to generate invoices!'}
+                </p>
+              </div>
+            )
+          }
+
+          return (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
@@ -799,7 +847,7 @@ export default function InvoicesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sales.map((sale) => (
+                {filteredSales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {format(new Date(sale.date), 'dd MMM yyyy')}
@@ -917,7 +965,8 @@ export default function InvoicesPage() {
               </tbody>
             </table>
           </div>
-        )}
+          )
+        })()}
       </div>
     </AdminLayout>
   )
