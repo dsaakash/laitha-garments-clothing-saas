@@ -277,9 +277,9 @@ export default function SalesPage() {
         if (!invItem) throw new Error('Inventory item not found')
         
         // Ensure dressCode is always present - this is critical for invoices
-        const dressCode = invItem.dressCode || invItem.dress_code || ''
+        const dressCode = invItem.dressCode || ''
         if (!dressCode || dressCode.trim() === '') {
-          console.warn(`⚠️ Warning: Inventory item "${invItem.dressName}" (ID: ${invItem.id}) has no dress_code`)
+          console.warn(`⚠️ Warning: Inventory item "${invItem.dressName}" (ID: ${invItem.id}) has no dressCode`)
           alert(`Warning: Item "${invItem.dressName}" has no dress code. Please update the inventory item first.`)
         }
         
