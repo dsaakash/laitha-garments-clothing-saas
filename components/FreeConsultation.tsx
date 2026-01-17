@@ -252,12 +252,12 @@ export default function FreeConsultation() {
             >
               📅 Schedule Appointment
             </button>
-            <button
-              onClick={handleWhatsApp}
+          <button
+            onClick={handleWhatsApp}
               className="bg-green-500 hover:bg-green-600 text-white px-8 sm:px-10 py-3 sm:py-4 rounded-full font-semibold text-base sm:text-lg shadow-large transform transition-all duration-300 hover:scale-105 active:scale-95 min-h-[44px] flex items-center justify-center gap-2"
-            >
+          >
               💬 WhatsApp
-            </button>
+          </button>
           </div>
           
           <p className="text-sm text-gray-500 mt-4">

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
+import ItemSelectionModal from '@/components/ItemSelectionModal'
 import { Sale, InventoryItem, Customer } from '@/lib/storage'
 import { format } from 'date-fns'
 
@@ -20,9 +21,19 @@ export default function SalesPage() {
     email: '',
     address: '',
   })
+  const [showItemModal, setShowItemModal] = useState(false)
+  const [itemModalIndex, setItemModalIndex] = useState<number | null>(null)
   const [filterMonth, setFilterMonth] = useState('')
   const [filterYear, setFilterYear] = useState('')
   const [searchPartyName, setSearchPartyName] = useState<string>('')
+  const [selectedParty, setSelectedParty] = useState<string>('All')
+  const [salesSummary, setSalesSummary] = useState<{
+    totalSales: number
+    totalRevenue: number
+    averageSale: number
+    dateRange: { from: string; to: string } | null
+  } | null>(null)
+  const [uniqueParties, setUniqueParties] = useState<string[]>([])
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     partyName: '',
@@ -104,6 +115,25 @@ export default function SalesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Fetch next bill number when modal opens or date changes
+  useEffect(() => {
+    if (showModal && !editingSale) {
+      fetchNextBillNumber()
+    }
+  }, [showModal, formData.date, editingSale])
+
+  const fetchNextBillNumber = async () => {
+    try {
+      const response = await fetch(`/api/sales/next-bill-number?date=${formData.date}`)
+      const result = await response.json()
+      if (result.success && result.billNumber) {
+        setFormData(prev => ({ ...prev, billNumber: result.billNumber }))
+      }
+    } catch (error) {
+      console.error('Failed to fetch next bill number:', error)
+    }
+  }
+
   // Handle ESC key to close modals
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
@@ -130,7 +160,23 @@ export default function SalesPage() {
   useEffect(() => {
     loadSales()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterMonth, filterYear])
+  }, [filterMonth, filterYear, selectedParty])
+
+  useEffect(() => {
+    // Extract unique party names from sales
+    const parties = Array.from(new Set(sales.map(sale => sale.partyName))).sort()
+    setUniqueParties(parties)
+  }, [sales])
+
+  useEffect(() => {
+    // Load sales summary for selected party or all parties
+    if (selectedParty !== 'All') {
+      loadSalesSummary(selectedParty)
+    } else {
+      // Load summary for all parties
+      loadSalesSummary(null)
+    }
+  }, [selectedParty, filterMonth, filterYear])
 
   const loadData = async () => {
     try {
@@ -157,6 +203,9 @@ export default function SalesPage() {
       const params = new URLSearchParams()
       if (filterYear) params.append('year', filterYear)
       if (filterMonth) params.append('month', filterMonth)
+      if (selectedParty && selectedParty !== 'All') {
+        params.append('partyName', selectedParty)
+      }
       
       const response = await fetch(`/api/sales?${params.toString()}`)
       const result = await response.json()
@@ -168,11 +217,63 @@ export default function SalesPage() {
     }
   }
 
+  const loadSalesSummary = async (partyName: string | null) => {
+    try {
+      const params = new URLSearchParams()
+      if (partyName) {
+        params.append('partyName', partyName)
+      }
+      if (filterYear) {
+        const startDate = `${filterYear}-01-01`
+        const endDate = `${filterYear}-12-31`
+        params.append('startDate', startDate)
+        params.append('endDate', endDate)
+      } else if (filterMonth && filterYear) {
+        // If month is selected, use that month's date range
+        const daysInMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 0).getDate()
+        const startDate = `${filterYear}-${filterMonth}-01`
+        const endDate = `${filterYear}-${filterMonth}-${String(daysInMonth).padStart(2, '0')}`
+        params.append('startDate', startDate)
+        params.append('endDate', endDate)
+      }
+      
+      const response = await fetch(`/api/sales/summary?${params.toString()}`)
+      const result = await response.json()
+      if (result.success) {
+        setSalesSummary(result.data)
+      }
+    } catch (error) {
+      console.error('Failed to load sales summary:', error)
+    }
+  }
+
   const handleAddItem = () => {
+    const newIndex = formData.items.length
     setFormData({
       ...formData,
       items: [...formData.items, { inventoryId: '', size: '', quantity: 1, usePerMeter: false }],
     })
+    setItemModalIndex(newIndex)
+    setShowItemModal(true)
+  }
+
+  const handleItemSelect = (item: InventoryItem, index: number) => {
+    const stock = item.currentStock || 0
+    const status = getStockStatus(stock)
+    
+    if (status === 'out_of_stock') {
+      alert(`This item is out of stock. Current stock: 0`)
+      return
+    }
+    
+    handleItemChange(index, 'inventoryId', item.id)
+    setShowItemModal(false)
+    setItemModalIndex(null)
+  }
+
+  const handleOpenItemModal = (index: number) => {
+    setItemModalIndex(index)
+    setShowItemModal(true)
   }
 
   const handleItemChange = (index: number, field: string, value: string | number) => {
@@ -499,6 +600,28 @@ export default function SalesPage() {
     return inventory.find(item => item.id === inventoryId)
   }
 
+  const getStockStatus = (stock: number | undefined): 'in_stock' | 'low_stock' | 'out_of_stock' => {
+    if (!stock || stock === 0) return 'out_of_stock'
+    if (stock <= 5) return 'low_stock'
+    return 'in_stock'
+  }
+
+  const getStockStatusColor = (status: 'in_stock' | 'low_stock' | 'out_of_stock'): string => {
+    switch (status) {
+      case 'in_stock': return 'text-green-600 bg-green-50 border-green-200'
+      case 'low_stock': return 'text-yellow-600 bg-yellow-50 border-yellow-200'
+      case 'out_of_stock': return 'text-red-600 bg-red-50 border-red-200'
+    }
+  }
+
+  const getStockStatusText = (status: 'in_stock' | 'low_stock' | 'out_of_stock', stock: number): string => {
+    switch (status) {
+      case 'in_stock': return `In Stock (${stock} available)`
+      case 'low_stock': return `Low Stock (${stock} available)`
+      case 'out_of_stock': return 'Out of Stock'
+    }
+  }
+
   const currentYear = new Date().getFullYear()
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
 
@@ -524,16 +647,46 @@ export default function SalesPage() {
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <div className="space-y-4">
-            {/* Search by Party Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search by Party Name</label>
-              <input
-                type="text"
-                value={searchPartyName}
-                onChange={(e) => setSearchPartyName(e.target.value)}
-                placeholder="Enter party name to search..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
+            {/* Party Filter */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Party</label>
+                <select
+                  value={selectedParty}
+                  onChange={(e) => {
+                    setSelectedParty(e.target.value)
+                    setSearchPartyName('') // Clear search when party is selected
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="All">All Parties</option>
+                  {uniqueParties.map(party => (
+                    <option key={party} value={party}>{party}</option>
+                  ))}
+                </select>
+                {selectedParty !== 'All' && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {sales.filter(s => s.partyName === selectedParty).length} sales for this party
+                  </p>
+                )}
+              </div>
+              
+              {/* Search by Party Name (for quick search) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quick Search by Party Name</label>
+                <input
+                  type="text"
+                  value={searchPartyName}
+                  onChange={(e) => {
+                    setSearchPartyName(e.target.value)
+                    if (e.target.value) {
+                      setSelectedParty('All') // Reset party filter when searching
+                    }
+                  }}
+                  placeholder="Type to search party name..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
             </div>
             
             {/* Date Filters */}
@@ -573,12 +726,13 @@ export default function SalesPage() {
                 <option value="12">December</option>
               </select>
             </div>
-              {(filterMonth || filterYear || searchPartyName) && (
+              {(filterMonth || filterYear || searchPartyName || selectedParty !== 'All') && (
               <button
                 onClick={() => {
                   setFilterMonth('')
                   setFilterYear('')
-                    setSearchPartyName('')
+                  setSearchPartyName('')
+                  setSelectedParty('All')
                 }}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
               >
@@ -589,12 +743,45 @@ export default function SalesPage() {
           </div>
         </div>
 
+        {/* Sales Summary Card */}
+        {salesSummary && (
+          <div className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg shadow-lg p-6 mb-6 text-white">
+            <h2 className="text-xl font-bold mb-4">
+              Sales Summary {selectedParty !== 'All' ? `for ${selectedParty}` : 'for All Parties'}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
+                <p className="text-sm opacity-90 mb-1">Total Sales</p>
+                <p className="text-3xl font-bold">{salesSummary.totalSales}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
+                <p className="text-sm opacity-90 mb-1">Total Revenue</p>
+                <p className="text-3xl font-bold">₹{salesSummary.totalRevenue.toLocaleString('en-IN')}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
+                <p className="text-sm opacity-90 mb-1">Average Sale</p>
+                <p className="text-3xl font-bold">₹{Math.round(salesSummary.averageSale).toLocaleString('en-IN')}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
+                <p className="text-sm opacity-90 mb-1">Date Range</p>
+                {salesSummary.dateRange ? (
+                  <p className="text-sm font-medium">
+                    {format(new Date(salesSummary.dateRange.from), 'dd MMM yyyy')} - {format(new Date(salesSummary.dateRange.to), 'dd MMM yyyy')}
+                  </p>
+                ) : (
+                  <p className="text-sm font-medium">N/A</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {(() => {
           // Filter sales based on search and date filters
           let filteredSales = sales
           
-          // Apply party name search filter
-          if (searchPartyName) {
+          // Apply party name search filter (only if party dropdown is not selected)
+          if (searchPartyName && selectedParty === 'All') {
             filteredSales = filteredSales.filter(sale => 
               sale.partyName.toLowerCase().includes(searchPartyName.toLowerCase())
             )
@@ -770,13 +957,20 @@ export default function SalesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bill Number *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Bill Number *
+                      <span className="ml-2 text-xs text-gray-500 font-normal">
+                        (Auto-generated, click to edit)
+                      </span>
+                    </label>
                     <input
                       type="text"
                       required
                       value={formData.billNumber}
                       onChange={(e) => setFormData({ ...formData, billNumber: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50"
+                      placeholder="Will be auto-generated..."
+                      title="Bill number is auto-generated. You can edit it if needed for special cases."
                     />
                   </div>
                 </div>
@@ -800,19 +994,19 @@ export default function SalesPage() {
                   </div>
                   {useCustomer ? (
                     <div className="flex gap-2">
-                      <select
-                        required
-                        value={formData.customerId}
-                        onChange={(e) => handleCustomerSelect(e.target.value)}
+                    <select
+                      required
+                      value={formData.customerId}
+                      onChange={(e) => handleCustomerSelect(e.target.value)}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      >
-                        <option value="">Select Customer</option>
-                        {customers.map(customer => (
-                          <option key={customer.id} value={customer.id}>
-                            {customer.name} - {customer.phone}
-                          </option>
-                        ))}
-                      </select>
+                    >
+                      <option value="">Select Customer</option>
+                      {customers.map(customer => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.name} - {customer.phone}
+                        </option>
+                      ))}
+                    </select>
                       <button
                         type="button"
                         onClick={() => setShowCustomerModal(true)}
@@ -901,19 +1095,39 @@ export default function SalesPage() {
                             <div className="grid grid-cols-3 gap-4 mb-3">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Dress *</label>
-                                <select
-                                  required
-                                  value={item.inventoryId}
-                                  onChange={(e) => handleItemChange(index, 'inventoryId', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                >
-                                  <option value="">Select Item</option>
-                                  {inventory.map(inv => (
-                                    <option key={inv.id} value={inv.id}>
-                                      {inv.dressName} ({inv.dressType}) - {inv.dressCode}
-                                    </option>
-                                  ))}
-                                </select>
+                                {selectedItem ? (
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenItemModal(index)}
+                                        className="flex-1 px-3 py-2 border-2 border-purple-300 bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 text-left flex items-center justify-between"
+                                      >
+                                        <span className="font-medium">{selectedItem.dressName}</span>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    <div className={`px-2 py-1 rounded text-xs font-medium border ${getStockStatusColor(getStockStatus(selectedItem.currentStock))}`}>
+                                      {getStockStatusText(getStockStatus(selectedItem.currentStock), selectedItem.currentStock || 0)}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      Code: {selectedItem.dressCode} • {selectedItem.dressType}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenItemModal(index)}
+                                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-purple-400 hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-600 flex items-center justify-center gap-2"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <span>Search & Select Product</span>
+                                  </button>
+                                )}
                               </div>
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Size *</label>
@@ -936,10 +1150,30 @@ export default function SalesPage() {
                                   type="number"
                                   required
                                   min="1"
+                                  max={selectedItem?.currentStock || undefined}
                                   value={item.quantity}
-                                  onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value))}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  onChange={(e) => {
+                                    const quantity = parseInt(e.target.value) || 0
+                                    const availableStock = selectedItem?.currentStock || 0
+                                    
+                                    if (quantity > availableStock) {
+                                      alert(`Insufficient stock. Available: ${availableStock}, Requested: ${quantity}`)
+                                      return
+                                    }
+                                    
+                                    handleItemChange(index, 'quantity', quantity)
+                                  }}
+                                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                                    selectedItem && item.quantity > (selectedItem.currentStock || 0)
+                                      ? 'border-red-300 bg-red-50'
+                                      : 'border-gray-300'
+                                  }`}
                                 />
+                                {selectedItem && item.quantity > (selectedItem.currentStock || 0) && (
+                                  <p className="mt-1 text-xs text-red-600">
+                                    Only {selectedItem.currentStock || 0} units available
+                                  </p>
+                                )}
                               </div>
                             </div>
                             {/* Per Meter Pricing Option */}
@@ -1479,6 +1713,19 @@ export default function SalesPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Item Selection Modal */}
+        {showItemModal && itemModalIndex !== null && (
+          <ItemSelectionModal
+            isOpen={showItemModal}
+            onClose={() => {
+              setShowItemModal(false)
+              setItemModalIndex(null)
+            }}
+            onSelect={(item) => handleItemSelect(item, itemModalIndex)}
+            inventory={inventory}
+          />
         )}
 
         {/* Customer Creation Modal */}

@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const month = searchParams.get('month')
     const year = searchParams.get('year')
     const customerId = searchParams.get('customer_id')
+    const partyName = searchParams.get('partyName')
     
     let queryText = `
       SELECT s.*, 
@@ -40,6 +41,12 @@ export async function GET(request: NextRequest) {
     if (customerId) {
       conditions.push(`s.customer_id = $${paramCount}`)
       params.push(parseInt(customerId))
+      paramCount++
+    }
+    
+    if (partyName) {
+      conditions.push(`LOWER(s.party_name) = LOWER($${paramCount})`)
+      params.push(partyName)
       paramCount++
     }
     
@@ -99,6 +106,21 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
+    // Auto-generate bill number if not provided
+    let billNumber = body.billNumber
+    if (!billNumber || billNumber.trim() === '') {
+      // Extract year from sale date
+      const saleDate = new Date(body.date)
+      const year = saleDate.getFullYear()
+      
+      // Generate bill number using the function
+      const billNumberResult = await query(
+        'SELECT get_next_bill_number($1) as bill_number',
+        [year]
+      )
+      billNumber = billNumberResult.rows[0].bill_number
+    }
+    
     // Start transaction - insert sale first
     const saleResult = await query(
       `INSERT INTO sales 
@@ -110,7 +132,7 @@ export async function POST(request: NextRequest) {
         body.date,
         body.partyName,
         body.customerId ? parseInt(body.customerId) : null,
-        body.billNumber,
+        billNumber,
         body.subtotal || body.totalAmount,
         body.discountType || null,
         body.discountPercentage || null,
@@ -131,6 +153,38 @@ export async function POST(request: NextRequest) {
     
     // Insert sale items and update inventory stock
     if (body.items && body.items.length > 0) {
+      // First, validate stock for all items before processing
+      for (const item of body.items) {
+        const inventoryId = item.inventoryId ? parseInt(item.inventoryId) : null
+        if (inventoryId) {
+          const inventoryResult = await query(
+            'SELECT current_stock, dress_name, dress_code FROM inventory WHERE id = $1',
+            [inventoryId]
+          )
+          if (inventoryResult.rows.length > 0) {
+            const inventoryItem = inventoryResult.rows[0]
+            const availableStock = parseInt(inventoryItem.current_stock) || 0
+            const requestedQuantity = item.quantity || 0
+            
+            if (availableStock < requestedQuantity) {
+              return NextResponse.json(
+                { 
+                  success: false, 
+                  message: `Insufficient stock for ${inventoryItem.dress_name} (${inventoryItem.dress_code}). Available: ${availableStock}, Requested: ${requestedQuantity}` 
+                },
+                { status: 400 }
+              )
+            }
+          } else {
+            return NextResponse.json(
+              { success: false, message: `Inventory item not found for ID: ${inventoryId}` },
+              { status: 400 }
+            )
+          }
+        }
+      }
+      
+      // Now process items if all validations pass
       for (const item of body.items) {
         // ALWAYS ensure dress_code is present - fetch from inventory if missing
         let dressCode = item.dressCode || ''

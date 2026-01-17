@@ -21,6 +21,7 @@ export interface InventoryItem {
   quantityIn?: number
   quantityOut?: number
   currentStock?: number
+  category?: string // Category (Kurtis, Dresses, Sarees, Home Textiles, etc.)
   createdAt: string
   updatedAt: string
 }

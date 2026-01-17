@@ -94,6 +94,47 @@ export async function PUT(
 
       // Insert new sale items and update inventory stock
       if (body.items && body.items.length > 0) {
+        // First, validate stock for all items before processing
+        for (const item of body.items) {
+          const inventoryId = item.inventoryId ? parseInt(item.inventoryId) : null
+          if (inventoryId) {
+            const inventoryResult = await client.query(
+              'SELECT current_stock, dress_name, dress_code FROM inventory WHERE id = $1',
+              [inventoryId]
+            )
+            if (inventoryResult.rows.length > 0) {
+              const inventoryItem = inventoryResult.rows[0]
+              const availableStock = parseInt(inventoryItem.current_stock) || 0
+              // For updates, we need to account for items that were already in the sale
+              // Find if this item was in the old sale and restore that quantity
+              const oldItem = oldItems.find((oi: any) => oi.inventory_id === inventoryId)
+              const restoredQuantity = oldItem ? (oldItem.use_per_meter && oldItem.meters ? oldItem.meters : oldItem.quantity) : 0
+              const effectiveStock = availableStock + restoredQuantity
+              const requestedQuantity = item.quantity || 0
+              
+              if (effectiveStock < requestedQuantity) {
+                await client.query('ROLLBACK')
+                client.release()
+                return NextResponse.json(
+                  { 
+                    success: false, 
+                    message: `Insufficient stock for ${inventoryItem.dress_name} (${inventoryItem.dress_code}). Available: ${effectiveStock}, Requested: ${requestedQuantity}` 
+                  },
+                  { status: 400 }
+                )
+              }
+            } else {
+              await client.query('ROLLBACK')
+              client.release()
+              return NextResponse.json(
+                { success: false, message: `Inventory item not found for ID: ${inventoryId}` },
+                { status: 400 }
+              )
+            }
+          }
+        }
+        
+        // Now process items if all validations pass
         for (const item of body.items) {
           // Validate required fields
           if (!item.dressName || !item.dressType || item.quantity === undefined || item.quantity === null) {

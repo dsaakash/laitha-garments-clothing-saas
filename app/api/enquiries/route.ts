@@ -115,12 +115,12 @@ export async function POST(request: NextRequest) {
     } else {
       // Insert without booking fields (backward compatibility)
       result = await query(
-        `INSERT INTO customer_enquiries 
-         (customer_name, customer_phone, product_id, product_name, product_code, fabric_type, enquiry_method, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-         RETURNING *`,
+      `INSERT INTO customer_enquiries 
+       (customer_name, customer_phone, product_id, product_name, product_code, fabric_type, enquiry_method, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+       RETURNING *`,
         [customerName, customerPhoneValue, productIdInt, productName, productCode || null, fabricType || null, enquiryMethod]
-      )
+    )
     }
 
     return NextResponse.json({

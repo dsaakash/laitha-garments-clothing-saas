@@ -36,13 +36,13 @@ export async function PUT(
     let paramIndex = 1
 
     if (status) {
-      const validStatuses = ['pending', 'contacted', 'resolved', 'closed']
-      if (!validStatuses.includes(status)) {
-        return NextResponse.json(
-          { success: false, error: 'Invalid status' },
-          { status: 400 }
-        )
-      }
+    const validStatuses = ['pending', 'contacted', 'resolved', 'closed']
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid status' },
+        { status: 400 }
+      )
+    }
       updateFields.push(`status = $${paramIndex}`)
       updateValues.push(status)
       paramIndex++

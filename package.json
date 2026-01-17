@@ -39,7 +39,8 @@
     "migrate-categories": "node scripts/run-categories-migration.js",
     "migrate-transport": "node scripts/run-transport-migration.js",
     "migrate-dress-codes": "node scripts/run-dress-codes-migration.js",
-    "fix-dress-codes": "node scripts/fix-missing-dress-codes.js"
+    "fix-dress-codes": "node scripts/fix-missing-dress-codes.js",
+    "migrate-bill-numbers": "node scripts/run-bill-number-migration.js"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
