@@ -558,7 +558,7 @@ export default function EnquiriesPage() {
                         )}
                         {!selectedEnquiry.booking_type && !selectedEnquiry.appointment_date && (
                           <div>
-                            <p className="text-sm text-gray-500 italic mb-2">No booking details yet. Click "Edit Booking" or "Create Appointment" to add appointment details.</p>
+                            <p className="text-sm text-gray-500 italic mb-2">No booking details yet. Click &quot;Edit Booking&quot; or &quot;Create Appointment&quot; to add appointment details.</p>
                             <p className="text-xs text-gray-400">All appointment details will be saved to the database for tracking and follow-up.</p>
                           </div>
                         )}
