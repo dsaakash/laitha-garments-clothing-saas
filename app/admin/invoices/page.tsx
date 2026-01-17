@@ -273,7 +273,7 @@ export default function InvoicesPage() {
       // Only show address if provided
       if (profile.address) {
         doc.text(profile.address, 14, yPos)
-        yPos += 6
+      yPos += 6
       }
       
       // Only show contact info if provided
@@ -386,7 +386,7 @@ export default function InvoicesPage() {
           item.dressType || '',
           wrappedCode || dressCode || '[NO CODE]', // Always show code
           item.size || '',
-          item.quantity.toString(),
+        item.quantity.toString(),
           priceText,
         ]
       })
@@ -834,8 +834,8 @@ export default function InvoicesPage() {
           }
 
           return (
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>

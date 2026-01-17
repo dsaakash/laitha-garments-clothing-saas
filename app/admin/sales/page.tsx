@@ -487,54 +487,54 @@ export default function SalesPage() {
             </div>
             
             {/* Date Filters */}
-            <div className="flex gap-4 items-end">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Year</label>
-                <select
-                  value={filterYear}
-                  onChange={(e) => setFilterYear(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">All Years</option>
-                  {years.map(year => (
-                    <option key={year} value={year.toString()}>{year}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Month</label>
-                <select
-                  value={filterMonth}
-                  onChange={(e) => setFilterMonth(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">All Months</option>
-                  <option value="01">January</option>
-                  <option value="02">February</option>
-                  <option value="03">March</option>
-                  <option value="04">April</option>
-                  <option value="05">May</option>
-                  <option value="06">June</option>
-                  <option value="07">July</option>
-                  <option value="08">August</option>
-                  <option value="09">September</option>
-                  <option value="10">October</option>
-                  <option value="11">November</option>
-                  <option value="12">December</option>
-                </select>
-              </div>
+          <div className="flex gap-4 items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Year</label>
+              <select
+                value={filterYear}
+                onChange={(e) => setFilterYear(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">All Years</option>
+                {years.map(year => (
+                  <option key={year} value={year.toString()}>{year}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Month</label>
+              <select
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">All Months</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </div>
               {(filterMonth || filterYear || searchPartyName) && (
-                <button
-                  onClick={() => {
-                    setFilterMonth('')
-                    setFilterYear('')
+              <button
+                onClick={() => {
+                  setFilterMonth('')
+                  setFilterYear('')
                     setSearchPartyName('')
-                  }}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-                >
-                  Clear Filters
-                </button>
-              )}
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+              >
+                Clear Filters
+              </button>
+            )}
             </div>
           </div>
         </div>
@@ -552,18 +552,18 @@ export default function SalesPage() {
           
           if (filteredSales.length === 0) {
             return (
-              <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <div className="bg-white rounded-lg shadow-md p-12 text-center">
                 <p className="text-gray-500 text-lg">
                   {searchPartyName || filterMonth || filterYear
                     ? `No sales found matching your filters.`
                     : 'No sales recorded yet. Record your first sale!'}
                 </p>
-              </div>
+          </div>
             )
           }
           
           return (
-            <div className="space-y-4">
+          <div className="space-y-4">
               {filteredSales.map((sale) => {
               const totalProfit = sale.items.reduce((sum, item) => sum + item.profit, 0)
               return (
@@ -576,9 +576,9 @@ export default function SalesPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-green-600">₹{sale.totalAmount.toLocaleString()}</p>
-                        <p className="text-sm text-gray-500">Profit: ₹{totalProfit.toLocaleString()}</p>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-green-600">₹{sale.totalAmount.toLocaleString()}</p>
+                      <p className="text-sm text-gray-500">Profit: ₹{totalProfit.toLocaleString()}</p>
                       </div>
                       <div className="flex gap-2">
                         <button

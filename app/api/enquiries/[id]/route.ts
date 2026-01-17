@@ -7,31 +7,111 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    const { status, notes } = body
+    const { 
+      status, 
+      notes,
+      bookingType,
+      meetingLink,
+      appointmentDate,
+      appointmentTime,
+      calendarEventId,
+      customerName,
+      customerPhone
+    } = body
     const id = params.id
 
-    if (!status) {
+    // Check if booking fields exist in table
+    const checkColumns = await query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'customer_enquiries' 
+      AND column_name IN ('booking_type', 'meeting_link', 'appointment_date', 'appointment_time', 'calendar_event_id')
+    `)
+    
+    const hasBookingFields = checkColumns.rows.length > 0
+
+    // Build update query dynamically
+    const updateFields: string[] = []
+    const updateValues: any[] = []
+    let paramIndex = 1
+
+    if (status) {
+      const validStatuses = ['pending', 'contacted', 'resolved', 'closed']
+      if (!validStatuses.includes(status)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid status' },
+          { status: 400 }
+        )
+      }
+      updateFields.push(`status = $${paramIndex}`)
+      updateValues.push(status)
+      paramIndex++
+    }
+
+    if (notes !== undefined) {
+      updateFields.push(`notes = $${paramIndex}`)
+      updateValues.push(notes || null)
+      paramIndex++
+    }
+
+    if (hasBookingFields) {
+      if (bookingType !== undefined) {
+        updateFields.push(`booking_type = $${paramIndex}`)
+        updateValues.push(bookingType || null)
+        paramIndex++
+      }
+      if (meetingLink !== undefined) {
+        updateFields.push(`meeting_link = $${paramIndex}`)
+        updateValues.push(meetingLink || null)
+        paramIndex++
+      }
+      if (appointmentDate !== undefined) {
+        updateFields.push(`appointment_date = $${paramIndex}`)
+        updateValues.push(appointmentDate || null)
+        paramIndex++
+      }
+      if (appointmentTime !== undefined) {
+        updateFields.push(`appointment_time = $${paramIndex}`)
+        updateValues.push(appointmentTime || null)
+        paramIndex++
+      }
+      if (calendarEventId !== undefined) {
+        updateFields.push(`calendar_event_id = $${paramIndex}`)
+        updateValues.push(calendarEventId || null)
+        paramIndex++
+      }
+    }
+
+    if (customerName !== undefined) {
+      updateFields.push(`customer_name = $${paramIndex}`)
+      updateValues.push(customerName)
+      paramIndex++
+    }
+
+    if (customerPhone !== undefined) {
+      updateFields.push(`customer_phone = $${paramIndex}`)
+      updateValues.push(customerPhone)
+      paramIndex++
+    }
+
+    if (updateFields.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Status is required' },
+        { success: false, error: 'No fields to update' },
         { status: 400 }
       )
     }
 
-    const validStatuses = ['pending', 'contacted', 'resolved', 'closed']
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid status' },
-        { status: 400 }
-      )
-    }
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`)
+    updateValues.push(id)
 
-    const result = await query(
-      `UPDATE customer_enquiries 
-       SET status = $1, notes = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3
-       RETURNING *`,
-      [status, notes || null, id]
-    )
+    const queryText = `
+      UPDATE customer_enquiries 
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `
+
+    const result = await query(queryText, updateValues)
 
     if (result.rows.length === 0) {
       return NextResponse.json(

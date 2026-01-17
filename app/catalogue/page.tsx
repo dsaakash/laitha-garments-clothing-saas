@@ -14,15 +14,74 @@ interface CatalogueItem {
   price: string
 }
 
-const categories = ['All', 'Kurtis', 'Dresses', 'Sarees']
+const categories = ['All', 'Kurtis', 'Dresses', 'Sarees', 'Home Textiles']
 
-// Map dress types to categories
-const getCategory = (dressType: string): string => {
-  const type = dressType.toLowerCase()
-  if (type.includes('kurta') || type.includes('kurti')) return 'Kurtis'
-  if (type.includes('dress') || type.includes('anarkali')) return 'Dresses'
-  if (type.includes('saree') || type.includes('sari')) return 'Sarees'
-  return 'Kurtis' // default
+// Map dress types and names to categories - improved matching
+const getCategory = (dressType: string, dressName: string = ''): string => {
+  // Combine both dressType and dressName for better matching
+  const searchText = `${dressType || ''} ${dressName || ''}`.toLowerCase().trim()
+  
+  if (!searchText) return 'Kurtis' // default
+  
+  // Home Textiles - check first for bedsheets, pillow covers, etc.
+  if (
+    searchText.includes('bedsheet') || 
+    searchText.includes('bed sheet') || 
+    searchText.includes('bed-sheet') ||
+    searchText.includes('pillow cover') ||
+    searchText.includes('pillowcover') ||
+    searchText.includes('pillow') ||
+    searchText.includes('sheeting') ||
+    searchText.includes('percale') ||
+    searchText.includes('duck') ||
+    searchText.includes('cashment') ||
+    searchText.includes('bedsheet-single') ||
+    searchText.includes('bedsheet-double') ||
+    searchText.includes('bedsheet-king') ||
+    searchText.includes('quilt') ||
+    searchText.includes('comforter') ||
+    searchText.includes('blanket') ||
+    searchText.includes('curtain') ||
+    searchText.includes('cushion')
+  ) {
+    return 'Home Textiles'
+  }
+  
+  // Sarees - check for saree-related terms
+  if (
+    searchText.includes('saree') || 
+    searchText.includes('sari') || 
+    searchText.includes('sare')
+  ) {
+    return 'Sarees'
+  }
+  
+  // Dresses - check for dress-related terms
+  if (
+    searchText.includes('dress') || 
+    searchText.includes('anarkali') || 
+    searchText.includes('gown') ||
+    searchText.includes('frock') ||
+    searchText.includes('lehenga') ||
+    searchText.includes('maxi') ||
+    searchText.includes('midi')
+  ) {
+    return 'Dresses'
+  }
+  
+  // Kurtis - check for kurta/kurti related terms
+  if (
+    searchText.includes('kurta') || 
+    searchText.includes('kurti') ||
+    searchText.includes('top') ||
+    searchText.includes('tunic') ||
+    searchText.includes('kameez')
+  ) {
+    return 'Kurtis'
+  }
+  
+  // Default to Kurtis if no match
+  return 'Kurtis'
 }
 
 export default function CataloguePage() {
@@ -55,7 +114,7 @@ export default function CataloguePage() {
             return {
               id: item.id,
               name: item.dressName,
-              category: getCategory(item.dressType),
+              category: item.category || getCategory(item.dressType, item.dressName),
               image: image,
               description: `${item.dressType} - ${item.dressCode || ''}`,
               price: 'Custom Pricing',
@@ -77,7 +136,26 @@ export default function CataloguePage() {
       ? catalogueItems
       : catalogueItems.filter((item) => item.category === selectedCategory)
 
-  const handleWhatsApp = (itemName: string) => {
+  const handleWhatsApp = async (itemName: string, itemId?: string) => {
+    try {
+      // Create enquiry for this product
+      await fetch('/api/enquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: 'Catalogue Visitor',
+          customerPhone: '',
+          productId: itemId || null,
+          productName: itemName,
+          productCode: null,
+          fabricType: null,
+          enquiryMethod: 'whatsapp'
+        })
+      })
+    } catch (error) {
+      console.error('Failed to create enquiry:', error)
+    }
+    
     const message = `Hi, I'm interested in ${itemName}. Can you provide more details?`
     window.open(`https://wa.me/917204219541?text=${encodeURIComponent(message)}`, '_blank')
   }
@@ -180,7 +258,7 @@ export default function CataloguePage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleWhatsApp(item.name)}
+                    onClick={() => handleWhatsApp(item.name, item.id)}
                     className="w-full bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white py-3.5 rounded-xl font-semibold text-sm transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-100"
                   >
                     Inquire on WhatsApp

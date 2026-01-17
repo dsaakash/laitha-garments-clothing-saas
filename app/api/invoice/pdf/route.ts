@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
     
     // Only show address if provided
     if (businessProfile.address) {
-      doc.text(businessProfile.address, 14, yPos)
-      yPos += 6
+    doc.text(businessProfile.address, 14, yPos)
+    yPos += 6
     }
     
     // Only show contact info if provided

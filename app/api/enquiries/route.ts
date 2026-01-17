@@ -43,15 +43,31 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { customerName, customerPhone, productId, productName, productCode, fabricType, enquiryMethod = 'form' } = body
+    const { 
+      customerName, 
+      customerPhone, 
+      productId, 
+      productName, 
+      productCode, 
+      fabricType, 
+      enquiryMethod = 'form',
+      bookingType,
+      meetingLink,
+      appointmentDate,
+      appointmentTime,
+      calendarEventId
+    } = body
 
-    // Validate required fields
-    if (!customerName || !customerPhone || !productName) {
+    // Validate required fields - allow calendar bookings without phone
+    if (!customerName || !productName) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: customerName, customerPhone, productName' },
+        { success: false, error: 'Missing required fields: customerName, productName' },
         { status: 400 }
       )
     }
+
+    // For calendar bookings, phone might be empty initially
+    const customerPhoneValue = customerPhone || ''
 
     // Convert productId to integer if it's a string
     let productIdInt = null
@@ -62,13 +78,50 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = await query(
-      `INSERT INTO customer_enquiries 
-       (customer_name, customer_phone, product_id, product_name, product_code, fabric_type, enquiry_method, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-       RETURNING *`,
-      [customerName, customerPhone, productIdInt, productName, productCode || null, fabricType || null, enquiryMethod]
-    )
+    // Check if booking fields exist in table (for migration compatibility)
+    const checkColumns = await query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'customer_enquiries' 
+      AND column_name IN ('booking_type', 'meeting_link', 'appointment_date', 'appointment_time', 'calendar_event_id')
+    `)
+    
+    const hasBookingFields = checkColumns.rows.length > 0
+
+    let result
+    if (hasBookingFields) {
+      // Insert with booking fields
+      result = await query(
+        `INSERT INTO customer_enquiries 
+         (customer_name, customer_phone, product_id, product_name, product_code, fabric_type, 
+          enquiry_method, status, booking_type, meeting_link, appointment_date, appointment_time, calendar_event_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12)
+         RETURNING *`,
+        [
+          customerName, 
+          customerPhoneValue, 
+          productIdInt, 
+          productName, 
+          productCode || null, 
+          fabricType || null, 
+          enquiryMethod,
+          bookingType || null,
+          meetingLink || null,
+          appointmentDate || null,
+          appointmentTime || null,
+          calendarEventId || null
+        ]
+      )
+    } else {
+      // Insert without booking fields (backward compatibility)
+      result = await query(
+        `INSERT INTO customer_enquiries 
+         (customer_name, customer_phone, product_id, product_name, product_code, fabric_type, enquiry_method, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+         RETURNING *`,
+        [customerName, customerPhoneValue, productIdInt, productName, productCode || null, fabricType || null, enquiryMethod]
+      )
+    }
 
     return NextResponse.json({
       success: true,

@@ -1,7 +1,34 @@
 'use client'
 
+import { useState } from 'react'
+
 export default function WhatsAppFloat() {
-  const handleWhatsApp = () => {
+  const [clicked, setClicked] = useState(false)
+
+  const handleWhatsApp = async () => {
+    // Create a basic enquiry when WhatsApp float is clicked
+    if (!clicked) {
+      setClicked(true)
+      try {
+        await fetch('/api/enquiries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerName: 'Website Visitor',
+            customerPhone: '',
+            productName: 'General Inquiry - WhatsApp Float',
+            productCode: null,
+            fabricType: null,
+            enquiryMethod: 'whatsapp'
+          })
+        })
+      } catch (error) {
+        console.error('Failed to create enquiry:', error)
+      }
+      // Reset after 5 seconds to allow multiple clicks
+      setTimeout(() => setClicked(false), 5000)
+    }
+    
     window.open('https://wa.me/917204219541', '_blank')
   }
 

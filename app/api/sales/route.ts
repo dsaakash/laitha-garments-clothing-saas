@@ -201,27 +201,27 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // No inventoryId provided, use provided data
-          await query(
-            `INSERT INTO sale_items 
-             (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
-              quantity, use_per_meter, meters, price_per_meter, purchase_price, selling_price, profit)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-            [
-              saleId,
+        await query(
+          `INSERT INTO sale_items 
+           (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
+            quantity, use_per_meter, meters, price_per_meter, purchase_price, selling_price, profit)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            saleId,
               null,
-              item.dressName,
-              item.dressType,
+            item.dressName,
+            item.dressType,
               dressCode || null,
-              item.size,
-              item.quantity,
-              item.usePerMeter || false,
-              item.meters || null,
-              item.pricePerMeter || null,
-              item.purchasePrice,
-              item.sellingPrice,
-              item.profit,
-            ]
-          )
+            item.size,
+            item.quantity,
+            item.usePerMeter || false,
+            item.meters || null,
+            item.pricePerMeter || null,
+            item.purchasePrice,
+            item.sellingPrice,
+            item.profit,
+          ]
+        )
         }
         
         // Update inventory stock: decrease quantity_out and current_stock

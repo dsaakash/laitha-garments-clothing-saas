@@ -12,7 +12,7 @@ interface CustomerEnquiry {
   product_name: string
   product_code: string | null
   fabric_type: string | null
-  enquiry_method: 'form' | 'whatsapp'
+  enquiry_method: 'form' | 'whatsapp' | 'calendar'
   status: 'pending' | 'contacted' | 'resolved' | 'closed'
   notes: string | null
   created_at: string
@@ -20,6 +20,11 @@ interface CustomerEnquiry {
   product_dress_name?: string
   product_dress_code?: string
   product_image_url?: string
+  booking_type?: 'visit' | 'online_meeting' | 'product_showcase' | 'online' | null
+  meeting_link?: string | null
+  appointment_date?: string | null
+  appointment_time?: string | null
+  calendar_event_id?: string | null
 }
 
 export default function EnquiriesPage() {
@@ -29,6 +34,20 @@ export default function EnquiriesPage() {
   const [selectedEnquiry, setSelectedEnquiry] = useState<CustomerEnquiry | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [showBookingForm, setShowBookingForm] = useState(false)
+  const [bookingData, setBookingData] = useState({
+    bookingType: '' as 'visit' | 'online_meeting' | 'product_showcase' | '',
+    meetingLink: '',
+    appointmentDate: '',
+    appointmentTime: '',
+    customerName: '',
+    customerPhone: '',
+    notes: ''
+  })
+  const [showNotesForm, setShowNotesForm] = useState(false)
+  const [notesText, setNotesText] = useState('')
+  
+  const GOOGLE_CALENDAR_LINK = 'https://calendar.app.google/jYyt5esKUUCRmC6y5'
 
   const loadEnquiries = useCallback(async () => {
     try {
@@ -118,7 +137,106 @@ export default function EnquiriesPage() {
   }
 
   const getMethodIcon = (method: string) => {
-    return method === 'whatsapp' ? '💬' : '📝'
+    if (method === 'whatsapp') return '💬'
+    if (method === 'calendar') return '📅'
+    return '📝'
+  }
+
+  const handleUpdateBooking = async () => {
+    if (!selectedEnquiry) return
+    
+    setUpdating(true)
+    try {
+      const response = await fetch(`/api/enquiries/${selectedEnquiry.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingType: bookingData.bookingType || null,
+          meetingLink: bookingData.meetingLink || null,
+          appointmentDate: bookingData.appointmentDate || null,
+          appointmentTime: bookingData.appointmentTime || null,
+          customerName: bookingData.customerName || selectedEnquiry.customer_name,
+          customerPhone: bookingData.customerPhone || selectedEnquiry.customer_phone,
+          notes: bookingData.notes || null
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        await loadEnquiries()
+        setSelectedEnquiry(result.data)
+        setShowBookingForm(false)
+        setBookingData({
+          bookingType: '',
+          meetingLink: '',
+          appointmentDate: '',
+          appointmentTime: '',
+          customerName: '',
+          customerPhone: '',
+          notes: ''
+        })
+      } else {
+        alert('Failed to update booking details')
+      }
+    } catch (error) {
+      console.error('Failed to update booking:', error)
+      alert('Failed to update booking details')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleUpdateNotes = async () => {
+    if (!selectedEnquiry) return
+    
+    setUpdating(true)
+    try {
+      const response = await fetch(`/api/enquiries/${selectedEnquiry.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notes: notesText
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        await loadEnquiries()
+        setSelectedEnquiry(result.data)
+        setShowNotesForm(false)
+        setNotesText('')
+      } else {
+        alert('Failed to update notes')
+      }
+    } catch (error) {
+      console.error('Failed to update notes:', error)
+      alert('Failed to update notes')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleCreateAppointment = (enquiry?: CustomerEnquiry) => {
+    const enquiryToUse = enquiry || selectedEnquiry
+    if (!enquiryToUse) return
+    
+    // Set selected enquiry if not already set
+    if (!selectedEnquiry) {
+      setSelectedEnquiry(enquiryToUse)
+      setShowDetailModal(true)
+    }
+    
+    // Open the booking form to create/update appointment
+    setBookingData({
+      bookingType: enquiryToUse.booking_type || '',
+      meetingLink: enquiryToUse.meeting_link || '',
+      appointmentDate: enquiryToUse.appointment_date || '',
+      appointmentTime: enquiryToUse.appointment_time || '',
+      customerName: enquiryToUse.customer_name,
+      customerPhone: enquiryToUse.customer_phone,
+      notes: enquiryToUse.notes || ''
+    })
+    setShowBookingForm(true)
   }
 
   if (loading) {
@@ -142,6 +260,7 @@ export default function EnquiriesPage() {
             <h1 className="text-3xl font-bold text-gray-900">Customer Enquiries</h1>
             <p className="text-gray-600 mt-1">Manage and track customer product enquiries</p>
           </div>
+           {/* Removed Schedule Appointment button - appointments are created from enquiry details */}
         </div>
 
         {/* Filters */}
@@ -181,10 +300,22 @@ export default function EnquiriesPage() {
               <div
                 key={enquiry.id}
                 className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => {
-                  setSelectedEnquiry(enquiry)
-                  setShowDetailModal(true)
-                }}
+                  onClick={() => {
+                    setSelectedEnquiry(enquiry)
+                    setShowDetailModal(true)
+                    setShowBookingForm(false)
+                    setShowNotesForm(false)
+                    setBookingData({
+                      bookingType: enquiry.booking_type || '',
+                      meetingLink: enquiry.meeting_link || '',
+                      appointmentDate: enquiry.appointment_date || '',
+                      appointmentTime: enquiry.appointment_time || '',
+                      customerName: enquiry.customer_name,
+                      customerPhone: enquiry.customer_phone,
+                      notes: enquiry.notes || ''
+                    })
+                    setNotesText(enquiry.notes || '')
+                  }}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
@@ -195,7 +326,9 @@ export default function EnquiriesPage() {
                         {enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1)}
                       </span>
                     </div>
-                    <p className="text-gray-600 mb-1">📞 {enquiry.customer_phone}</p>
+                    {enquiry.customer_phone && (
+                      <p className="text-gray-600 mb-1">📞 {enquiry.customer_phone}</p>
+                    )}
                     <p className="text-gray-700 font-medium mb-2">
                       Product: {enquiry.product_name}
                       {enquiry.product_code && ` (${enquiry.product_code})`}
@@ -208,26 +341,42 @@ export default function EnquiriesPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        window.open(`tel:${enquiry.customer_phone}`, '_self')
-                      }}
-                      className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium"
-                      title="Call Customer"
-                    >
-                      📞 Call
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        window.open(`https://wa.me/${enquiry.customer_phone.replace(/\D/g, '')}`, '_blank')
-                      }}
-                      className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-md text-sm font-medium"
-                      title="WhatsApp Customer"
-                    >
-                      💬 WhatsApp
-                    </button>
+                    {!enquiry.appointment_date && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCreateAppointment(enquiry)
+                        }}
+                        className="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-md text-sm font-medium"
+                        title="Create Appointment"
+                      >
+                        📅 Create Appointment
+                      </button>
+                    )}
+                    {enquiry.customer_phone && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.open(`tel:${enquiry.customer_phone}`, '_self')
+                          }}
+                          className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium"
+                          title="Call Customer"
+                        >
+                          📞 Call
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.open(`https://wa.me/${enquiry.customer_phone.replace(/\D/g, '')}`, '_blank')
+                          }}
+                          className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-md text-sm font-medium"
+                          title="WhatsApp Customer"
+                        >
+                          💬 WhatsApp
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -245,6 +394,18 @@ export default function EnquiriesPage() {
                   onClick={() => {
                     setShowDetailModal(false)
                     setSelectedEnquiry(null)
+                    setShowBookingForm(false)
+                    setShowNotesForm(false)
+                    setBookingData({
+                      bookingType: '',
+                      meetingLink: '',
+                      appointmentDate: '',
+                      appointmentTime: '',
+                      customerName: '',
+                      customerPhone: '',
+                      notes: ''
+                    })
+                    setNotesText('')
                   }}
                   className="text-gray-400 hover:text-gray-600 text-2xl"
                 >
@@ -263,25 +424,27 @@ export default function EnquiriesPage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Phone</p>
-                      <p className="font-medium text-gray-900">{selectedEnquiry.customer_phone}</p>
+                      <p className="font-medium text-gray-900">{selectedEnquiry.customer_phone || 'Not provided'}</p>
                     </div>
                   </div>
-                  <div className="mt-4 flex gap-2">
-                    <a
-                      href={`tel:${selectedEnquiry.customer_phone}`}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
-                    >
-                      📞 Call
-                    </a>
-                    <a
-                      href={`https://wa.me/${selectedEnquiry.customer_phone.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
-                    >
-                      💬 WhatsApp
-                    </a>
-                  </div>
+                  {selectedEnquiry.customer_phone && (
+                    <div className="mt-4 flex gap-2">
+                      <a
+                        href={`tel:${selectedEnquiry.customer_phone}`}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+                      >
+                        📞 Call
+                      </a>
+                      <a
+                        href={`https://wa.me/${selectedEnquiry.customer_phone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
+                      >
+                        💬 WhatsApp
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 {/* Product Info */}
@@ -307,10 +470,353 @@ export default function EnquiriesPage() {
                     <div>
                       <p className="text-sm text-gray-500">Enquiry Method</p>
                       <p className="font-medium text-gray-900">
-                        {getMethodIcon(selectedEnquiry.enquiry_method)} {selectedEnquiry.enquiry_method === 'whatsapp' ? 'WhatsApp' : 'Form Submission'}
+                        {getMethodIcon(selectedEnquiry.enquiry_method)} {
+                          selectedEnquiry.enquiry_method === 'whatsapp' ? 'WhatsApp' : 
+                          selectedEnquiry.enquiry_method === 'calendar' ? 'Calendar Booking' : 
+                          'Form Submission'}
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Booking Information */}
+                {(selectedEnquiry.enquiry_method === 'calendar' || selectedEnquiry.booking_type || selectedEnquiry.appointment_date) && (
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-bold text-gray-900">📅 Appointment Booking</h3>
+                      <button
+                        onClick={() => {
+                          setBookingData({
+                            bookingType: selectedEnquiry.booking_type || '',
+                            meetingLink: selectedEnquiry.meeting_link || '',
+                            appointmentDate: selectedEnquiry.appointment_date || '',
+                            appointmentTime: selectedEnquiry.appointment_time || '',
+                            customerName: selectedEnquiry.customer_name,
+                            customerPhone: selectedEnquiry.customer_phone,
+                            notes: selectedEnquiry.notes || ''
+                          })
+                          setNotesText(selectedEnquiry.notes || '')
+                          setShowBookingForm(!showBookingForm)
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {showBookingForm ? 'Cancel' : 'Edit Booking'}
+                      </button>
+                    </div>
+                    
+                    {!showBookingForm ? (
+                      <div className="space-y-2">
+                        {selectedEnquiry.booking_type && (
+                          <div>
+                            <p className="text-sm text-gray-500">Appointment Type</p>
+                            <p className="font-medium text-gray-900">
+                              {selectedEnquiry.booking_type === 'visit' ? '🏢 In-Person Visit' :
+                               selectedEnquiry.booking_type === 'online_meeting' ? '💻 Online Requirement Meeting' :
+                               selectedEnquiry.booking_type === 'product_showcase' ? '📱 Product Showcase (WhatsApp Video Call)' :
+                               selectedEnquiry.booking_type === 'online' ? '🌐 Online' : 
+                               selectedEnquiry.booking_type}
+                            </p>
+                          </div>
+                        )}
+                        {selectedEnquiry.appointment_date && (
+                          <div>
+                            <p className="text-sm text-gray-500">Appointment Date</p>
+                            <p className="font-medium text-gray-900">
+                              {format(new Date(selectedEnquiry.appointment_date), 'dd MMM yyyy')}
+                            </p>
+                          </div>
+                        )}
+                        {selectedEnquiry.appointment_time && (
+                          <div>
+                            <p className="text-sm text-gray-500">Appointment Time</p>
+                            <p className="font-medium text-gray-900">{selectedEnquiry.appointment_time}</p>
+                          </div>
+                        )}
+                        {selectedEnquiry.meeting_link && (
+                          <div>
+                            <p className="text-sm text-gray-500">Meeting Link</p>
+                            <a
+                              href={selectedEnquiry.meeting_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-blue-600 hover:text-blue-800 underline break-all"
+                            >
+                              {selectedEnquiry.meeting_link}
+                            </a>
+                            {selectedEnquiry.customer_phone && (
+                              <button
+                                onClick={() => {
+                                  const message = `Hello ${selectedEnquiry.customer_name}! Your appointment is confirmed.\n\nDate: ${selectedEnquiry.appointment_date ? format(new Date(selectedEnquiry.appointment_date), 'dd MMM yyyy') : 'TBD'}\nTime: ${selectedEnquiry.appointment_time || 'TBD'}\n\nMeeting Link: ${selectedEnquiry.meeting_link}\n\nSee you soon!`
+                                  window.open(`https://wa.me/${selectedEnquiry.customer_phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
+                                }}
+                                className="mt-2 px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
+                              >
+                                💬 Send Link via WhatsApp
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {!selectedEnquiry.booking_type && !selectedEnquiry.appointment_date && (
+                          <div>
+                            <p className="text-sm text-gray-500 italic mb-2">No booking details yet. Click "Edit Booking" or "Create Appointment" to add appointment details.</p>
+                            <p className="text-xs text-gray-400">All appointment details will be saved to the database for tracking and follow-up.</p>
+                          </div>
+                        )}
+                        {!selectedEnquiry.appointment_date && !selectedEnquiry.appointment_time && (
+                          <div className="mt-3 pt-3 border-t border-blue-200">
+                            <button
+                              onClick={handleCreateAppointment}
+                              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center justify-center gap-2"
+                            >
+                              📅 Create Appointment
+                            </button>
+                            <p className="text-xs text-gray-500 mt-2 text-center">
+                              Click to create an appointment for this customer enquiry. All details will be saved to database.
+                            </p>
+                          </div>
+                        )}
+                        {selectedEnquiry.booking_type === 'online_meeting' && !selectedEnquiry.meeting_link && (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-3">
+                            <p className="text-sm text-yellow-800 font-semibold mb-1">⚠️ Action Required:</p>
+                            <p className="text-sm text-yellow-700">Add a meeting link (Google Meet/Zoom) and send it to the customer.</p>
+                          </div>
+                        )}
+                        {selectedEnquiry.booking_type === 'product_showcase' && selectedEnquiry.customer_phone && (
+                          <div className="bg-purple-50 border border-purple-200 rounded-md p-3 mt-3">
+                            <p className="text-sm text-purple-800 font-semibold mb-2">📱 Action Required:</p>
+                            <p className="text-sm text-purple-700 mb-2">Send WhatsApp confirmation to customer about the video call appointment.</p>
+                            <button
+                              onClick={() => {
+                                const message = `Hello ${selectedEnquiry.customer_name}! Your product showcase appointment is confirmed.\n\nDate: ${selectedEnquiry.appointment_date ? format(new Date(selectedEnquiry.appointment_date), 'dd MMM yyyy') : 'TBD'}\nTime: ${selectedEnquiry.appointment_time || 'TBD'}\n\nWe'll call you on WhatsApp video at the scheduled time to show you our products.\n\nSee you soon!`
+                                window.open(`https://wa.me/${selectedEnquiry.customer_phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
+                              }}
+                              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm font-medium"
+                            >
+                              💬 Send WhatsApp Confirmation
+                            </button>
+                          </div>
+                        )}
+                        {selectedEnquiry.booking_type === 'visit' && selectedEnquiry.customer_phone && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-3">
+                            <p className="text-sm text-blue-800 font-semibold mb-2">📞 Action Required:</p>
+                            <p className="text-sm text-blue-700 mb-2">Call the customer to confirm appointment time and provide store location.</p>
+                            <a
+                              href={`tel:${selectedEnquiry.customer_phone}`}
+                              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+                            >
+                              📞 Call Customer Now
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Booking Type</label>
+                          <select
+                            value={bookingData.bookingType}
+                            onChange={(e) => setBookingData({ ...bookingData, bookingType: e.target.value as 'visit' | 'online_meeting' | 'product_showcase' | '' })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          >
+                            <option value="">Select type</option>
+                            <option value="visit">🏢 In-Person Visit</option>
+                            <option value="online_meeting">💻 Online Requirement Meeting</option>
+                            <option value="product_showcase">📱 Product Showcase (WhatsApp Video Call)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
+                          <input
+                            type="date"
+                            value={bookingData.appointmentDate}
+                            onChange={(e) => setBookingData({ ...bookingData, appointmentDate: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Time</label>
+                          <input
+                            type="time"
+                            value={bookingData.appointmentTime}
+                            onChange={(e) => setBookingData({ ...bookingData, appointmentTime: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                        {bookingData.bookingType === 'online_meeting' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Link (Google Meet/Zoom) *</label>
+                            <input
+                              type="url"
+                              required
+                              value={bookingData.meetingLink}
+                              onChange={(e) => setBookingData({ ...bookingData, meetingLink: e.target.value })}
+                              placeholder="https://meet.google.com/xxx-yyyy-zzz or https://zoom.us/j/..."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              After saving, send this link to the customer via WhatsApp or email.
+                            </p>
+                          </div>
+                        )}
+                        {bookingData.bookingType === 'product_showcase' && (
+                          <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                            <p className="text-sm text-purple-800 font-semibold mb-2">📱 WhatsApp Video Call</p>
+                            <p className="text-sm text-purple-700 mb-2">
+                              This will be a WhatsApp video call to showcase products. No meeting link needed.
+                            </p>
+                            {selectedEnquiry?.customer_phone && (
+                              <button
+                                onClick={() => {
+                                  const message = `Hello ${selectedEnquiry.customer_name}! Your product showcase appointment is confirmed.\n\nDate: ${bookingData.appointmentDate ? new Date(bookingData.appointmentDate).toLocaleDateString() : 'TBD'}\nTime: ${bookingData.appointmentTime || 'TBD'}\n\nWe'll call you on WhatsApp video at the scheduled time to show you our products.\n\nSee you soon!`
+                                  window.open(`https://wa.me/${selectedEnquiry.customer_phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank')
+                                }}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm font-medium"
+                              >
+                                💬 Send WhatsApp Confirmation
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {bookingData.bookingType === 'visit' && (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                            <p className="text-sm text-yellow-800 mb-2">
+                              💡 <strong>Action Required:</strong> Call the customer to confirm the appointment time and provide store location.
+                            </p>
+                            {selectedEnquiry?.customer_phone && (
+                              <a
+                                href={`tel:${selectedEnquiry.customer_phone}`}
+                                className="inline-block px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm font-medium"
+                              >
+                                📞 Call Customer Now
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Customer Requirements & Follow-up Notes
+                          </label>
+                          <textarea
+                            value={bookingData.notes}
+                            onChange={(e) => setBookingData({ ...bookingData, notes: e.target.value })}
+                            rows={5}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="Add customer requirements, interests, preferences, follow-up conversation details, or any important notes...
+
+Example:
+- Customer interested in: [product type]
+- Budget: [amount]
+- Follow-up: [conversation details]
+- Requirements: [specific needs]"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Track customer interests, requirements, and follow-up conversations. This helps manage customer relationships and appointments.
+                          </p>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={handleUpdateBooking}
+                            disabled={updating || (bookingData.bookingType === 'online_meeting' && !bookingData.meetingLink)}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {updating ? 'Saving...' : 'Save Booking Details'}
+                          </button>
+                          {bookingData.bookingType === 'online_meeting' && bookingData.meetingLink && (
+                            <button
+                              onClick={() => {
+                                const message = `Hello ${selectedEnquiry?.customer_name || 'there'}! Your appointment is confirmed.\n\nDate: ${bookingData.appointmentDate ? new Date(bookingData.appointmentDate).toLocaleDateString() : 'TBD'}\nTime: ${bookingData.appointmentTime || 'TBD'}\n\nMeeting Link: ${bookingData.meetingLink}\n\nSee you soon!`
+                                const phone = selectedEnquiry?.customer_phone?.replace(/\D/g, '') || ''
+                                if (phone) {
+                                  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
+                                } else {
+                                  alert('Customer phone number not available')
+                                }
+                              }}
+                              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center gap-2"
+                            >
+                              💬 Send Meeting Link via WhatsApp
+                            </button>
+                          )}
+                          {/* Appointment is saved to database - no calendar redirect */}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Customer Requirements & Follow-up Notes */}
+                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h3 className="font-bold text-gray-900">📝 Customer Requirements & Follow-up Notes</h3>
+                      <p className="text-xs text-gray-600 mt-1">Track customer interests, requirements, and conversation follow-ups</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setNotesText(selectedEnquiry.notes || '')
+                        setShowNotesForm(!showNotesForm)
+                      }}
+                      className="text-sm text-yellow-700 hover:text-yellow-900 font-medium"
+                    >
+                      {showNotesForm ? 'Cancel' : selectedEnquiry.notes ? 'Edit Notes' : 'Add Notes'}
+                    </button>
+                  </div>
+                  
+                  {!showNotesForm ? (
+                    <div>
+                      {selectedEnquiry.notes ? (
+                        <div className="bg-white p-3 rounded-md border border-yellow-300">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedEnquiry.notes}</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-gray-500 italic mb-2">No notes added yet.</p>
+                          <p className="text-xs text-gray-400">Use this section to:</p>
+                          <ul className="text-xs text-gray-400 list-disc list-inside mt-1 space-y-1">
+                            <li>Record customer requirements and interests</li>
+                            <li>Track follow-up conversations</li>
+                            <li>Add notes about what customer is looking for</li>
+                            <li>Document any important details from calls/meetings</li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <textarea
+                        value={notesText}
+                        onChange={(e) => setNotesText(e.target.value)}
+                        rows={8}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                        placeholder="Add customer requirements, interests, preferences, follow-up conversation details, or any important notes here...
+
+Example:
+- Customer interested in: Sarees, Cotton fabric
+- Budget: Rs. 2000-3000
+- Follow-up: Called on 15 Jan - confirmed appointment for 20 Jan
+- Requirements: Needs ready-made, size M
+- Notes: Prefers pastel colors, traditional designs"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleUpdateNotes}
+                          disabled={updating}
+                          className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm font-medium disabled:opacity-50"
+                        >
+                          {updating ? 'Saving...' : 'Save Notes'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowNotesForm(false)
+                            setNotesText(selectedEnquiry.notes || '')
+                          }}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Status Update */}

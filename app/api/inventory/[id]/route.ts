@@ -1,6 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 
+// Function to determine category from dress_type and dress_name
+function determineCategory(dressType: string = '', dressName: string = ''): string {
+  const searchText = `${dressType || ''} ${dressName || ''}`.toLowerCase().trim()
+  
+  if (!searchText) return 'Kurtis' // default
+  
+  // Home Textiles - check first for bedsheets, pillow covers, etc.
+  if (
+    searchText.includes('bedsheet') || 
+    searchText.includes('bed sheet') || 
+    searchText.includes('bed-sheet') ||
+    searchText.includes('pillow cover') ||
+    searchText.includes('pillowcover') ||
+    searchText.includes('pillow') ||
+    searchText.includes('sheeting') ||
+    searchText.includes('percale') ||
+    searchText.includes('duck') ||
+    searchText.includes('cashment') ||
+    searchText.includes('bedsheet-single') ||
+    searchText.includes('bedsheet-double') ||
+    searchText.includes('bedsheet-king') ||
+    searchText.includes('quilt') ||
+    searchText.includes('comforter') ||
+    searchText.includes('blanket') ||
+    searchText.includes('curtain') ||
+    searchText.includes('cushion')
+  ) {
+    return 'Home Textiles'
+  }
+  
+  // Sarees - check for saree-related terms
+  if (
+    searchText.includes('saree') || 
+    searchText.includes('sari') || 
+    searchText.includes('sare')
+  ) {
+    return 'Sarees'
+  }
+  
+  // Dresses - check for dress-related terms
+  if (
+    searchText.includes('dress') || 
+    searchText.includes('anarkali') || 
+    searchText.includes('gown') ||
+    searchText.includes('frock') ||
+    searchText.includes('lehenga') ||
+    searchText.includes('maxi') ||
+    searchText.includes('midi')
+  ) {
+    return 'Dresses'
+  }
+  
+  // Kurtis - check for kurta/kurti related terms
+  if (
+    searchText.includes('kurta') || 
+    searchText.includes('kurti') ||
+    searchText.includes('top') ||
+    searchText.includes('tunic') ||
+    searchText.includes('kameez')
+  ) {
+    return 'Kurtis'
+  }
+  
+  // Default to Kurtis if no match
+  return 'Kurtis'
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -50,19 +117,23 @@ export async function PUT(
       ? JSON.stringify(body.productImages) 
       : (body.imageUrl ? JSON.stringify([body.imageUrl]) : null)
     
+    // Determine category from dress_type and dress_name (or use provided category)
+    const category = body.category || determineCategory(body.dressType, body.dressName)
+    
     const result = await query(
       `UPDATE inventory 
-       SET dress_name = $1, dress_type = $2, dress_code = $3, sizes = $4,
-           wholesale_price = $5, selling_price = $6, pricing_unit = $7, price_per_piece = $8, price_per_meter = $9,
-           image_url = $10, product_images = $11, fabric_type = $12, 
-           supplier_name = $13, supplier_address = $14, supplier_phone = $15, 
+       SET dress_name = $1, dress_type = $2, dress_code = $3, category = $4, sizes = $5,
+           wholesale_price = $6, selling_price = $7, pricing_unit = $8, price_per_piece = $9, price_per_meter = $10,
+           image_url = $11, product_images = $12, fabric_type = $13, 
+           supplier_name = $14, supplier_address = $15, supplier_phone = $16, 
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $16
+       WHERE id = $17
        RETURNING *`,
       [
         body.dressName,
         body.dressType,
         body.dressCode,
+        category,
         body.sizes || [],
         body.wholesalePrice,
         body.sellingPrice,
@@ -179,6 +250,7 @@ export async function PUT(
       dressName: item.dress_name,
       dressType: item.dress_type,
       dressCode: item.dress_code,
+      category: item.category || determineCategory(item.dress_type, item.dress_name),
       sizes: item.sizes || [],
       wholesalePrice: parseFloat(item.wholesale_price),
       sellingPrice: parseFloat(item.selling_price),
