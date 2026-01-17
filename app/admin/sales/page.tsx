@@ -119,14 +119,7 @@ export default function SalesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Fetch next bill number when modal opens or date changes
-  useEffect(() => {
-    if (showModal && !editingSale) {
-      fetchNextBillNumber()
-    }
-  }, [showModal, formData.date, editingSale])
-
-  const fetchNextBillNumber = async () => {
+  const fetchNextBillNumber = useCallback(async () => {
     try {
       const response = await fetch(`/api/sales/next-bill-number?date=${formData.date}`)
       const result = await response.json()
@@ -136,7 +129,14 @@ export default function SalesPage() {
     } catch (error) {
       console.error('Failed to fetch next bill number:', error)
     }
-  }
+  }, [formData.date])
+
+  // Fetch next bill number when modal opens or date changes
+  useEffect(() => {
+    if (showModal && !editingSale) {
+      fetchNextBillNumber()
+    }
+  }, [showModal, formData.date, editingSale, fetchNextBillNumber])
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -172,6 +172,36 @@ export default function SalesPage() {
     setUniqueParties(parties)
   }, [sales])
 
+  const loadSalesSummary = useCallback(async (partyName: string | null) => {
+    try {
+      const params = new URLSearchParams()
+      if (partyName) {
+        params.append('partyName', partyName)
+      }
+      if (filterYear) {
+        const startDate = `${filterYear}-01-01`
+        const endDate = `${filterYear}-12-31`
+        params.append('startDate', startDate)
+        params.append('endDate', endDate)
+      } else if (filterMonth && filterYear) {
+        // If month is selected, use that month's date range
+        const daysInMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 0).getDate()
+        const startDate = `${filterYear}-${filterMonth}-01`
+        const endDate = `${filterYear}-${filterMonth}-${String(daysInMonth).padStart(2, '0')}`
+        params.append('startDate', startDate)
+        params.append('endDate', endDate)
+      }
+      
+      const response = await fetch(`/api/sales/summary?${params.toString()}`)
+      const result = await response.json()
+      if (result.success) {
+        setSalesSummary(result.data)
+      }
+    } catch (error) {
+      console.error('Failed to load sales summary:', error)
+    }
+  }, [filterMonth, filterYear])
+
   useEffect(() => {
     // Load sales summary for selected party or all parties
     if (selectedParty !== 'All') {
@@ -180,7 +210,7 @@ export default function SalesPage() {
       // Load summary for all parties
       loadSalesSummary(null)
     }
-  }, [selectedParty, filterMonth, filterYear])
+  }, [selectedParty, filterMonth, filterYear, loadSalesSummary])
 
   const loadData = async () => {
     try {
@@ -221,35 +251,6 @@ export default function SalesPage() {
     }
   }
 
-  const loadSalesSummary = async (partyName: string | null) => {
-    try {
-      const params = new URLSearchParams()
-      if (partyName) {
-        params.append('partyName', partyName)
-      }
-      if (filterYear) {
-        const startDate = `${filterYear}-01-01`
-        const endDate = `${filterYear}-12-31`
-        params.append('startDate', startDate)
-        params.append('endDate', endDate)
-      } else if (filterMonth && filterYear) {
-        // If month is selected, use that month's date range
-        const daysInMonth = new Date(parseInt(filterYear), parseInt(filterMonth), 0).getDate()
-        const startDate = `${filterYear}-${filterMonth}-01`
-        const endDate = `${filterYear}-${filterMonth}-${String(daysInMonth).padStart(2, '0')}`
-        params.append('startDate', startDate)
-        params.append('endDate', endDate)
-      }
-      
-      const response = await fetch(`/api/sales/summary?${params.toString()}`)
-      const result = await response.json()
-      if (result.success) {
-        setSalesSummary(result.data)
-      }
-    } catch (error) {
-      console.error('Failed to load sales summary:', error)
-    }
-  }
 
   const handleAddItem = () => {
     const newIndex = formData.items.length
@@ -1798,137 +1799,6 @@ export default function SalesPage() {
           />
         )}
 
-        {/* UPI Modals Removed - Basic UPI flow only */}
-        {false && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Enter Customer Mobile Number</h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Enter customer's mobile number to send payment request to their UPI app
-              </p>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number *</label>
-                <input
-                  type="tel"
-                  value={customerMobile}
-                  onChange={(e) => setCustomerMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="10-digit mobile number"
-                  maxLength={10}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && customerMobile.length === 10 && selectedUpiApp) {
-                      handleMobileSubmit()
-                    }
-                  }}
-                  autoFocus
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select UPI App *</label>
-                <select
-                  value={selectedUpiApp}
-                  onChange={(e) => setSelectedUpiApp(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">-- Select UPI App --</option>
-                  <option value="paytm">Paytm</option>
-                  <option value="phonepe">PhonePe</option>
-                  <option value="gpay">Google Pay</option>
-                  <option value="hdfc">HDFC Bank</option>
-                  <option value="sbi">SBI Pay</option>
-                  <option value="axis">Axis Bank</option>
-                  <option value="icici">ICICI Bank</option>
-                  <option value="bob">Bank of Baroda</option>
-                  <option value="kotak">Kotak Bank</option>
-                  <option value="yes">Yes Bank</option>
-                  <option value="generic">Generic UPI (Any App)</option>
-                </select>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleMobileSubmit}
-                  disabled={!customerMobile || customerMobile.length !== 10 || !selectedUpiApp}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-md transition-colors"
-                >
-                  Continue
-                </button>
-                <button
-                  onClick={() => {
-                    setShowUpiModal(false)
-                    setCustomerMobile('')
-                    setSelectedUpiApp('')
-                    setFormData(prev => ({ ...prev, paymentMode: 'Cash' }))
-                  }}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Payment Confirmation Dialog Removed */}
-        {false && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Payment Confirmation</h2>
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total Amount:</span>
-                    <span className="font-bold text-lg text-green-600">₹{pendingPaymentData.totalAmount.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Mobile Number:</span>
-                    <span className="font-medium text-gray-900">+91 {pendingPaymentData.mobileNumber}</span>
-                  </div>
-                  {pendingPaymentData.upiApp && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">UPI App:</span>
-                      <span className="font-medium text-blue-600 capitalize">
-                        {pendingPaymentData.upiApp === 'gpay' ? 'Google Pay' : 
-                         pendingPaymentData.upiApp === 'sbi' ? 'SBI Pay' :
-                         pendingPaymentData.upiApp === 'bob' ? 'Bank of Baroda' :
-                         pendingPaymentData.upiApp.charAt(0).toUpperCase() + pendingPaymentData.upiApp.slice(1)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Bill Number:</span>
-                    <span className="font-medium text-gray-900">{pendingPaymentData.billNumber}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <button
-                  onClick={() => handlePaymentStatus('paid')}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
-                >
-                  ✅ Payment Done
-                </button>
-                <button
-                  onClick={() => handlePaymentStatus('pending')}
-                  className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
-                >
-                  ❌ Not Received
-                </button>
-                <button
-                  onClick={handleSendPaymentRequest}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
-                >
-                  📱 Send Payment Request
-                </button>
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  Send payment request to: +91 7204219541
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Customer Creation Modal */}
         {showCustomerModal && (
