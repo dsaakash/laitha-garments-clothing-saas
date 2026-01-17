@@ -13,6 +13,13 @@ export default function SalesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingSale, setEditingSale] = useState<Sale | null>(null)
   const [useCustomer, setUseCustomer] = useState(false)
+  const [showCustomerModal, setShowCustomerModal] = useState(false)
+  const [customerFormData, setCustomerFormData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+  })
   const [filterMonth, setFilterMonth] = useState('')
   const [filterYear, setFilterYear] = useState('')
   const [searchPartyName, setSearchPartyName] = useState<string>('')
@@ -445,6 +452,49 @@ export default function SalesPage() {
     }
   }
 
+  const handleCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    try {
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customerFormData),
+      })
+      const result = await response.json()
+      
+      if (!result.success) {
+        alert('Failed to create customer')
+        return
+      }
+      
+      // Reload customers list
+      await loadData()
+      
+      // Auto-select the newly created customer
+      if (result.data && result.data.id) {
+        setFormData(prev => ({
+          ...prev,
+          customerId: result.data.id,
+          partyName: result.data.name,
+        }))
+        setUseCustomer(true)
+      }
+      
+      // Close customer modal and reset form
+      setCustomerFormData({
+        name: '',
+        phone: '',
+        email: '',
+        address: '',
+      })
+      setShowCustomerModal(false)
+    } catch (error) {
+      console.error('Failed to create customer:', error)
+      alert('Failed to create customer')
+    }
+  }
+
   const getSelectedInventoryItem = (inventoryId: string) => {
     return inventory.find(item => item.id === inventoryId)
   }
@@ -749,19 +799,31 @@ export default function SalesPage() {
                     </label>
                   </div>
                   {useCustomer ? (
-                    <select
-                      required
-                      value={formData.customerId}
-                      onChange={(e) => handleCustomerSelect(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Select Customer</option>
-                      {customers.map(customer => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name} - {customer.phone}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        required
+                        value={formData.customerId}
+                        onChange={(e) => handleCustomerSelect(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="">Select Customer</option>
+                        {customers.map(customer => (
+                          <option key={customer.id} value={customer.id}>
+                            {customer.name} - {customer.phone}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomerModal(true)}
+                        className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-center"
+                        title="Add New Customer"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    </div>
                   ) : (
                     <input
                       type="text"
@@ -1415,6 +1477,111 @@ export default function SalesPage() {
                 </div>
               </form>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Customer Creation Modal */}
+        {showCustomerModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Add New Customer</h2>
+                <button
+                  onClick={() => {
+                    setShowCustomerModal(false)
+                    setCustomerFormData({
+                      name: '',
+                      phone: '',
+                      email: '',
+                      address: '',
+                    })
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateCustomer} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={customerFormData.name}
+                    onChange={(e) => setCustomerFormData({ ...customerFormData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Enter customer name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={customerFormData.phone}
+                    onChange={(e) => setCustomerFormData({ ...customerFormData, phone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={customerFormData.email}
+                    onChange={(e) => setCustomerFormData({ ...customerFormData, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Enter email address"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Address (Optional)
+                  </label>
+                  <textarea
+                    value={customerFormData.address}
+                    onChange={(e) => setCustomerFormData({ ...customerFormData, address: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Enter address"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
+                  >
+                    Create Customer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCustomerModal(false)
+                      setCustomerFormData({
+                        name: '',
+                        phone: '',
+                        email: '',
+                        address: '',
+                      })
+                    }}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-md font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
