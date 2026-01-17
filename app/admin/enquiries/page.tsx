@@ -570,7 +570,7 @@ export default function EnquiriesPage() {
                         {!selectedEnquiry.appointment_date && !selectedEnquiry.appointment_time && (
                           <div className="mt-3 pt-3 border-t border-blue-200">
                             <button
-                              onClick={handleCreateAppointment}
+                              onClick={() => handleCreateAppointment()}
                               className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center justify-center gap-2"
                             >
                               📅 Create Appointment
