@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
+import ItemSelectionModal from '@/components/ItemSelectionModal'
 import { Catalogue, InventoryItem } from '@/lib/storage'
 
 export default function CataloguesPage() {
@@ -10,6 +11,7 @@ export default function CataloguesPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [showModal, setShowModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [showItemSelectionModal, setShowItemSelectionModal] = useState(false)
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [editingCatalogue, setEditingCatalogue] = useState<Catalogue | null>(null)
   const [userRole, setUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
@@ -148,6 +150,26 @@ export default function CataloguesPage() {
       items: prev.items.includes(itemId)
         ? prev.items.filter(id => id !== itemId)
         : [...prev.items, itemId],
+    }))
+  }
+
+  const handleItemSelect = (item: InventoryItem) => {
+    // Toggle item selection (add if not selected, remove if already selected)
+    if (formData.items.includes(item.id)) {
+      handleRemoveItem(item.id)
+    } else {
+      toggleItem(item.id)
+    }
+  }
+
+  const handleAddItems = () => {
+    setShowItemSelectionModal(true)
+  }
+
+  const handleRemoveItem = (itemId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter(id => id !== itemId),
     }))
   }
 
@@ -297,46 +319,96 @@ export default function CataloguesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Items</label>
-                  <div className="border border-gray-300 rounded-md p-4 max-h-64 overflow-y-auto">
-                    {inventory.length === 0 ? (
-                      <p className="text-gray-500 text-sm">No inventory items available</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {inventory.map((item) => (
-                          <label
-                            key={item.id}
-                            className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.items.includes(item.id)}
-                              onChange={() => toggleItem(item.id)}
-                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                            />
-                            <div className="flex-1">
-                              <span className="text-sm font-medium text-gray-900">{item.dressName}</span>
-                              <span className="text-xs text-gray-500 ml-2">({item.dressCode})</span>
-                            </div>
-                            {item.imageUrl && (
-                              <div className="relative w-12 h-12">
-                                <Image
-                                  src={item.imageUrl}
-                                  alt={item.dressName}
-                                  fill
-                                  className="object-cover rounded"
-                                  sizes="48px"
-                                />
-                              </div>
-                            )}
-                          </label>
-                        ))}
-                      </div>
-                    )}
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">Select Items</label>
+                    <button
+                      type="button"
+                      onClick={handleAddItems}
+                      className="text-sm bg-purple-600 text-white px-4 py-1.5 rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2"
+                    >
+                      <span>🔍</span> Search & Add Products
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formData.items.length} item{formData.items.length !== 1 ? 's' : ''} selected
-                  </p>
+                  
+                  {/* Selected Items Grid */}
+                  {formData.items.length > 0 ? (
+                    <div className="border border-gray-300 rounded-md p-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+                        {formData.items.map((itemId) => {
+                          const item = inventory.find(i => i.id === itemId)
+                          if (!item) return null
+                          
+                          const imageUrl = item.productImages?.[0] || item.imageUrl
+                          const isValidUrl = imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))
+                          
+                          return (
+                            <div
+                              key={itemId}
+                              className="relative group border border-gray-200 rounded-lg p-2 hover:border-purple-400 hover:shadow-md transition-all"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(itemId)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Remove from catalogue"
+                              >
+                                ×
+                              </button>
+                              
+                              {isValidUrl ? (
+                                <div className="relative w-full aspect-square mb-2">
+                                  <Image
+                                    src={imageUrl}
+                                    alt={item.dressName}
+                                    fill
+                                    className="object-cover rounded"
+                                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                    unoptimized
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement
+                                      target.style.display = 'none'
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-full aspect-square bg-gray-100 rounded mb-2 flex items-center justify-center text-gray-400 text-xs">
+                                  No Image
+                                </div>
+                              )}
+                              
+                              <div className="text-xs">
+                                <p className="font-medium text-gray-900 truncate" title={item.dressName}>
+                                  {item.dressName}
+                                </p>
+                                <p className="text-gray-500 truncate" title={item.dressCode}>
+                                  {item.dressCode}
+                                </p>
+                                {item.category && (
+                                  <p className="text-gray-400 text-[10px] truncate">
+                                    {item.category}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="text-xs text-gray-500 text-center">
+                        {formData.items.length} item{formData.items.length !== 1 ? 's' : ''} selected
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-md p-8 text-center">
+                      <p className="text-gray-500 text-sm mb-3">No items selected</p>
+                      <button
+                        type="button"
+                        onClick={handleAddItems}
+                        className="text-sm bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
+                      >
+                        🔍 Search & Add Products
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
@@ -359,6 +431,18 @@ export default function CataloguesPage() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* Item Selection Modal for Catalogue */}
+        {showItemSelectionModal && (
+          <ItemSelectionModal
+            isOpen={showItemSelectionModal}
+            onClose={() => setShowItemSelectionModal(false)}
+            onSelect={handleItemSelect}
+            inventory={inventory}
+            multiSelect={true}
+            selectedItems={formData.items}
+          />
         )}
 
         {showDetailModal && selectedItem && (

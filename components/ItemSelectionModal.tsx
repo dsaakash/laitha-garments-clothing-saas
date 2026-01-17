@@ -9,6 +9,8 @@ interface ItemSelectionModalProps {
   onClose: () => void
   onSelect: (item: InventoryItem) => void
   inventory: InventoryItem[]
+  multiSelect?: boolean // Allow selecting multiple items without closing
+  selectedItems?: string[] // Array of selected item IDs for multi-select mode
 }
 
 type SortOption = 'name' | 'code' | 'price' | 'stock'
@@ -19,6 +21,8 @@ export default function ItemSelectionModal({
   onClose,
   onSelect,
   inventory,
+  multiSelect = false,
+  selectedItems = [],
 }: ItemSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
@@ -123,11 +127,15 @@ export default function ItemSelectionModal({
     }
     
     onSelect(item)
-    onClose()
-    // Reset filters
-    setSearchQuery('')
-    setSelectedCategory('All')
-    setStockFilter('all')
+    
+    // Only close modal if not in multi-select mode
+    if (!multiSelect) {
+      onClose()
+      // Reset filters
+      setSearchQuery('')
+      setSelectedCategory('All')
+      setStockFilter('all')
+    }
   }
 
   if (!isOpen) return null
@@ -137,13 +145,30 @@ export default function ItemSelectionModal({
       <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">Select Product</h2>
-          <button
-            onClick={onClose}
-            className="text-white hover:text-gray-200 text-2xl font-bold"
-          >
-            ×
-          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-white">Select Product</h2>
+            {multiSelect && (
+              <p className="text-purple-100 text-sm mt-1">
+                {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {multiSelect && (
+              <button
+                onClick={onClose}
+                className="bg-white text-purple-600 px-4 py-2 rounded-md hover:bg-purple-50 font-medium transition-colors"
+              >
+                Done ({selectedItems.length})
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-white hover:text-gray-200 text-2xl font-bold"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -243,17 +268,27 @@ export default function ItemSelectionModal({
                 }
                 const category = (item as any).category || item.dressType
 
+                const isSelected = multiSelect && selectedItems.includes(item.id)
+                
                 return (
                   <div
                     key={item.id}
                     data-item-id={item.id}
                     onClick={() => !isOutOfStock && handleItemSelect(item)}
-                    className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
+                    className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 relative ${
                       isOutOfStock
                         ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                        : isSelected
+                        ? 'border-purple-500 bg-purple-50 shadow-lg'
                         : 'border-gray-200 bg-white hover:border-purple-400 hover:shadow-lg'
                     }`}
                   >
+                    {/* Selected Badge */}
+                    {isSelected && (
+                      <div className="absolute top-2 left-2 bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center z-10">
+                        ✓
+                      </div>
+                    )}
                     {/* Product Image */}
                     <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
                       {productImage && productImage.trim() !== '' && (productImage.startsWith('http') || productImage.startsWith('//')) ? (

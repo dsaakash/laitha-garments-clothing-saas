@@ -69,8 +69,8 @@ export async function PUT(
              subtotal = $5, discount_type = $6, discount_percentage = $7, discount_amount = $8,
              gst_type = $9, gst_percentage = $10, gst_amount = $11,
              total_amount = $12, final_total = $13, payment_mode = $14,
-             upi_transaction_id = $15, sale_image = $16
-         WHERE id = $17`,
+             upi_transaction_id = $15, upi_id = $16, payment_status = $17, sale_image = $18
+         WHERE id = $19`,
         [
           body.date,
           body.partyName,
@@ -87,6 +87,8 @@ export async function PUT(
           body.finalTotal || body.totalAmount,
           body.paymentMode,
           body.upiTransactionId || null,
+          body.upiId || null,
+          body.paymentStatus || null,
           body.saleImage || null,
           id,
         ]
@@ -277,6 +279,8 @@ export async function PUT(
         finalTotal: updatedSale.final_total ? parseFloat(updatedSale.final_total) : parseFloat(updatedSale.total_amount),
         paymentMode: updatedSale.payment_mode,
         upiTransactionId: updatedSale.upi_transaction_id || undefined,
+        upiId: updatedSale.upi_id || undefined,
+        paymentStatus: updatedSale.payment_status || undefined,
         saleImage: updatedSale.sale_image || undefined,
         createdAt: updatedSale.created_at.toISOString(),
       }

@@ -88,6 +88,8 @@ export async function GET(request: NextRequest) {
       finalTotal: row.final_total ? parseFloat(row.final_total) : parseFloat(row.total_amount),
       paymentMode: row.payment_mode,
       upiTransactionId: row.upi_transaction_id || undefined,
+      upiId: row.upi_id || undefined,
+      paymentStatus: row.payment_status || undefined,
       saleImage: row.sale_image || undefined,
       createdAt: row.created_at.toISOString(),
     }))
@@ -125,8 +127,8 @@ export async function POST(request: NextRequest) {
     const saleResult = await query(
       `INSERT INTO sales 
        (date, party_name, customer_id, bill_number, subtotal, discount_type, discount_percentage, discount_amount,
-        gst_type, gst_percentage, gst_amount, total_amount, final_total, payment_mode, upi_transaction_id, sale_image)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        gst_type, gst_percentage, gst_amount, total_amount, final_total, payment_mode, upi_transaction_id, upi_id, payment_status, sale_image)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING *`,
       [
         body.date,
@@ -144,6 +146,8 @@ export async function POST(request: NextRequest) {
         body.finalTotal || body.totalAmount,
         body.paymentMode,
         body.upiTransactionId || null,
+        body.upiId || null,
+        body.paymentStatus || (body.paymentMode === 'UPI' ? 'pending' : null),
         body.saleImage || null,
       ]
     )

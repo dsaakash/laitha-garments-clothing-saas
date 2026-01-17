@@ -41,6 +41,8 @@ export default function SalesPage() {
     billNumber: '',
     paymentMode: 'Cash',
     upiTransactionId: '',
+    upiId: '',
+    paymentStatus: undefined as 'paid' | 'pending' | 'failed' | undefined,
     saleImage: '',
     items: [] as Array<{
       inventoryId: string
@@ -87,6 +89,8 @@ export default function SalesPage() {
       billNumber: '',
       paymentMode: 'Cash',
       upiTransactionId: '',
+      upiId: '',
+      paymentStatus: undefined,
       saleImage: '',
       items: [] as Array<{
         inventoryId: string
@@ -377,6 +381,48 @@ export default function SalesPage() {
     }
   }
 
+
+  const handlePaymentModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newPaymentMode = e.target.value
+    setFormData({ 
+      ...formData, 
+      paymentMode: newPaymentMode,
+      // Set default payment status for UPI
+      paymentStatus: newPaymentMode === 'UPI' ? 'pending' : undefined
+    })
+  }
+
+
+  const handleUpdatePaymentStatus = async (saleId: string, newStatus: 'paid' | 'pending' | 'failed') => {
+    try {
+      const response = await fetch(`/api/sales/${saleId}/payment-status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentStatus: newStatus }),
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        // Update the sale in the local state immediately for better UX
+        setSales(prevSales => 
+          prevSales.map(sale => 
+            sale.id === saleId 
+              ? { ...sale, paymentStatus: newStatus }
+              : sale
+          )
+        )
+        // Reload sales to ensure consistency
+        await loadSales()
+      } else {
+        console.error('Payment status update failed:', result)
+        alert(`Failed to update payment status: ${result.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Failed to update payment status:', error)
+      alert(`Failed to update payment status: ${error instanceof Error ? error.message : 'Network error'}`)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -470,6 +516,8 @@ export default function SalesPage() {
           finalTotal,
           paymentMode: formData.paymentMode,
           upiTransactionId: formData.upiTransactionId || undefined,
+          upiId: formData.upiId || undefined,
+          paymentStatus: formData.paymentMode === 'UPI' ? (formData.paymentStatus || 'pending') : (formData.paymentStatus || undefined),
           saleImage: formData.saleImage || undefined,
         }),
       })
@@ -501,6 +549,8 @@ export default function SalesPage() {
       billNumber: sale.billNumber,
       paymentMode: sale.paymentMode,
       upiTransactionId: sale.upiTransactionId || '',
+      upiId: sale.upiId || '',
+      paymentStatus: sale.paymentStatus,
       saleImage: sale.saleImage || '',
       items: sale.items.map(item => ({
         inventoryId: item.inventoryId || '',
@@ -753,7 +803,7 @@ export default function SalesPage() {
               <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
                 <p className="text-sm opacity-90 mb-1">Total Sales</p>
                 <p className="text-3xl font-bold">{salesSummary.totalSales}</p>
-              </div>
+          </div>
               <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
                 <p className="text-sm opacity-90 mb-1">Total Revenue</p>
                 <p className="text-3xl font-bold">₹{salesSummary.totalRevenue.toLocaleString('en-IN')}</p>
@@ -844,9 +894,28 @@ export default function SalesPage() {
                         </svg>
                         <span className="text-sm font-medium text-blue-700">{sale.paymentMode}</span>
                       </div>
+                      {sale.paymentStatus && (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={sale.paymentStatus}
+                            onChange={(e) => handleUpdatePaymentStatus(sale.id, e.target.value as 'paid' | 'pending' | 'failed')}
+                            className="text-xs px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="pending">⏳ Pending</option>
+                            <option value="paid">✅ Paid</option>
+                            <option value="failed">❌ Failed</option>
+                          </select>
+                        </div>
+                      )}
+                      {sale.upiId && (
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <span className="px-2 py-1 bg-gray-100 rounded">UPI ID: {sale.upiId}</span>
+                        </div>
+                      )}
                       {sale.upiTransactionId && (
                         <div className="flex items-center gap-2 text-xs text-gray-600">
-                          <span className="px-2 py-1 bg-gray-100 rounded">UPI: {sale.upiTransactionId}</span>
+                          <span className="px-2 py-1 bg-gray-100 rounded">TXN: {sale.upiTransactionId}</span>
                         </div>
                       )}
                     </div>
@@ -1040,10 +1109,11 @@ export default function SalesPage() {
                     <select
                       required
                       value={formData.paymentMode}
-                      onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
+                      onChange={handlePaymentModeChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     >
                       <option value="Cash">Cash</option>
+                      <option value="UPI">UPI</option>
                       <option value="UPI - GPay">UPI - GPay</option>
                       <option value="UPI - PhonePe">UPI - PhonePe</option>
                       <option value="UPI - Paytm">UPI - Paytm</option>
@@ -1102,7 +1172,7 @@ export default function SalesPage() {
                                         type="button"
                                         onClick={() => handleOpenItemModal(index)}
                                         className="flex-1 px-3 py-2 border-2 border-purple-300 bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 text-left flex items-center justify-between"
-                                      >
+                                >
                                         <span className="font-medium">{selectedItem.dressName}</span>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1726,6 +1796,138 @@ export default function SalesPage() {
             onSelect={(item) => handleItemSelect(item, itemModalIndex)}
             inventory={inventory}
           />
+        )}
+
+        {/* UPI Modals Removed - Basic UPI flow only */}
+        {false && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Enter Customer Mobile Number</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter customer's mobile number to send payment request to their UPI app
+              </p>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number *</label>
+                <input
+                  type="tel"
+                  value={customerMobile}
+                  onChange={(e) => setCustomerMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="10-digit mobile number"
+                  maxLength={10}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && customerMobile.length === 10 && selectedUpiApp) {
+                      handleMobileSubmit()
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select UPI App *</label>
+                <select
+                  value={selectedUpiApp}
+                  onChange={(e) => setSelectedUpiApp(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">-- Select UPI App --</option>
+                  <option value="paytm">Paytm</option>
+                  <option value="phonepe">PhonePe</option>
+                  <option value="gpay">Google Pay</option>
+                  <option value="hdfc">HDFC Bank</option>
+                  <option value="sbi">SBI Pay</option>
+                  <option value="axis">Axis Bank</option>
+                  <option value="icici">ICICI Bank</option>
+                  <option value="bob">Bank of Baroda</option>
+                  <option value="kotak">Kotak Bank</option>
+                  <option value="yes">Yes Bank</option>
+                  <option value="generic">Generic UPI (Any App)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleMobileSubmit}
+                  disabled={!customerMobile || customerMobile.length !== 10 || !selectedUpiApp}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-md transition-colors"
+                >
+                  Continue
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUpiModal(false)
+                    setCustomerMobile('')
+                    setSelectedUpiApp('')
+                    setFormData(prev => ({ ...prev, paymentMode: 'Cash' }))
+                  }}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Confirmation Dialog Removed */}
+        {false && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Payment Confirmation</h2>
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="font-bold text-lg text-green-600">₹{pendingPaymentData.totalAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Mobile Number:</span>
+                    <span className="font-medium text-gray-900">+91 {pendingPaymentData.mobileNumber}</span>
+                  </div>
+                  {pendingPaymentData.upiApp && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">UPI App:</span>
+                      <span className="font-medium text-blue-600 capitalize">
+                        {pendingPaymentData.upiApp === 'gpay' ? 'Google Pay' : 
+                         pendingPaymentData.upiApp === 'sbi' ? 'SBI Pay' :
+                         pendingPaymentData.upiApp === 'bob' ? 'Bank of Baroda' :
+                         pendingPaymentData.upiApp.charAt(0).toUpperCase() + pendingPaymentData.upiApp.slice(1)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Bill Number:</span>
+                    <span className="font-medium text-gray-900">{pendingPaymentData.billNumber}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <button
+                  onClick={() => handlePaymentStatus('paid')}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
+                >
+                  ✅ Payment Done
+                </button>
+                <button
+                  onClick={() => handlePaymentStatus('pending')}
+                  className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
+                >
+                  ❌ Not Received
+                </button>
+                <button
+                  onClick={handleSendPaymentRequest}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
+                >
+                  📱 Send Payment Request
+                </button>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  Send payment request to: +91 7204219541
+                </p>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Customer Creation Modal */}

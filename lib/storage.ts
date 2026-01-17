@@ -44,6 +44,8 @@ export interface Sale {
   finalTotal?: number // Same as totalAmount, kept for clarity
   paymentMode: string
   upiTransactionId?: string
+  upiId?: string // Customer UPI ID for payment requests
+  paymentStatus?: 'paid' | 'pending' | 'failed' // Payment status
   saleImage?: string // Image captured as proof of sale
   createdAt: string
 }
