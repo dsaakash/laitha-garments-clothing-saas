@@ -227,8 +227,13 @@ export default function EnquiriesPage() {
     }
     
     // Open the booking form to create/update appointment
+    // Map legacy 'online' to 'online_meeting'
+    const bookingType = enquiryToUse.booking_type === 'online' 
+      ? 'online_meeting' 
+      : (enquiryToUse.booking_type || '') as 'visit' | 'online_meeting' | 'product_showcase' | ''
+    
     setBookingData({
-      bookingType: enquiryToUse.booking_type || '',
+      bookingType: bookingType,
       meetingLink: enquiryToUse.meeting_link || '',
       appointmentDate: enquiryToUse.appointment_date || '',
       appointmentTime: enquiryToUse.appointment_time || '',
@@ -306,7 +311,7 @@ export default function EnquiriesPage() {
                     setShowBookingForm(false)
                     setShowNotesForm(false)
                     setBookingData({
-                      bookingType: enquiry.booking_type || '',
+                      bookingType: (enquiry.booking_type === 'online' ? 'online_meeting' : enquiry.booking_type) || '',
                       meetingLink: enquiry.meeting_link || '',
                       appointmentDate: enquiry.appointment_date || '',
                       appointmentTime: enquiry.appointment_time || '',
@@ -487,7 +492,7 @@ export default function EnquiriesPage() {
                       <button
                         onClick={() => {
                           setBookingData({
-                            bookingType: selectedEnquiry.booking_type || '',
+                            bookingType: (selectedEnquiry.booking_type === 'online' ? 'online_meeting' : selectedEnquiry.booking_type) || '',
                             meetingLink: selectedEnquiry.meeting_link || '',
                             appointmentDate: selectedEnquiry.appointment_date || '',
                             appointmentTime: selectedEnquiry.appointment_time || '',
