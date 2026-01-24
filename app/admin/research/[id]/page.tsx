@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
@@ -70,23 +70,7 @@ export default function ResearchDetailPage() {
     { id: 5, label: 'YouTube Reference Links', icon: Link2 },
   ]
 
-  useEffect(() => {
-    if (id) {
-      loadEntry()
-    }
-  }, [id])
-
-  // Debug: Log entry changes
-  useEffect(() => {
-    if (entry) {
-      console.log('Entry loaded - referenceLinks:', entry.referenceLinks)
-      console.log('Entry loaded - referenceLinks type:', typeof entry.referenceLinks)
-      console.log('Entry loaded - referenceLinks is array?', Array.isArray(entry.referenceLinks))
-      console.log('Entry loaded - referenceLinks length:', entry.referenceLinks?.length)
-    }
-  }, [entry])
-
-  const loadEntry = async () => {
+  const loadEntry = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/research/${id}`, { credentials: 'include' })
@@ -120,7 +104,23 @@ export default function ResearchDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (id) {
+      loadEntry()
+    }
+  }, [id, loadEntry])
+
+  // Debug: Log entry changes
+  useEffect(() => {
+    if (entry) {
+      console.log('Entry loaded - referenceLinks:', entry.referenceLinks)
+      console.log('Entry loaded - referenceLinks type:', typeof entry.referenceLinks)
+      console.log('Entry loaded - referenceLinks is array?', Array.isArray(entry.referenceLinks))
+      console.log('Entry loaded - referenceLinks length:', entry.referenceLinks?.length)
+    }
+  }, [entry])
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this research entry? This action cannot be undone.')) {

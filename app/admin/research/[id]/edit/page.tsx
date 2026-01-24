@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
-import { ArrowLeft, Save, MapPin, Video, Image as ImageIcon, User, Package, Home, Globe, Link2 } from 'lucide-react'
+import { ArrowLeft, Save, Plus, X, MapPin, Video, Image as ImageIcon, User, Package, Home, Globe, Link2 } from 'lucide-react'
 import { uploadImage } from '@/lib/cloudinary'
 
 interface ReferenceLink {
@@ -59,14 +59,7 @@ export default function EditResearchPage() {
     { id: 5, label: 'YouTube Reference Links', icon: Link2 },
   ]
 
-  useEffect(() => {
-    if (id) {
-      loadEntry()
-    }
-  }, [id])
-
-
-  const loadEntry = async () => {
+  const loadEntry = useCallback(async () => {
     try {
       setLoadingData(true)
       const response = await fetch(`/api/research/${id}`, { credentials: 'include' })
@@ -139,7 +132,13 @@ export default function EditResearchPage() {
     } finally {
       setLoadingData(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (id) {
+      loadEntry()
+    }
+  }, [id, loadEntry])
 
   const addProduct = () => {
     const newProduct: Product = {
