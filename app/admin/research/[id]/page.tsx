@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
 import Link from 'next/link'
 import { ArrowLeft, Edit, Trash2, MapPin, Video, Image as ImageIcon, ExternalLink, Phone, Mail, MessageCircle, User, Package, Home, Globe, Link2 } from 'lucide-react'
@@ -359,9 +360,11 @@ export default function ResearchDetailPage() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                               {product.images.map((imageUrl, imgIdx) => (
                                 <div key={imgIdx} className="relative group">
-                                  <img
+                                  <Image
                                     src={imageUrl}
                                     alt={`Product ${index + 1} Image ${imgIdx + 1}`}
+                                    width={192}
+                                    height={192}
                                     className="w-full h-48 object-cover rounded-lg border border-gray-200"
                                   />
                                   <a
@@ -418,9 +421,11 @@ export default function ResearchDetailPage() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           {entry.materialImages.map((imageUrl, idx) => (
                             <div key={idx} className="relative group">
-                              <img
+                              <Image
                                 src={imageUrl}
                                 alt={`Product ${idx + 1}`}
+                                width={192}
+                                height={192}
                                 className="w-full h-48 object-cover rounded-lg border border-gray-200"
                               />
                               <a

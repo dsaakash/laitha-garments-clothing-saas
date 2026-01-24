@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import PageHeader from '@/components/PageHeader'
@@ -42,11 +42,7 @@ export default function TenantDetailsPage() {
     const [upgrading, setUpgrading] = useState(false)
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
-    useEffect(() => {
-        loadTenantDetails()
-    }, [params.id])
-
-    const loadTenantDetails = async () => {
+    const loadTenantDetails = useCallback(async () => {
         try {
             const response = await fetch(`/api/tenants/${params.id}`)
             const result = await response.json()
@@ -60,7 +56,11 @@ export default function TenantDetailsPage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [params.id])
+
+    useEffect(() => {
+        loadTenantDetails()
+    }, [loadTenantDetails])
 
     const handleCopyCredentials = () => {
         if (credentials && tenant) {

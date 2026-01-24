@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import Link from 'next/link'
@@ -47,11 +47,7 @@ export default function ResearchPage() {
     tags: string[]
   }>({ statuses: [], materialTypes: [], tags: [] })
 
-  useEffect(() => {
-    loadResearch()
-  }, [])
-
-  const loadResearch = async () => {
+  const loadResearch = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -73,7 +69,11 @@ export default function ResearchPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [statusFilter, materialTypeFilter, searchQuery])
+
+  useEffect(() => {
+    loadResearch()
+  }, [loadResearch])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this research entry?')) {

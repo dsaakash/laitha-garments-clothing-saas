@@ -81,7 +81,7 @@ export default function TrialExpiredPage() {
 
                 {/* Footer Note */}
                 <p className="text-center text-gray-500 text-sm mt-6">
-                    Once you upgrade, you'll regain instant access to all your data
+                    Once you upgrade, you&apos;ll regain instant access to all your data
                 </p>
             </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
 import { ArrowLeft, Save, Plus, X, MapPin, Video, Image as ImageIcon, User, Package, Home, Globe, Link2 } from 'lucide-react'
 import { uploadImage } from '@/lib/cloudinary'
@@ -533,7 +534,13 @@ export default function EditResearchPage() {
                                 <div className="grid grid-cols-4 gap-4">
                                   {product.images.map((url, imgIndex) => (
                                     <div key={imgIndex} className="relative group">
-                                      <img src={url} alt={`Product ${index + 1} Image ${imgIndex + 1}`} className="w-full h-32 object-cover rounded-lg border border-gray-200" />
+                                      <Image 
+                                        src={url} 
+                                        alt={`Product ${index + 1} Image ${imgIndex + 1}`} 
+                                        width={128} 
+                                        height={128}
+                                        className="w-full h-32 object-cover rounded-lg border border-gray-200" 
+                                      />
                                       <button
                                         type="button"
                                         onClick={() => removeImage(product.id, imgIndex)}
