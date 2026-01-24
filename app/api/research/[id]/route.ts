@@ -37,7 +37,7 @@ export async function GET(
     const products = entry.products ? (Array.isArray(entry.products) ? entry.products : JSON.parse(entry.products)) : []
     
     // Parse reference links - extract URL string (like mapLocation)
-    let referenceLinks: string | ReferenceLink[] = ''
+    let referenceLinks: string = ''
     
     if (entry.reference_links) {
       // If it's already an array (JSONB array from PostgreSQL)
@@ -244,7 +244,7 @@ export async function PUT(
     const parsedProducts = entry.products ? (Array.isArray(entry.products) ? entry.products : JSON.parse(entry.products)) : []
     
     // Parse reference links - extract URL string (like mapLocation)
-    let parsedReferenceLinks: string | ReferenceLink[] = ''
+    let parsedReferenceLinks: string = ''
     
     if (entry.reference_links) {
       if (Array.isArray(entry.reference_links) && entry.reference_links.length > 0) {
