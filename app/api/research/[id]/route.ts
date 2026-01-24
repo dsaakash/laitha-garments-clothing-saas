@@ -59,8 +59,8 @@ export async function GET(
             }
           }
         } catch (e) {
-          // If parsing fails, might be a plain URL string
-          referenceLinks = trimmed
+          // If parsing fails, might be a plain URL string - use it directly
+          referenceLinks = entry.reference_links.trim()
         }
       } 
       // If it's an object (single link object)
