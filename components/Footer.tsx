@@ -62,15 +62,15 @@ export default function Footer() {
             <ul className="space-y-5">
               <li className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 text-purple-500 shrink-0 mt-1" />
-                <span>123, Fashion Street, Bangalore, Karnataka, India - 560001</span>
+                <span>Kr mill colony , 570003</span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone className="w-5 h-5 text-purple-500 shrink-0" />
-                <span>+91 98765 43210</span>
+                <span>7204219541</span>
               </li>
               <li className="flex items-center gap-3">
                 <Mail className="w-5 h-5 text-purple-500 shrink-0" />
-                <span>hello@lalithagarments.com</span>
+                <span>lalithasavant@gmail.com</span>
               </li>
             </ul>
           </div>
