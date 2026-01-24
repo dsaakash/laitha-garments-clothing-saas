@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getTenantContext } from '@/lib/tenant-context'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
+    
+    // Get tenant context
+    const context = getTenantContext(request)
+    const tenantId = context.isTenant ? context.tenantId : null
     
     // Extract year from date or use current year
     let year: number
@@ -15,10 +20,10 @@ export async function GET(request: NextRequest) {
     }
     
     // Get next bill number (without incrementing - for preview only)
-    // We need to check current last_number and add 1 for preview
+    // Check current last_number for this tenant and year, add 1 for preview
     const sequenceResult = await query(
-      'SELECT last_number FROM bill_number_sequence WHERE year = $1',
-      [year]
+      'SELECT last_number FROM bill_number_sequence WHERE year = $1 AND (tenant_id = $2 OR (tenant_id IS NULL AND $2 IS NULL))',
+      [year, tenantId]
     )
     
     let nextNumber = 1

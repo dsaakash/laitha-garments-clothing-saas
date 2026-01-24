@@ -27,12 +27,21 @@ export async function POST(request: NextRequest) {
     // ALWAYS fetch the latest business profile from database to ensure it's up to date
     // This ensures any changes to business profile are immediately reflected in all invoices
     const { query } = await import('@/lib/db')
+    const { getTenantContext, buildTenantFilter } = await import('@/lib/tenant-context')
     let businessProfile = providedBusinessProfile
     
     try {
-      const businessResult = await query(
-        'SELECT * FROM business_profile ORDER BY id DESC LIMIT 1'
-      )
+      // Get tenant context for filtering business profile
+      const context = getTenantContext(request)
+      const tenantFilter = buildTenantFilter(context, true)
+      
+      let businessQuery = 'SELECT * FROM business_profile'
+      if (tenantFilter.where) {
+        businessQuery += ' ' + tenantFilter.where
+      }
+      businessQuery += ' ORDER BY id DESC LIMIT 1'
+      
+      const businessResult = await query(businessQuery, tenantFilter.params)
       
       if (businessResult.rows.length > 0) {
         const profile = businessResult.rows[0]

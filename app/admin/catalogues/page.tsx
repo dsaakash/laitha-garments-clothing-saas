@@ -80,7 +80,7 @@ export default function CataloguesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       if (editingCatalogue) {
         const response = await fetch(`/api/catalogues/${editingCatalogue.id}`, {
@@ -105,7 +105,7 @@ export default function CataloguesPage() {
           return
         }
       }
-      
+
       resetForm()
       await loadData()
       setShowModal(false)
@@ -329,7 +329,7 @@ export default function CataloguesPage() {
                       <span>🔍</span> Search & Add Products
                     </button>
                   </div>
-                  
+
                   {/* Selected Items Grid */}
                   {formData.items.length > 0 ? (
                     <div className="border border-gray-300 rounded-md p-4">
@@ -337,10 +337,10 @@ export default function CataloguesPage() {
                         {formData.items.map((itemId) => {
                           const item = inventory.find(i => i.id === itemId)
                           if (!item) return null
-                          
+
                           const imageUrl = item.productImages?.[0] || item.imageUrl
                           const isValidUrl = imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))
-                          
+
                           return (
                             <div
                               key={itemId}
@@ -354,7 +354,7 @@ export default function CataloguesPage() {
                               >
                                 ×
                               </button>
-                              
+
                               {isValidUrl ? (
                                 <div className="relative w-full aspect-square mb-2">
                                   <Image
@@ -375,7 +375,7 @@ export default function CataloguesPage() {
                                   No Image
                                 </div>
                               )}
-                              
+
                               <div className="text-xs">
                                 <p className="font-medium text-gray-900 truncate" title={item.dressName}>
                                   {item.dressName}

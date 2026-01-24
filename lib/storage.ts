@@ -3,6 +3,7 @@
 
 export interface InventoryItem {
   id: string
+  tenant_id: string  // Multi-tenant: isolates data per business
   dressName: string
   dressType: string
   dressCode: string
@@ -28,6 +29,7 @@ export interface InventoryItem {
 
 export interface Sale {
   id: string
+  tenant_id: string  // Multi-tenant: isolates data per business
   date: string
   partyName: string
   customerId?: string // Link to customer if exists
@@ -77,6 +79,7 @@ export interface BusinessProfile {
 
 export interface Customer {
   id: string
+  tenant_id: string  // Multi-tenant: isolates data per business
   name: string
   phone: string
   email?: string
@@ -87,6 +90,7 @@ export interface Customer {
 
 export interface Catalogue {
   id: string
+  tenant_id: string  // Multi-tenant: isolates data per business
   name: string
   description?: string
   items: string[] // Array of inventory item IDs
@@ -104,6 +108,7 @@ export interface SupplierContact {
 
 export interface Supplier {
   id: string
+  tenant_id: string  // Multi-tenant: isolates data per business
   name: string
   phone: string
   email?: string
@@ -131,6 +136,7 @@ export interface PurchaseOrderItem {
 
 export interface PurchaseOrder {
   id: string
+  tenant_id: string  // Multi-tenant: isolates data per business
   date: string
   supplierId: string
   supplierName: string
@@ -174,7 +180,7 @@ export const storage = {
     }
     return inventory
   },
-  
+
   addInventory: (item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>): InventoryItem => {
     const newItem: InventoryItem = {
       ...item,
@@ -191,12 +197,12 @@ export const storage = {
     }
     return newItem
   },
-  
+
   updateInventory: (id: string, updates: Partial<InventoryItem>): InventoryItem | null => {
     const items = storage.getInventory()
     const index = items.findIndex(item => item.id === id)
     if (index === -1) return null
-    
+
     items[index] = {
       ...items[index],
       ...updates,
@@ -209,12 +215,12 @@ export const storage = {
     }
     return items[index]
   },
-  
+
   deleteInventory: (id: string): boolean => {
     const items = storage.getInventory()
     const filtered = items.filter(item => item.id !== id)
     if (filtered.length === items.length) return false
-    
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('lalitha_inventory', JSON.stringify(filtered))
     } else {
@@ -222,7 +228,7 @@ export const storage = {
     }
     return true
   },
-  
+
   // Sales
   getSales: (): Sale[] => {
     if (typeof window !== 'undefined') {
@@ -231,7 +237,7 @@ export const storage = {
     }
     return sales
   },
-  
+
   addSale: (sale: Omit<Sale, 'id' | 'createdAt'>): Sale => {
     const newSale: Sale = {
       ...sale,
@@ -247,7 +253,7 @@ export const storage = {
     }
     return newSale
   },
-  
+
   // Business Profile
   getBusinessProfile: (): BusinessProfile | null => {
     if (typeof window !== 'undefined') {
@@ -256,7 +262,7 @@ export const storage = {
     }
     return businessProfile
   },
-  
+
   updateBusinessProfile: (profile: BusinessProfile): BusinessProfile => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('lalitha_business_profile', JSON.stringify(profile))
@@ -265,7 +271,7 @@ export const storage = {
     }
     return profile
   },
-  
+
   // Customers
   getCustomers: (): Customer[] => {
     if (typeof window !== 'undefined') {
@@ -274,7 +280,7 @@ export const storage = {
     }
     return customers
   },
-  
+
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>): Customer => {
     const newCustomer: Customer = {
       ...customer,
@@ -291,12 +297,12 @@ export const storage = {
     }
     return newCustomer
   },
-  
+
   updateCustomer: (id: string, updates: Partial<Customer>): Customer | null => {
     const allCustomers = storage.getCustomers()
     const index = allCustomers.findIndex(c => c.id === id)
     if (index === -1) return null
-    
+
     allCustomers[index] = {
       ...allCustomers[index],
       ...updates,
@@ -309,12 +315,12 @@ export const storage = {
     }
     return allCustomers[index]
   },
-  
+
   deleteCustomer: (id: string): boolean => {
     const allCustomers = storage.getCustomers()
     const filtered = allCustomers.filter(c => c.id !== id)
     if (filtered.length === allCustomers.length) return false
-    
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('lalitha_customers', JSON.stringify(filtered))
     } else {
@@ -322,7 +328,7 @@ export const storage = {
     }
     return true
   },
-  
+
   // Catalogues
   getCatalogues: (): Catalogue[] => {
     if (typeof window !== 'undefined') {
@@ -331,7 +337,7 @@ export const storage = {
     }
     return catalogues
   },
-  
+
   addCatalogue: (catalogue: Omit<Catalogue, 'id' | 'createdAt' | 'updatedAt'>): Catalogue => {
     const newCatalogue: Catalogue = {
       ...catalogue,
@@ -348,12 +354,12 @@ export const storage = {
     }
     return newCatalogue
   },
-  
+
   updateCatalogue: (id: string, updates: Partial<Catalogue>): Catalogue | null => {
     const allCatalogues = storage.getCatalogues()
     const index = allCatalogues.findIndex(c => c.id === id)
     if (index === -1) return null
-    
+
     allCatalogues[index] = {
       ...allCatalogues[index],
       ...updates,
@@ -366,12 +372,12 @@ export const storage = {
     }
     return allCatalogues[index]
   },
-  
+
   deleteCatalogue: (id: string): boolean => {
     const allCatalogues = storage.getCatalogues()
     const filtered = allCatalogues.filter(c => c.id !== id)
     if (filtered.length === allCatalogues.length) return false
-    
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('lalitha_catalogues', JSON.stringify(filtered))
     } else {
@@ -379,7 +385,7 @@ export const storage = {
     }
     return true
   },
-  
+
   // Suppliers
   getSuppliers: (): Supplier[] => {
     if (typeof window !== 'undefined') {
@@ -388,7 +394,7 @@ export const storage = {
     }
     return suppliers
   },
-  
+
   addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>): Supplier => {
     const newSupplier: Supplier = {
       ...supplier,
@@ -405,12 +411,12 @@ export const storage = {
     }
     return newSupplier
   },
-  
+
   updateSupplier: (id: string, updates: Partial<Supplier>): Supplier | null => {
     const allSuppliers = storage.getSuppliers()
     const index = allSuppliers.findIndex(s => s.id === id)
     if (index === -1) return null
-    
+
     allSuppliers[index] = {
       ...allSuppliers[index],
       ...updates,
@@ -423,12 +429,12 @@ export const storage = {
     }
     return allSuppliers[index]
   },
-  
+
   deleteSupplier: (id: string): boolean => {
     const allSuppliers = storage.getSuppliers()
     const filtered = allSuppliers.filter(s => s.id !== id)
     if (filtered.length === allSuppliers.length) return false
-    
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('lalitha_suppliers', JSON.stringify(filtered))
     } else {
@@ -436,7 +442,7 @@ export const storage = {
     }
     return true
   },
-  
+
   // Purchase Orders
   getPurchaseOrders: (): PurchaseOrder[] => {
     if (typeof window !== 'undefined') {
@@ -453,7 +459,7 @@ export const storage = {
       sizes: order.sizes || ['Standard'],
     }))
   },
-  
+
   addPurchaseOrder: (order: Omit<PurchaseOrder, 'id' | 'createdAt'>): PurchaseOrder => {
     const newOrder: PurchaseOrder = {
       ...order,
@@ -470,25 +476,25 @@ export const storage = {
     }
     return newOrder
   },
-  
+
   updatePurchaseOrder: (id: string, updates: Partial<PurchaseOrder>): PurchaseOrder | null => {
     const allOrders = storage.getPurchaseOrders()
     const index = allOrders.findIndex(o => o.id === id)
     if (index === -1) return null
-    
+
     // Recalculate total if quantity or price changes
     if (updates.quantity !== undefined || updates.pricePerPiece !== undefined) {
       const quantity = updates.quantity ?? allOrders[index].quantity ?? 0
       const pricePerPiece = updates.pricePerPiece ?? allOrders[index].pricePerPiece ?? 0
       updates.totalAmount = quantity * pricePerPiece
     }
-    
+
     // Ensure sizes array exists for old orders
     const existingOrder = allOrders[index]
     if (!existingOrder.sizes || existingOrder.sizes.length === 0) {
       existingOrder.sizes = ['Standard'] // Default for old orders
     }
-    
+
     allOrders[index] = {
       ...existingOrder,
       ...updates,
@@ -500,12 +506,12 @@ export const storage = {
     }
     return allOrders[index]
   },
-  
+
   deletePurchaseOrder: (id: string): boolean => {
     const allOrders = storage.getPurchaseOrders()
     const filtered = allOrders.filter(o => o.id !== id)
     if (filtered.length === allOrders.length) return false
-    
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('lalitha_purchase_orders', JSON.stringify(filtered))
     } else {

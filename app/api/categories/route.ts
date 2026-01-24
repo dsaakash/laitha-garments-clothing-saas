@@ -1,90 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getTenantContext, buildTenantFilter } from '@/lib/tenant-context'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Get tenant context
+    const context = getTenantContext(request)
+    const tenantFilter = buildTenantFilter(context)
+
     // Check if categories table exists, if not return empty array with a message
     try {
-      const result = await query('SELECT * FROM categories ORDER BY name ASC')
-      
+      let queryText = 'SELECT * FROM categories'
+      if (tenantFilter.where) {
+        queryText += ' ' + tenantFilter.where
+      }
+      queryText += ' ORDER BY name ASC'
+
+      const result = await query(queryText, tenantFilter.params)
+
       const categories = result.rows.map(row => ({
         id: row.id.toString(),
         name: row.name,
         description: row.description || '',
+        parentId: (row.parent_id !== undefined && row.parent_id !== null) ? row.parent_id.toString() : null,
+        displayOrder: (row.display_order !== undefined && row.display_order !== null) ? row.display_order : 0,
         createdAt: row.created_at.toISOString(),
         updatedAt: row.updated_at.toISOString(),
       }))
-      
+
       return NextResponse.json({ success: true, data: categories })
     } catch (tableError: any) {
-      // If table doesn't exist, try to create it and migrate existing categories
-      if (tableError.code === '42P01') { // Table does not exist
-        console.log('Categories table does not exist. Creating it and migrating existing categories...')
-        
-        try {
-          // Create table
-          await query(`
-            CREATE TABLE IF NOT EXISTS categories (
-              id SERIAL PRIMARY KEY,
-              name VARCHAR(255) UNIQUE NOT NULL,
-              description TEXT,
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-          `)
-          
-          // Create index
-          await query('CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name)')
-          
-          // Insert default categories
-          await query(`
-            INSERT INTO categories (name) VALUES 
-              ('Custom'),
-              ('Kurtis'),
-              ('Dresses'),
-              ('Sarees'),
-              ('Tops'),
-              ('Bottoms')
-            ON CONFLICT (name) DO NOTHING
-          `)
-          
-          // Migrate existing categories from purchase_order_items
-          await query(`
-            INSERT INTO categories (name)
-            SELECT DISTINCT category 
-            FROM purchase_order_items 
-            WHERE category IS NOT NULL AND category != ''
-            ON CONFLICT (name) DO NOTHING
-          `)
-          
-          // Migrate existing categories from inventory (dress_type)
-          await query(`
-            INSERT INTO categories (name)
-            SELECT DISTINCT dress_type 
-            FROM inventory 
-            WHERE dress_type IS NOT NULL AND dress_type != ''
-            ON CONFLICT (name) DO NOTHING
-          `)
-          
-          // Now fetch categories
-          const result = await query('SELECT * FROM categories ORDER BY name ASC')
-          
-          const categories = result.rows.map(row => ({
-            id: row.id.toString(),
-            name: row.name,
-            description: row.description || '',
-            createdAt: row.created_at.toISOString(),
-            updatedAt: row.updated_at.toISOString(),
-          }))
-          
-          return NextResponse.json({ success: true, data: categories })
-        } catch (createError) {
-          console.error('Failed to create categories table:', createError)
-          return NextResponse.json(
-            { success: false, message: 'Categories table does not exist. Please run the migration script.' },
-            { status: 500 }
-          )
-        }
+      // If table doesn't exist, return empty for now
+      if (tableError.code === '42P01') {
+        console.log('Categories table does not exist')
+        return NextResponse.json({ success: true, data: [] })
       }
       throw tableError
     }
@@ -100,33 +49,140 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    
+
+    // Get tenant context
+    const context = getTenantContext(request)
+    const tenantId = context.isTenant ? context.tenantId : null
+
     if (!body.name || !body.name.trim()) {
       return NextResponse.json(
         { success: false, message: 'Category name is required' },
         { status: 400 }
       )
     }
+
+    // Validate parentId if provided
+    let parentId = null
+    if (body.parentId) {
+      const parentIdNum = parseInt(body.parentId)
+      if (isNaN(parentIdNum)) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid parent category ID' },
+          { status: 400 }
+        )
+      }
+
+      // Check if parent exists and belongs to same tenant
+      let parentCheckQuery: string
+      let parentCheckParams: any[]
+      
+      // Check if tenant_id column exists
+      let hasTenantIdForCheck = false
+      try {
+        await query('SELECT tenant_id FROM categories LIMIT 1')
+        hasTenantIdForCheck = true
+      } catch (colError: any) {
+        hasTenantIdForCheck = false
+      }
+      
+      if (hasTenantIdForCheck) {
+        // Column exists, use tenant filtering
+        parentCheckQuery = 'SELECT id FROM categories WHERE id = $1 AND (tenant_id = $2 OR tenant_id IS NULL)'
+        parentCheckParams = [parentIdNum, tenantId]
+      } else {
+        // Column doesn't exist, check without tenant filtering
+        parentCheckQuery = 'SELECT id FROM categories WHERE id = $1'
+        parentCheckParams = [parentIdNum]
+      }
+      
+      const parentCheck = await query(parentCheckQuery, parentCheckParams)
+      if (parentCheck.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, message: 'Parent category not found' },
+          { status: 400 }
+        )
+      }
+
+      parentId = parentIdNum
+    }
+
+    // Check which columns exist
+    let hasTenantIdColumn = false
+    let hasParentIdColumn = false
+    let hasDisplayOrderColumn = false
     
-    const result = await query(
-      `INSERT INTO categories (name, description)
-       VALUES ($1, $2)
-       RETURNING *`,
-      [
-        body.name.trim(),
-        body.description || null,
-      ]
-    )
+    try {
+      await query('SELECT tenant_id FROM categories LIMIT 1')
+      hasTenantIdColumn = true
+    } catch (colError: any) {
+      hasTenantIdColumn = false
+    }
     
+    try {
+      await query('SELECT parent_id FROM categories LIMIT 1')
+      hasParentIdColumn = true
+    } catch (colError: any) {
+      hasParentIdColumn = false
+    }
+    
+    try {
+      await query('SELECT display_order FROM categories LIMIT 1')
+      hasDisplayOrderColumn = true
+    } catch (colError: any) {
+      hasDisplayOrderColumn = false
+    }
+
+    // Build INSERT query based on available columns
+    const columns: string[] = ['name']
+    const values: string[] = ['$1']
+    const params: any[] = [body.name.trim()]
+    let paramCount = 2
+    
+    if (body.description) {
+      columns.push('description')
+      values.push(`$${paramCount}`)
+      params.push(body.description)
+      paramCount++
+    }
+    
+    if (hasParentIdColumn) {
+      columns.push('parent_id')
+      values.push(`$${paramCount}`)
+      params.push(parentId)
+      paramCount++
+    }
+    
+    if (hasDisplayOrderColumn) {
+      columns.push('display_order')
+      values.push(`$${paramCount}`)
+      params.push(body.displayOrder || 0)
+      paramCount++
+    }
+    
+    if (hasTenantIdColumn) {
+      columns.push('tenant_id')
+      values.push(`$${paramCount}`)
+      params.push(tenantId)
+      paramCount++
+    }
+
+    const insertQuery = `INSERT INTO categories (${columns.join(', ')})
+       VALUES (${values.join(', ')})
+       RETURNING *`
+
+    const result = await query(insertQuery, params)
+
     const category = result.rows[0]
     const newCategory = {
       id: category.id.toString(),
       name: category.name,
       description: category.description || '',
+      parentId: category.parent_id ? category.parent_id.toString() : null,
+      displayOrder: category.display_order || 0,
       createdAt: category.created_at.toISOString(),
       updatedAt: category.updated_at.toISOString(),
     }
-    
+
     return NextResponse.json({ success: true, data: newCategory })
   } catch (error: any) {
     console.error('Category add error:', error)
@@ -142,4 +198,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

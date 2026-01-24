@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getTenantContext, buildTenantFilter } from '@/lib/tenant-context'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +9,11 @@ export async function GET(request: NextRequest) {
     const year = searchParams.get('year')
     const customerId = searchParams.get('customer_id')
     const partyName = searchParams.get('partyName')
-    
+
+    // Get tenant context
+    const context = getTenantContext(request)
+    const tenantFilter = buildTenantFilter(context)
+
     let queryText = `
       SELECT s.*, 
              COALESCE(
@@ -33,43 +38,48 @@ export async function GET(request: NextRequest) {
       FROM sales s
       LEFT JOIN sale_items si ON s.id = si.sale_id
     `
-    
+
     const conditions: string[] = []
-    const params: any[] = []
-    let paramCount = 1
-    
+    const params: any[] = [...tenantFilter.params]
+    let paramCount = tenantFilter.params.length + 1
+
+    // Add tenant filter
+    if (tenantFilter.where) {
+      conditions.push(tenantFilter.where.replace('WHERE ', '').replace('tenant_id', 's.tenant_id'))
+    }
+
     if (customerId) {
       conditions.push(`s.customer_id = $${paramCount}`)
       params.push(parseInt(customerId))
       paramCount++
     }
-    
+
     if (partyName) {
       conditions.push(`LOWER(s.party_name) = LOWER($${paramCount})`)
       params.push(partyName)
       paramCount++
     }
-    
+
     if (year) {
       conditions.push(`EXTRACT(YEAR FROM s.date) = $${paramCount}`)
       params.push(year)
       paramCount++
     }
-    
+
     if (month) {
       conditions.push(`EXTRACT(MONTH FROM s.date) = $${paramCount}`)
       params.push(month)
       paramCount++
     }
-    
+
     if (conditions.length > 0) {
       queryText += ' WHERE ' + conditions.join(' AND ')
     }
-    
+
     queryText += ' GROUP BY s.id ORDER BY s.date DESC'
-    
+
     const result = await query(queryText, params)
-    
+
     const sales = result.rows.map(row => ({
       id: row.id.toString(),
       date: row.date.toISOString().split('T')[0],
@@ -93,7 +103,7 @@ export async function GET(request: NextRequest) {
       saleImage: row.sale_image || undefined,
       createdAt: row.created_at.toISOString(),
     }))
-    
+
     return NextResponse.json({ success: true, data: sales })
   } catch (error) {
     console.error('Sales fetch error:', error)
@@ -107,28 +117,32 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    
+
+    // Get tenant context
+    const context = getTenantContext(request)
+    const tenantId = context.isTenant ? context.tenantId : null
+
     // Auto-generate bill number if not provided
     let billNumber = body.billNumber
     if (!billNumber || billNumber.trim() === '') {
       // Extract year from sale date
       const saleDate = new Date(body.date)
       const year = saleDate.getFullYear()
-      
-      // Generate bill number using the function
+
+      // Generate bill number using the function with tenant_id
       const billNumberResult = await query(
-        'SELECT get_next_bill_number($1) as bill_number',
-        [year]
+        'SELECT get_next_bill_number($1, $2) as bill_number',
+        [year, tenantId]
       )
       billNumber = billNumberResult.rows[0].bill_number
     }
-    
-    // Start transaction - insert sale first
+
+    // Start transaction - insert sale first (with tenant_id)
     const saleResult = await query(
       `INSERT INTO sales 
        (date, party_name, customer_id, bill_number, subtotal, discount_type, discount_percentage, discount_amount,
-        gst_type, gst_percentage, gst_amount, total_amount, final_total, payment_mode, upi_transaction_id, upi_id, payment_status, sale_image)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        gst_type, gst_percentage, gst_amount, total_amount, final_total, payment_mode, upi_transaction_id, upi_id, payment_status, sale_image, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        RETURNING *`,
       [
         body.date,
@@ -149,12 +163,13 @@ export async function POST(request: NextRequest) {
         body.upiId || null,
         body.paymentStatus || (body.paymentMode === 'UPI' ? 'pending' : null),
         body.saleImage || null,
+        tenantId
       ]
     )
-    
+
     const sale = saleResult.rows[0]
     const saleId = sale.id
-    
+
     // Insert sale items and update inventory stock
     if (body.items && body.items.length > 0) {
       // First, validate stock for all items before processing
@@ -169,12 +184,12 @@ export async function POST(request: NextRequest) {
             const inventoryItem = inventoryResult.rows[0]
             const availableStock = parseInt(inventoryItem.current_stock) || 0
             const requestedQuantity = item.quantity || 0
-            
+
             if (availableStock < requestedQuantity) {
               return NextResponse.json(
-                { 
-                  success: false, 
-                  message: `Insufficient stock for ${inventoryItem.dress_name} (${inventoryItem.dress_code}). Available: ${availableStock}, Requested: ${requestedQuantity}` 
+                {
+                  success: false,
+                  message: `Insufficient stock for ${inventoryItem.dress_name} (${inventoryItem.dress_code}). Available: ${availableStock}, Requested: ${requestedQuantity}`
                 },
                 { status: 400 }
               )
@@ -187,13 +202,13 @@ export async function POST(request: NextRequest) {
           }
         }
       }
-      
+
       // Now process items if all validations pass
       for (const item of body.items) {
         // ALWAYS ensure dress_code is present - fetch from inventory if missing
         let dressCode = item.dressCode || ''
         let inventoryId = item.inventoryId ? parseInt(item.inventoryId) : null
-        
+
         // If inventoryId is provided, always fetch the latest dress_code from inventory
         if (inventoryId) {
           const inventoryResult = await query(
@@ -210,7 +225,7 @@ export async function POST(request: NextRequest) {
             // Also ensure dress_name and dress_type match inventory if not provided
             const finalDressName = item.dressName || inventory.dress_name || ''
             const finalDressType = item.dressType || inventory.dress_type || ''
-            
+
             await query(
               `INSERT INTO sale_items 
                (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
@@ -259,36 +274,36 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // No inventoryId provided, use provided data
-        await query(
-          `INSERT INTO sale_items 
+          await query(
+            `INSERT INTO sale_items 
            (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
             quantity, use_per_meter, meters, price_per_meter, purchase_price, selling_price, profit)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [
-            saleId,
+            [
+              saleId,
               null,
-            item.dressName,
-            item.dressType,
+              item.dressName,
+              item.dressType,
               dressCode || null,
-            item.size,
-            item.quantity,
-            item.usePerMeter || false,
-            item.meters || null,
-            item.pricePerMeter || null,
-            item.purchasePrice,
-            item.sellingPrice,
-            item.profit,
-          ]
-        )
+              item.size,
+              item.quantity,
+              item.usePerMeter || false,
+              item.meters || null,
+              item.pricePerMeter || null,
+              item.purchasePrice,
+              item.sellingPrice,
+              item.profit,
+            ]
+          )
         }
-        
+
         // Update inventory stock: decrease quantity_out and current_stock
         if (item.inventoryId) {
           const inventoryResult = await query(
             'SELECT quantity_out, current_stock FROM inventory WHERE id = $1',
             [parseInt(item.inventoryId)]
           )
-          
+
           if (inventoryResult.rows.length > 0) {
             const inventory = inventoryResult.rows[0]
             const currentQuantityIn = parseInt(inventory.quantity_in) || 0
@@ -299,7 +314,7 @@ export async function POST(request: NextRequest) {
             const newQuantityOut = currentQuantityOut + quantityToDeduct
             // Maintain relationship: current_stock = quantity_in - quantity_out
             const newCurrentStock = Math.max(0, currentQuantityIn - newQuantityOut) // Prevent negative stock
-            
+
             await query(
               `UPDATE inventory 
                SET quantity_out = $1, 
@@ -315,7 +330,7 @@ export async function POST(request: NextRequest) {
             'SELECT id, quantity_out, current_stock FROM inventory WHERE dress_code = $1',
             [item.dressCode]
           )
-          
+
           if (inventoryResult.rows.length > 0) {
             const inventory = inventoryResult.rows[0]
             const currentQuantityIn = parseInt(inventory.quantity_in) || 0
@@ -324,7 +339,7 @@ export async function POST(request: NextRequest) {
             const newQuantityOut = currentQuantityOut + item.quantity
             // Maintain relationship: current_stock = quantity_in - quantity_out
             const newCurrentStock = Math.max(0, currentQuantityIn - newQuantityOut) // Prevent negative stock
-            
+
             await query(
               `UPDATE inventory 
                SET quantity_out = $1, 
@@ -337,7 +352,7 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-    
+
     // Fetch complete sale with items
     const completeSaleResult = await query(
       `SELECT s.*, 
@@ -363,7 +378,7 @@ export async function POST(request: NextRequest) {
        GROUP BY s.id`,
       [saleId]
     )
-    
+
     const completeSale = completeSaleResult.rows[0]
     const newSale = {
       id: completeSale.id.toString(),
@@ -378,7 +393,7 @@ export async function POST(request: NextRequest) {
       saleImage: completeSale.sale_image || undefined,
       createdAt: completeSale.created_at.toISOString(),
     }
-    
+
     return NextResponse.json({ success: true, data: newSale })
   } catch (error) {
     console.error('Sales add error:', error)

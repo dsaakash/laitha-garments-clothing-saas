@@ -12,11 +12,19 @@ export default function PurchasesPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [categories, setCategories] = useState<string[]>(['All'])
-  const [availableCategories, setAvailableCategories] = useState<Array<{id: string, name: string}>>([])
+  const [availableCategories, setAvailableCategories] = useState<Array<{id: string, name: string, parentId: string | null}>>([])
   const [showModal, setShowModal] = useState(false)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryParentId, setNewCategoryParentId] = useState('')
   const [categoryModalItemIndex, setCategoryModalItemIndex] = useState<number | null>(null)
+  const [showQuickSupplierModal, setShowQuickSupplierModal] = useState(false)
+  const [quickSupplierForm, setQuickSupplierForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+  })
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null)
   const [filterSupplier, setFilterSupplier] = useState('')
   const [filterCategory, setFilterCategory] = useState('All')
@@ -123,6 +131,101 @@ export default function PurchasesPage() {
     } catch (error) {
       console.error('Failed to load data:', error)
     }
+  }
+
+  const loadSuppliers = async () => {
+    try {
+      const response = await fetch('/api/suppliers')
+      const result = await response.json()
+      if (result.success) {
+        setSuppliers(result.data)
+      }
+    } catch (error) {
+      console.error('Failed to load suppliers:', error)
+    }
+  }
+
+  const handleQuickSupplierCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!quickSupplierForm.name.trim() || !quickSupplierForm.phone.trim()) {
+      alert('Name and Phone are required')
+      return
+    }
+    
+    try {
+      const response = await fetch('/api/suppliers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: quickSupplierForm.name.trim(),
+          phone: quickSupplierForm.phone.trim(),
+          email: quickSupplierForm.email.trim() || undefined,
+          address: quickSupplierForm.address.trim() || undefined,
+        }),
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Refresh suppliers list
+        await loadSuppliers()
+        // Auto-select new supplier
+        setFormData({ ...formData, supplierId: result.data.id })
+        // Close modal
+        setShowQuickSupplierModal(false)
+        // Reset form
+        setQuickSupplierForm({ name: '', phone: '', email: '', address: '' })
+        alert('Supplier created successfully!')
+      } else {
+        alert(result.message || 'Failed to create supplier')
+      }
+    } catch (error) {
+      console.error('Failed to create supplier:', error)
+      alert('Failed to create supplier')
+    }
+  }
+
+  // Build category tree for hierarchical display
+  const buildCategoryTree = (categories: Array<{id: string, name: string, parentId: string | null}>) => {
+    const map = new Map<string, {id: string, name: string, parentId: string | null, children: any[]}>()
+    const roots: any[] = []
+    
+    // Create nodes
+    categories.forEach(cat => {
+      map.set(cat.id, { ...cat, children: [] })
+    })
+    
+    // Build tree
+    categories.forEach(cat => {
+      const node = map.get(cat.id)!
+      if (cat.parentId && map.has(cat.parentId)) {
+        const parent = map.get(cat.parentId)!
+        parent.children.push(node)
+      } else {
+        roots.push(node)
+      }
+    })
+    
+    return { roots, map }
+  }
+
+  const getCategoryOptions = () => {
+    const { roots } = buildCategoryTree(availableCategories)
+    const options: JSX.Element[] = []
+    
+    const renderCategory = (category: any, level: number = 0) => {
+      const indent = '  '.repeat(level)
+      options.push(
+        <option key={category.id} value={category.name}>
+          {indent}{category.name}
+        </option>
+      )
+      category.children.forEach((child: any) => renderCategory(child, level + 1))
+    }
+    
+    roots.forEach(root => renderCategory(root))
+    return options
   }
 
   const loadOrders = async () => {
@@ -626,13 +729,15 @@ export default function PurchasesPage() {
       return
     }
     
-    // Check if category already exists (case-insensitive)
-    const existingCat = availableCategories.find(cat => 
-      cat.name.toLowerCase() === newCategoryName.trim().toLowerCase()
-    )
+    // Check if category already exists (case-insensitive) in the same parent
+    const existingCat = availableCategories.find(cat => {
+      const nameMatch = cat.name.toLowerCase() === newCategoryName.trim().toLowerCase()
+      const parentMatch = (cat.parentId || null) === (newCategoryParentId || null)
+      return nameMatch && parentMatch
+    })
     
     if (existingCat) {
-      alert(`Category "${existingCat.name}" already exists`)
+      alert(`Category "${existingCat.name}" already exists${newCategoryParentId ? ' under this parent' : ''}`)
       // Auto-select the existing category for the item that opened the modal
       if (categoryModalItemIndex !== null) {
         const newItems = [...items]
@@ -640,6 +745,7 @@ export default function PurchasesPage() {
         setItems(newItems)
       }
       setNewCategoryName('')
+      setNewCategoryParentId('')
       setCategoryModalItemIndex(null)
       setShowCategoryModal(false)
       return
@@ -649,7 +755,12 @@ export default function PurchasesPage() {
       const response = await fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newCategoryName.trim(), description: '' }),
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          description: '',
+          parentId: newCategoryParentId || undefined,
+          displayOrder: 0,
+        }),
       })
       const result = await response.json()
       if (!result.success) {
@@ -667,17 +778,36 @@ export default function PurchasesPage() {
       // Auto-select the newly created category for the item that opened the modal
       if (categoryModalItemIndex !== null) {
         const newItems = [...items]
-        newItems[categoryModalItemIndex].category = newCategoryName.trim()
+        newItems[categoryModalItemIndex].category = result.data.name
         setItems(newItems)
       }
       
       setNewCategoryName('')
+      setNewCategoryParentId('')
       setCategoryModalItemIndex(null)
       setShowCategoryModal(false)
     } catch (error) {
       console.error('Failed to create category:', error)
       alert('Failed to create category')
     }
+  }
+
+  // Get root categories for parent selection
+  const getRootCategories = () => {
+    return availableCategories.filter(cat => !cat.parentId)
+  }
+
+  // Get category path for display
+  const getCategoryPath = (categoryId: string): string => {
+    const category = availableCategories.find(c => c.id === categoryId)
+    if (!category) return ''
+    if (!category.parentId) return category.name
+    
+    const parent = availableCategories.find(c => c.id === category.parentId)
+    if (parent) {
+      return `${getCategoryPath(parent.id)} > ${category.name}`
+    }
+    return category.name
   }
 
   const exportToExcel = () => {
@@ -1070,19 +1200,32 @@ export default function PurchasesPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Supplier *</label>
-                    <select
-                      required
-                      value={formData.supplierId}
-                      onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Select Supplier</option>
-                      {suppliers.map(supplier => (
-                        <option key={supplier.id} value={supplier.id}>
-                          {supplier.name} {supplier.gstPercentage ? `(GST: ${supplier.gstPercentage}%)` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <select
+                        required
+                        value={formData.supplierId}
+                        onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="">Select Supplier</option>
+                        {suppliers.map(supplier => (
+                          <option key={supplier.id} value={supplier.id}>
+                            {supplier.name} {supplier.gstPercentage ? `(GST: ${supplier.gstPercentage}%)` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickSupplierForm({ name: '', phone: '', email: '', address: '' })
+                          setShowQuickSupplierModal(true)
+                        }}
+                        className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center justify-center min-w-[44px]"
+                        title="Add new supplier"
+                      >
+                        <span className="text-xl font-bold">+</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1155,21 +1298,18 @@ export default function PurchasesPage() {
                               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                           >
                               <option value="">Select a category...</option>
-                            {availableCategories.map(cat => (
-                                <option key={cat.id} value={cat.name}>
-                                  {cat.name}
-                                </option>
-                            ))}
+                            {getCategoryOptions()}
                           </select>
                             <button
                               type="button"
                               onClick={() => {
                                 setNewCategoryName('')
+                                setNewCategoryParentId('')
                                 setCategoryModalItemIndex(index)
                                 setShowCategoryModal(true)
                               }}
                               className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center min-w-[44px]"
-                              title="Add new category"
+                              title="Add new category or sub-category"
                             >
                               <span className="text-xl font-bold">+</span>
                             </button>
@@ -2038,50 +2178,192 @@ export default function PurchasesPage() {
           />
         )}
 
-        {/* Create Category Modal */}
+        {/* Create Category/Sub-Category Modal */}
         {showCategoryModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-              <h2 className="text-2xl font-bold mb-6">Create New Category</h2>
-              <div className="space-y-4">
+            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-2">Create Category</h2>
+              <p className="text-sm text-gray-500 mb-6">Create a new category or sub-category</p>
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateCategory(); }} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category Type
+                  </label>
+                  <div className="flex gap-4 mb-2">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="categoryType"
+                        value="root"
+                        checked={!newCategoryParentId}
+                        onChange={() => setNewCategoryParentId('')}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">Root Category</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="categoryType"
+                        value="sub"
+                        checked={!!newCategoryParentId}
+                        onChange={() => {
+                          if (!newCategoryParentId && getRootCategories().length > 0) {
+                            setNewCategoryParentId(getRootCategories()[0].id)
+                          }
+                        }}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">Sub-Category</span>
+                    </label>
+                  </div>
+                </div>
+
+                {newCategoryParentId && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Parent Category *
+                    </label>
+                    <select
+                      value={newCategoryParentId}
+                      onChange={(e) => setNewCategoryParentId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      required={!!newCategoryParentId}
+                    >
+                      <option value="">Select parent category...</option>
+                      {getRootCategories().map((parent) => (
+                        <option key={parent.id} value={parent.id}>
+                          {parent.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select the parent category for this sub-category
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {newCategoryParentId ? 'Sub-Category Name *' : 'Category Name *'}
+                  </label>
                   <input
                     type="text"
+                    required
                     value={newCategoryName}
                     onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="e.g., Kurtis, Dresses, Sarees"
+                    placeholder={newCategoryParentId ? "e.g., Anarkali, Straight, A-Line" : "e.g., Kurtis, Dresses, Sarees"}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleCreateCategory()
-                      }
-                    }}
                     autoFocus
+                  />
+                  {newCategoryParentId && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      This will be created under: <span className="font-medium">{getCategoryPath(newCategoryParentId)}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-800">
+                    <strong>💡 Tip:</strong> {newCategoryParentId 
+                      ? 'Sub-categories help organize products under main categories. Example: "Anarkali" under "Kurtis".'
+                      : 'Root categories are main product types. You can add sub-categories later to organize further.'}
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewCategoryName('')
+                      setNewCategoryParentId('')
+                      setCategoryModalItemIndex(null)
+                      setShowCategoryModal(false)
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                  >
+                    {newCategoryParentId ? 'Create Sub-Category' : 'Create Category'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Supplier Creation Modal */}
+        {showQuickSupplierModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-6">Quick Add Supplier</h2>
+              <form onSubmit={handleQuickSupplierCreate} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={quickSupplierForm.name}
+                    onChange={(e) => setQuickSupplierForm({ ...quickSupplierForm, name: e.target.value })}
+                    placeholder="Supplier name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={quickSupplierForm.phone}
+                    onChange={(e) => setQuickSupplierForm({ ...quickSupplierForm, phone: e.target.value })}
+                    placeholder="9876543210"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email (Optional)</label>
+                  <input
+                    type="email"
+                    value={quickSupplierForm.email}
+                    onChange={(e) => setQuickSupplierForm({ ...quickSupplierForm, email: e.target.value })}
+                    placeholder="supplier@example.com"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address (Optional)</label>
+                  <textarea
+                    value={quickSupplierForm.address}
+                    onChange={(e) => setQuickSupplierForm({ ...quickSupplierForm, address: e.target.value })}
+                    rows={3}
+                    placeholder="Supplier address"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
                     onClick={() => {
-                      setNewCategoryName('')
-                      setCategoryModalItemIndex(null)
-                      setShowCategoryModal(false)
+                      setQuickSupplierForm({ name: '', phone: '', email: '', address: '' })
+                      setShowQuickSupplierModal(false)
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
                     Cancel
                   </button>
                   <button
-                    type="button"
-                    onClick={handleCreateCategory}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                    type="submit"
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                   >
-                    Create Category
+                    Add Supplier
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
           </div>
         )}

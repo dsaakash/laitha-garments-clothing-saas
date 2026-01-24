@@ -1,74 +1,58 @@
+/**
+ * Simple script to run the tenant_id migration for business_profile table
+ * Run with: node scripts/run-migration.js
+ */
+
 const { Pool } = require('pg')
 const fs = require('fs')
 const path = require('path')
-
-// Load environment variables - try both .env and .env.local
-require('dotenv').config({ path: path.join(__dirname, '../.env') })
-require('dotenv').config({ path: path.join(__dirname, '../.env.local') })
-
-if (!process.env.DATABASE_URL) {
-  console.error('❌ DATABASE_URL not found in environment variables')
-  console.error('Please make sure you have a .env or .env.local file with DATABASE_URL')
-  process.exit(1)
-}
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('localhost') ? false : {
-    rejectUnauthorized: false
-  }
-})
+require('dotenv').config()
 
 async function runMigration() {
-  const client = await pool.connect()
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+  })
+
   try {
-    console.log('🔄 Starting migration...')
-    console.log('📝 Reading migration file...')
+    console.log('🔄 Running migration: Add tenant_id to business_profile...')
     
-    await client.query('BEGIN')
-    
-    const migrationSQL = fs.readFileSync(
-      path.join(__dirname, 'add-roles-migration.sql'),
-      'utf8'
-    )
-    
-    console.log('⚙️  Executing migration SQL...')
-    
-    // Split SQL by semicolons and execute each statement
-    const statements = migrationSQL
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'))
-    
-    for (const statement of statements) {
-      if (statement.trim()) {
-        await client.query(statement)
-      }
-    }
-    
-    await client.query('COMMIT')
+    const migrationSQL = `
+      -- Add tenant_id column to business_profile table
+      ALTER TABLE business_profile 
+        ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(255);
+
+      -- Create index for faster lookups
+      CREATE INDEX IF NOT EXISTS idx_business_profile_tenant_id ON business_profile(tenant_id);
+
+      -- Set existing business profiles to NULL (for Lalitha Garments - superadmin)
+      UPDATE business_profile 
+      SET tenant_id = NULL 
+      WHERE tenant_id IS NULL;
+    `
+
+    await pool.query(migrationSQL)
     console.log('✅ Migration completed successfully!')
-    console.log('📋 Changes applied:')
-    console.log('   - Added role column to admins table')
-    console.log('   - Set first admin as superadmin')
-    console.log('   - Created users table')
+    
+    // Verify the column exists
+    const verifyResult = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'business_profile' 
+      AND column_name = 'tenant_id'
+    `)
+    
+    if (verifyResult.rows.length > 0) {
+      console.log('✅ Verified: tenant_id column exists in business_profile table')
+    } else {
+      console.log('⚠️  Warning: Could not verify tenant_id column')
+    }
+    
   } catch (error) {
-    await client.query('ROLLBACK')
     console.error('❌ Migration failed:', error.message)
-    if (error.code) {
-      console.error('   Error code:', error.code)
-    }
-    if (error.detail) {
-      console.error('   Details:', error.detail)
-    }
     process.exit(1)
   } finally {
-    client.release()
     await pool.end()
   }
 }
 
-runMigration().catch(err => {
-  console.error('❌ Fatal error:', err)
-  process.exit(1)
-})
+runMigration()

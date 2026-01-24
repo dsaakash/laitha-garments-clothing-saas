@@ -17,11 +17,34 @@ html {
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  color: #2f362f;
-  background-color: #fefdfb;
-  line-height: 1.7;
+  color: #1a1a1a;
+  background-color: #f8fafc;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root {
+  --primary-glow: conic-gradient(from 180deg at 50% 50%, #e67e22 0deg, #d35400 55deg, #f39c12 120deg, #e67e22 160deg, transparent 360deg);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
 }
 
 @layer utilities {
@@ -36,6 +59,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -125,20 +149,21 @@ body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e67e22;
-  border-radius: 5px;
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #d4631a;
+  background: #94a3b8;
 }
 
 /* Sidebar scrollbar */
@@ -280,7 +305,7 @@ body {
   .table-wrapper table {
     min-width: 2000px !important;
   }
-  
+
   .table-wrapper::-webkit-scrollbar {
     height: 18px;
   }
@@ -289,14 +314,13 @@ body {
 /* Jaipur Palace Scene Background */
 .jaipur-background {
   position: relative;
-  background: 
+  background:
     /* Sky gradient - morning to evening */
-    linear-gradient(to bottom, 
-      #ffecd2 0%, 
-      #fcb69f 30%, 
-      #ff9a9e 60%, 
-      #fecfef 100%
-    );
+    linear-gradient(to bottom,
+      #ffecd2 0%,
+      #fcb69f 30%,
+      #ff9a9e 60%,
+      #fecfef 100%);
   overflow: hidden;
 }
 
@@ -304,37 +328,32 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: 
+  background:
     /* Palace facade - Hawa Mahal inspired */
     /* Base structure */
-    linear-gradient(to bottom, 
+    linear-gradient(to bottom,
       transparent 0%,
       transparent 40%,
       rgba(255, 182, 193, 0.15) 50%,
       rgba(255, 192, 203, 0.2) 60%,
       rgba(255, 182, 193, 0.15) 70%,
-      transparent 100%
-    ),
+      transparent 100%),
     /* Palace windows pattern */
-    repeating-linear-gradient(
-      90deg,
+    repeating-linear-gradient(90deg,
       transparent,
       transparent 8%,
       rgba(255, 255, 255, 0.1) 8.5%,
       rgba(255, 255, 255, 0.1) 9%,
       transparent 9.5%,
-      transparent 100%
-    ),
+      transparent 100%),
     /* Vertical architectural lines */
-    repeating-linear-gradient(
-      0deg,
+    repeating-linear-gradient(0deg,
       transparent,
       transparent 5%,
       rgba(255, 255, 255, 0.08) 5.2%,
       rgba(255, 255, 255, 0.08) 5.4%,
       transparent 5.6%,
-      transparent 100%
-    ),
+      transparent 100%),
     /* Dome shapes */
     radial-gradient(ellipse 200% 100% at 20% 30%, rgba(255, 215, 0, 0.15) 0%, transparent 50%),
     radial-gradient(ellipse 200% 100% at 80% 30%, rgba(255, 215, 0, 0.15) 0%, transparent 50%),
@@ -349,31 +368,31 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: 
+  background:
     /* Decorative elements - jali patterns */
-    repeating-linear-gradient(
-      45deg,
+    repeating-linear-gradient(45deg,
       transparent,
       transparent 3px,
       rgba(255, 255, 255, 0.05) 3px,
-      rgba(255, 255, 255, 0.05) 6px
-    ),
+      rgba(255, 255, 255, 0.05) 6px),
     /* Palace silhouette at bottom */
     linear-gradient(to top,
       rgba(255, 182, 193, 0.3) 0%,
       rgba(255, 192, 203, 0.2) 10%,
       rgba(255, 182, 193, 0.15) 20%,
-      transparent 40%
-    );
+      transparent 40%);
   background-size: 40px 40px, 100% 100%;
   opacity: 0.4;
 }
 
 @keyframes palaceGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.5;
     filter: brightness(1);
   }
+
   50% {
     opacity: 0.7;
     filter: brightness(1.1);
@@ -382,43 +401,42 @@ body {
 
 /* Additional palace decorative elements */
 .jaipur-background {
-  background-image: 
+  background-image:
     /* Multiple palace facades for depth */
     linear-gradient(to bottom, transparent 0%, transparent 35%, rgba(255, 182, 193, 0.1) 45%, rgba(255, 192, 203, 0.15) 55%, rgba(255, 182, 193, 0.1) 65%, transparent 100%),
     /* Window details */
-    repeating-linear-gradient(
-      90deg,
+    repeating-linear-gradient(90deg,
       transparent 0%,
       transparent 7.5%,
       rgba(255, 255, 255, 0.12) 8%,
       rgba(255, 255, 255, 0.12) 8.5%,
       transparent 9%,
-      transparent 100%
-    ),
+      transparent 100%),
     /* Architectural details - cornices */
     linear-gradient(to bottom,
       transparent 48%,
       rgba(255, 215, 0, 0.2) 49%,
       rgba(255, 215, 0, 0.2) 51%,
-      transparent 52%
-    ),
+      transparent 52%),
     /* Base sky */
-    linear-gradient(to bottom, 
-      #ffecd2 0%, 
-      #fcb69f 25%, 
-      #ff9a9e 50%, 
+    linear-gradient(to bottom,
+      #ffecd2 0%,
+      #fcb69f 25%,
+      #ff9a9e 50%,
       #fecfef 75%,
-      #ffecd2 100%
-    );
+      #ffecd2 100%);
   background-size: 100% 100%, 10% 100%, 100% 100%, 100% 100%;
   background-position: center, center, center, center;
   animation: palaceScene 25s ease-in-out infinite;
 }
 
 @keyframes palaceScene {
-  0%, 100% {
+
+  0%,
+  100% {
     background-position: center, center, center, 0% 0%;
   }
+
   50% {
     background-position: center, center, center, 0% 100%;
   }
@@ -429,7 +447,7 @@ body {
   .professional-card {
     border-radius: 16px;
   }
-  
+
   .image-container {
     border-radius: 12px;
   }
@@ -446,9 +464,10 @@ body {
 
 /* Touch-friendly buttons on mobile */
 @media (max-width: 768px) {
-  button, a {
+
+  button,
+  a {
     min-height: 44px;
     min-width: 44px;
   }
 }
-

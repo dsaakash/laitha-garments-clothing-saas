@@ -4,6 +4,31 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { checkAuth, logout } from '@/lib/auth'
+import { useTrialCheck } from '@/lib/useTrialCheck'
+import {
+  LayoutDashboard,
+  Rocket,
+  Settings,
+  Factory,
+  Tags,
+  ShoppingCart,
+  Package,
+  Users,
+  Shirt,
+  BookOpen,
+  Banknote,
+  FileText,
+  MessageSquare,
+  ShieldCheck,
+  UserCog,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  Building2,
+  Sliders,
+  Search
+} from 'lucide-react'
 
 interface AdminLayoutProps {
   children: React.ReactNode
@@ -26,6 +51,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [userName, setUserName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [businessName, setBusinessName] = useState<string>('Lalitha Garments')
+  const [workflowEnabled, setWorkflowEnabled] = useState<boolean>(false)
+
+  // Check trial expiry for tenants
+  useTrialCheck()
 
   useEffect(() => {
     checkAuth().then((auth) => {
@@ -42,27 +71,71 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             if (data.authenticated && data.admin) {
               // Get role from response
               let role = data.admin.role
-              
+
               // Handle null/undefined
-              if (!role) {
+              if (data.admin.type) {
+                // Use type if available (tenant, superadmin, user)
+                if (data.admin.type === 'tenant') {
+                  role = 'admin' // Tenants are admins of their own business
+                } else if (data.admin.type === 'superadmin') {
+                  role = 'superadmin'
+                } else if (data.admin.type === 'user') {
+                  role = 'user'
+                }
+              } else if (!role) {
                 console.warn('⚠️ Role is null/undefined in response, checking database...')
-                // Try to get role from database by making another call
                 role = 'superadmin' // Temporary: default to superadmin if role missing
               } else {
                 role = role.toLowerCase().trim()
                 // Normalize role values (handle any case variations)
                 if (role === 'super_admin') role = 'superadmin'
               }
-              
+
               console.log('✅ Setting user role to:', role)
               setUserRole(role as 'superadmin' | 'admin' | 'user')
-              
+
               // Set user name and email
               if (data.admin.name) {
                 setUserName(data.admin.name)
               }
               if (data.admin.email) {
                 setUserEmail(data.admin.email)
+              }
+
+              // Fetch tenant business name and workflow settings if this is a tenant user
+              if (data.admin.tenant_id) {
+                console.log('🏢 Fetching tenant info for:', data.admin.tenant_id)
+                fetch(`/api/tenants/${data.admin.tenant_id}`)
+                  .then(res => res.json())
+                  .then(tenantData => {
+                    if (tenantData.success && tenantData.data) {
+                      console.log('🏢 Tenant business name:', tenantData.data.businessName)
+                      console.log('🔧 Workflow enabled:', tenantData.data.workflowEnabled)
+                      setBusinessName(tenantData.data.businessName)
+                      setWorkflowEnabled(tenantData.data.workflowEnabled || false)
+                    }
+                  })
+                  .catch(err => console.error('Error fetching tenant:', err))
+              } else {
+                // Not a tenant, fetch business profile for superadmin
+                // For superadmin, use business profile if available, otherwise "Lalitha Garments"
+                fetch('/api/business', { credentials: 'include' })
+                  .then(res => res.json())
+                  .then(businessData => {
+                    if (businessData.success && businessData.data && businessData.data.businessName) {
+                      // For superadmin, prefer business profile name, but default to "Lalitha Garments"
+                      setBusinessName(businessData.data.businessName || 'Lalitha Garments')
+                    } else {
+                      // No business profile found, default to Lalitha Garments for superadmin
+                      setBusinessName('Lalitha Garments')
+                    }
+                  })
+                  .catch(err => {
+                    console.error('Failed to fetch business profile:', err)
+                    // Keep default 'Lalitha Garments' if fetch fails
+                    setBusinessName('Lalitha Garments')
+                  })
+                setWorkflowEnabled(false)
               }
             } else {
               console.warn('⚠️ No admin data in response')
@@ -76,19 +149,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             console.error('❌ Error fetching user role:', err)
             // Default to superadmin on error to ensure all menu items are visible
             setUserRole('superadmin')
-          })
-        
-        // Fetch business profile for sidebar name
-        fetch('/api/business')
-          .then(res => res.json())
-          .then(data => {
-            if (data.success && data.data && data.data.businessName) {
-              setBusinessName(data.data.businessName)
-            }
-          })
-          .catch(err => {
-            console.error('Failed to fetch business profile:', err)
-            // Keep default 'Lalitha Garments' if fetch fails
           })
       }
     })
@@ -166,10 +226,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
     // Add event listener for immediate updates
     window.addEventListener('businessProfileUpdated', handleBusinessProfileUpdate as EventListener)
-    
+
     // Check for updates on window focus (in case user switches tabs or windows)
     window.addEventListener('focus', checkForUpdates)
-    
+
     // Periodic check every 3 seconds (as backup, only if there's a recent update)
     const intervalId = setInterval(() => {
       if (typeof window !== 'undefined') {
@@ -224,134 +284,136 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return null
   }
 
+  // Updated navItems with Lucide icons
   const navItems = [
-    { href: '/admin/dashboard', label: 'Dashboard', icon: '📊', roles: ['superadmin', 'admin'] },
-    { href: '/admin/setup', label: 'Setup Wizard', icon: '🚀', roles: ['superadmin', 'admin'] },
-    { href: '/admin/business', label: 'Business Setup', icon: '⚙️', roles: ['superadmin', 'admin'] },
-    { href: '/admin/suppliers', label: 'Suppliers', icon: '🏭', roles: ['superadmin', 'admin'] },
-    { href: '/admin/categories', label: 'Categories', icon: '🏷️', roles: ['superadmin', 'admin'] },
-    { href: '/admin/purchases', label: 'Purchase Orders', icon: '🛒', roles: ['superadmin', 'admin'] },
-    { href: '/admin/inventory', label: 'Inventory', icon: '📦', roles: ['superadmin', 'admin'] },
-    { href: '/admin/customers', label: 'Customers', icon: '👥', roles: ['superadmin', 'admin'] },
-    { href: '/admin/products', label: 'Products', icon: '🛍️', roles: ['user'] },
-    { href: '/admin/catalogues', label: 'Catalogues', icon: '📚', roles: ['superadmin', 'admin'] },
-    { href: '/admin/sales', label: 'Sales', icon: '💰', roles: ['superadmin', 'admin'] },
-    { href: '/admin/invoices', label: 'Invoices', icon: '📄', roles: ['superadmin', 'admin', 'user'] },
-    { href: '/admin/enquiries', label: 'Customer Enquiries', icon: '📧', roles: ['superadmin', 'admin'] },
-    { href: '/admin/admins', label: 'Admin Management', icon: '👑', roles: ['superadmin'] },
-    { href: '/admin/users', label: 'User Management', icon: '👤', roles: ['superadmin', 'admin'] },
+    { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['superadmin', 'admin'] },
+    { href: '/admin/tenants', label: 'Tenants', icon: Building2, roles: ['superadmin'] },
+    { href: '/admin/research', label: 'Raw Research', icon: Search, roles: ['superadmin'] }, // Only superadmin
+    { href: '/admin/setup', label: 'Setup Wizard', icon: Rocket, roles: ['superadmin', 'admin'] },
+    { href: '/admin/business', label: 'Business Setup', icon: Settings, roles: ['superadmin', 'admin'] },
+    { href: '/admin/workflow', label: 'Workflow', icon: Sliders, roles: ['superadmin', 'admin'] }, // Conditional for tenants
+    { href: '/admin/suppliers', label: 'Suppliers', icon: Factory, roles: ['superadmin', 'admin'] },
+    { href: '/admin/categories', label: 'Categories', icon: Tags, roles: ['superadmin', 'admin'] },
+    { href: '/admin/purchases', label: 'Purchase Orders', icon: ShoppingCart, roles: ['superadmin', 'admin'] },
+    { href: '/admin/inventory', label: 'Inventory', icon: Package, roles: ['superadmin', 'admin'] },
+    { href: '/admin/customers', label: 'Customers', icon: Users, roles: ['superadmin', 'admin'] },
+    { href: '/admin/products', label: 'Products', icon: Shirt, roles: ['user'] },
+    { href: '/admin/catalogues', label: 'Catalogues', icon: BookOpen, roles: ['superadmin', 'admin'] },
+    { href: '/admin/sales', label: 'Sales', icon: Banknote, roles: ['superadmin', 'admin'] },
+    { href: '/admin/invoices', label: 'Invoices', icon: FileText, roles: ['superadmin', 'admin', 'user'] },
+    { href: '/admin/enquiries', label: 'Customer Enquiries', icon: MessageSquare, roles: ['superadmin'] }, // Only superadmin
+    { href: '/admin/admins', label: 'Admin Management', icon: ShieldCheck, roles: ['superadmin'] },
+    { href: '/admin/users', label: 'User Management', icon: UserCog, roles: ['superadmin'] }, // Only superadmin
   ]
-  
-  // Filter nav items based on user role
+
+  // Filter nav items based on user role and tenant settings
   const filteredNavItems = (() => {
     if (!userRole) {
       // While loading, show minimal items
       return navItems.filter(item => item.roles.includes('user'))
     }
-    
+
     // Filter based on role
-    return navItems.filter(item => item.roles.includes(userRole))
+    let items = navItems.filter(item => item.roles.includes(userRole))
+
+    // For tenants, conditionally show workflow based on workflowEnabled flag
+    if (userRole === 'admin') {
+      items = items.filter(item => {
+        // If it's the workflow item, only show if workflow is enabled
+        if (item.href === '/admin/workflow') {
+          return workflowEnabled
+        }
+        return true
+      })
+    }
+
+    return items
   })()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 font-sans">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800 text-white shadow-2xl transform transition-all duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64`}
+        className={`fixed inset-y-0 left-0 z-50 bg-slate-900 text-white shadow-2xl transform transition-all duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-72'} w-72 flex flex-col`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className={`border-b border-purple-400/30 flex-shrink-0 ${sidebarCollapsed ? 'p-4' : 'p-6'}`}>
-            <div className="flex items-start justify-between gap-2">
+          <div className={`flex-shrink-0 bg-slate-950/50 backdrop-blur border-b border-slate-800 ${sidebarCollapsed ? 'p-4 items-center justify-center' : 'p-6'}`}>
+            <div className="flex items-start justify-between gap-3">
               {!sidebarCollapsed && (
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl font-bold tracking-tight">{businessName}</h1>
-                  <p className="text-purple-200 text-sm mt-1 font-medium">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Building2 className="w-5 h-5 text-purple-400" />
+                    <h1 className="text-lg font-bold tracking-tight truncate">{businessName}</h1>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-400 text-xs font-medium bg-slate-800/50 py-1 px-2 rounded-md w-fit">
+                    <div className={`w-2 h-2 rounded-full ${userRole === 'superadmin' ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
                     {userRole === 'user' ? 'User Portal' : 'Admin Portal'}
-                  </p>
-                  {userName && (
-                    <p className="text-purple-100 text-xs mt-2 font-medium">
-                      👤 {userName}
-                    </p>
-                  )}
-                  {!userName && userEmail && (
-                    <p className="text-purple-100 text-xs mt-2 font-medium">
-                      👤 {userEmail}
-                    </p>
-                  )}
+                  </div>
                 </div>
               )}
               {sidebarCollapsed && (
-                <div className="flex-1 flex justify-center">
-                  <h1 className="text-xl font-bold">
-                    {businessName.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)}
-                  </h1>
+                <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-purple-900/50">
+                  <span className="font-bold text-lg">
+                    {businessName.slice(0, 1).toUpperCase()}
+                  </span>
                 </div>
               )}
+
               <div className="flex items-center gap-2 flex-shrink-0">
-                {/* Desktop Toggle Button - Top Right */}
-                <button
-                  onClick={toggleSidebar}
-                  className="hidden lg:flex items-center justify-center text-white bg-purple-500/50 hover:bg-purple-500/70 p-2.5 rounded-lg transition-all duration-200 hover:scale-110 shadow-md hover:shadow-lg border border-purple-300/30"
-                  title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                    {sidebarCollapsed ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                    )}
-                  </svg>
-                </button>
                 {/* Mobile Close Button */}
                 <button
                   onClick={() => setSidebarOpen(false)}
-                  className="lg:hidden text-purple-200 hover:text-white p-2 rounded-lg hover:bg-purple-500/50 transition-colors"
+                  className="lg:hidden text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="w-6 h-6" />
                 </button>
               </div>
             </div>
           </div>
-          
+
           {/* Navigation */}
-          <nav className={`flex-1 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-purple-400 scrollbar-track-transparent ${sidebarCollapsed ? 'p-2' : 'p-4'}`}>
-            {filteredNavItems.map((item, index) => {
+          <nav className={`flex-1 overflow-y-auto custom-scrollbar ${sidebarCollapsed ? 'px-2 py-4' : 'px-4 py-6'} space-y-1.5`}>
+            {filteredNavItems.map((item) => {
               const isActive = pathname === item.href
-              
+              const Icon = item.icon
+
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center rounded-xl transition-all duration-200 group ${
-                    sidebarCollapsed ? 'justify-center px-2 py-3' : 'space-x-3 px-4 py-3'
-                  } ${
-                    isActive
-                      ? 'bg-white text-purple-700 shadow-lg shadow-purple-500/20 scale-105'
-                      : 'text-purple-100 hover:bg-purple-500/50 hover:text-white hover:scale-[1.02]'
-                  }`}
+                  className={`relative flex items-center rounded-xl transition-all duration-200 group ${sidebarCollapsed ? 'justify-center p-3' : 'px-4 py-3 gap-3'
+                    } ${isActive
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-purple-100'
+                    }`}
                   title={sidebarCollapsed ? item.label : ''}
                 >
-                  <span className="text-xl group-hover:scale-110 transition-transform">{item.icon}</span>
+                  <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} strokeWidth={2} />
+
                   {!sidebarCollapsed && (
-                    <>
-                      <span className="font-medium">{item.label}</span>
-                      {isActive && (
-                        <span className="ml-auto w-2 h-2 bg-purple-600 rounded-full"></span>
-                      )}
-                    </>
+                    <span className="font-medium text-sm flex-1">{item.label}</span>
+                  )}
+
+                  {!sidebarCollapsed && isActive && (
+                    <span className="w-1.5 h-1.5 bg-white rounded-full shadow-glow"></span>
+                  )}
+
+                  {/* Tooltip for collapsed mode */}
+                  {sidebarCollapsed && (
+                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-xl border border-slate-700 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">
+                      {item.label}
+                      <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45 border-l border-b border-slate-700"></div>
+                    </div>
                   )}
                 </Link>
               )
@@ -359,57 +421,77 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </nav>
 
           {/* Footer */}
-          <div className={`border-t border-purple-400/30 flex-shrink-0 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-3`}>
+          <div className={`flex-shrink-0 border-t border-slate-800 bg-slate-950/30 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`}>
             {/* Collapse/Expand Toggle Button - Bottom */}
             <button
               onClick={toggleSidebar}
-              className="hidden lg:flex w-full items-center justify-center text-white bg-purple-500/60 hover:bg-purple-500/80 p-3 rounded-xl transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg border border-purple-300/40"
+              className={`hidden lg:flex w-full items-center text-slate-400 hover:text-white hover:bg-slate-800 p-2.5 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-700 ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'}`}
               title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <div className="bg-slate-800 rounded-lg p-1 group-hover:bg-slate-700">
                 {sidebarCollapsed ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  <ChevronRight className="w-4 h-4" />
                 ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  <ChevronLeft className="w-4 h-4" />
                 )}
-              </svg>
-              {!sidebarCollapsed && <span className="ml-2 text-sm font-medium">Collapse</span>}
+              </div>
+              {!sidebarCollapsed && <span className="text-sm font-medium">Collapse Sidebar</span>}
             </button>
-            
+
             <button
               onClick={handleLogout}
-              className={`w-full flex items-center rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
-                sidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-center space-x-3 px-4 py-3'
-              }`}
+              className={`w-full flex items-center bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-400 p-2.5 rounded-xl transition-all duration-200 border border-transparent hover:border-red-500/30 ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'
+                }`}
               title={sidebarCollapsed ? 'Logout' : ''}
             >
-              <span className="text-lg">🚪</span>
-              {!sidebarCollapsed && <span>Logout</span>}
+              <LogOut className="w-5 h-5 flex-shrink-0" />
+              {!sidebarCollapsed && <span className="text-sm font-medium">Logout</span>}
             </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'}`}>
         {/* Mobile Header */}
-        <div className="lg:hidden bg-white shadow-md sticky top-0 z-30 px-4 py-3 flex items-center justify-between">
+        <div className="lg:hidden bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30 px-4 py-3 flex items-center justify-between border-b border-gray-100">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-gray-700 hover:text-purple-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="text-gray-600 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Menu className="w-6 h-6" />
           </button>
-          <h1 className="text-lg font-bold text-gray-900">{businessName}</h1>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🌸</span>
+            <h1 className="text-lg font-bold text-gray-900 tracking-tight">{businessName}</h1>
+          </div>
           <div className="w-10"></div> {/* Spacer for centering */}
         </div>
 
-        <div className="p-4 lg:p-8">
+        <div className="p-4 lg:p-8 max-w-[1600px] mx-auto">
           {children}
         </div>
       </div>
     </div>
+  )
+}
+
+function X({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
   )
 }

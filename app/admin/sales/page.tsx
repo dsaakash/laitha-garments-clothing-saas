@@ -121,7 +121,7 @@ export default function SalesPage() {
 
   const fetchNextBillNumber = useCallback(async () => {
     try {
-      const response = await fetch(`/api/sales/next-bill-number?date=${formData.date}`)
+      const response = await fetch(`/api/sales/next-bill-number?date=${formData.date}`, { credentials: 'include' })
       const result = await response.json()
       if (result.success && result.billNumber) {
         setFormData(prev => ({ ...prev, billNumber: result.billNumber }))
@@ -192,7 +192,7 @@ export default function SalesPage() {
         params.append('endDate', endDate)
       }
       
-      const response = await fetch(`/api/sales/summary?${params.toString()}`)
+      const response = await fetch(`/api/sales/summary?${params.toString()}`, { credentials: 'include' })
       const result = await response.json()
       if (result.success) {
         setSalesSummary(result.data)
@@ -215,8 +215,8 @@ export default function SalesPage() {
   const loadData = async () => {
     try {
       const [inventoryRes, customersRes] = await Promise.all([
-        fetch('/api/inventory'),
-        fetch('/api/customers'),
+        fetch('/api/inventory', { credentials: 'include' }),
+        fetch('/api/customers', { credentials: 'include' }),
       ])
       const inventoryResult = await inventoryRes.json()
       const customersResult = await customersRes.json()
@@ -241,7 +241,7 @@ export default function SalesPage() {
         params.append('partyName', selectedParty)
       }
       
-      const response = await fetch(`/api/sales?${params.toString()}`)
+      const response = await fetch(`/api/sales?${params.toString()}`, { credentials: 'include' })
       const result = await response.json()
       if (result.success) {
         setSales(result.data)
@@ -609,6 +609,7 @@ export default function SalesPage() {
     
     try {
       const response = await fetch('/api/customers', {
+        credentials: 'include',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(customerFormData),

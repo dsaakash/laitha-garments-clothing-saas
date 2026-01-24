@@ -16,13 +16,13 @@ export default function SetupPage() {
   const checkCompletedSteps = async () => {
     try {
       const [profileRes, suppliersRes, purchasesRes, inventoryRes, customersRes, cataloguesRes, salesRes] = await Promise.all([
-        fetch('/api/business'),
-        fetch('/api/suppliers'),
-        fetch('/api/purchases'),
-        fetch('/api/inventory'),
-        fetch('/api/customers'),
-        fetch('/api/catalogues'),
-        fetch('/api/sales'),
+        fetch('/api/business', { credentials: 'include' }),
+        fetch('/api/suppliers', { credentials: 'include' }),
+        fetch('/api/purchases', { credentials: 'include' }),
+        fetch('/api/inventory', { credentials: 'include' }),
+        fetch('/api/customers', { credentials: 'include' }),
+        fetch('/api/catalogues', { credentials: 'include' }),
+        fetch('/api/sales', { credentials: 'include' }),
       ])
       
       const profile = profileRes.ok ? (await profileRes.json()).data : null

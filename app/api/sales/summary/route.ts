@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getTenantContext, buildTenantFilter } from '@/lib/tenant-context'
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,6 +8,10 @@ export async function GET(request: NextRequest) {
     const partyName = searchParams.get('partyName')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    
+    // Get tenant context
+    const context = getTenantContext(request)
+    const tenantFilter = buildTenantFilter(context)
     
     let queryText = `
       SELECT 
@@ -19,8 +24,13 @@ export async function GET(request: NextRequest) {
       WHERE 1=1
     `
     
-    const params: any[] = []
-    let paramCount = 1
+    const params: any[] = [...tenantFilter.params]
+    let paramCount = tenantFilter.params.length + 1
+    
+    // Add tenant filter
+    if (tenantFilter.where) {
+      queryText += ' AND ' + tenantFilter.where.replace('WHERE ', '').replace('tenant_id', 's.tenant_id')
+    }
     
     if (partyName) {
       queryText += ` AND LOWER(s.party_name) = LOWER($${paramCount})`

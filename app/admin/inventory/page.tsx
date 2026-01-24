@@ -4,9 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
 import ImageLightbox from '@/components/ImageLightbox'
+import PageHeader from '@/components/PageHeader'
+import ActionButton from '@/components/ActionButton'
+import StatusBadge from '@/components/StatusBadge'
 import { InventoryItem } from '@/lib/storage'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
+import { Plus, Download, Package2, Edit, Trash2, Eye } from 'lucide-react'
 
 export default function InventoryPage() {
   const tableWrapperRef = useRef<HTMLDivElement>(null)
@@ -141,29 +145,29 @@ export default function InventoryPage() {
 
   const loadItems = async () => {
     try {
-      const url = supplierFilter && supplierFilter !== 'All' 
+      const url = supplierFilter && supplierFilter !== 'All'
         ? `/api/inventory?supplier=${encodeURIComponent(supplierFilter)}`
         : '/api/inventory'
       const response = await fetch(url)
       const result = await response.json()
       if (result.success) {
         let filteredItems = result.data
-        
+
         // Store suppliers list
         if (result.suppliers) {
           setSuppliers(result.suppliers)
         }
-        
+
         // Apply search filter
         if (searchQuery.trim()) {
           const query = searchQuery.toLowerCase().trim()
-          filteredItems = filteredItems.filter((item: InventoryItem) => 
+          filteredItems = filteredItems.filter((item: InventoryItem) =>
             item.dressCode.toLowerCase().includes(query) ||
             item.dressName.toLowerCase().includes(query) ||
             (item.supplierName && item.supplierName.toLowerCase().includes(query))
           )
         }
-        
+
         setItems(filteredItems)
       }
     } catch (error) {
@@ -173,9 +177,9 @@ export default function InventoryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     const sizesArray = formData.sizes.split(',').map(s => s.trim()).filter(Boolean)
-    
+
     try {
       if (editingItem) {
         const response = await fetch(`/api/inventory/${editingItem.id}`, {
@@ -232,7 +236,7 @@ export default function InventoryPage() {
           return
         }
       }
-      
+
       resetForm()
       await loadItems()
       setShowModal(false)
@@ -248,7 +252,7 @@ export default function InventoryPage() {
 
     // Handle multiple files or single file
     const filesToUpload = Array.from(files)
-    
+
     // Validate all files
     for (const file of filesToUpload) {
       if (!file.type.startsWith('image/')) {
@@ -322,7 +326,7 @@ export default function InventoryPage() {
         setUploading(false)
       }
     }
-    
+
     // Reset input
     e.target.value = ''
   }
@@ -338,8 +342,8 @@ export default function InventoryPage() {
 
   const handleEdit = (item: InventoryItem) => {
     setEditingItem(item)
-    const images = item.productImages && item.productImages.length > 0 
-      ? item.productImages 
+    const images = item.productImages && item.productImages.length > 0
+      ? item.productImages
       : (item.imageUrl ? [item.imageUrl] : [])
     setFormData({
       dressName: item.dressName,
@@ -405,7 +409,7 @@ export default function InventoryPage() {
 
   const handleStockUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     const quantity = parseInt(stockFormData.quantity)
     if (isNaN(quantity) || quantity <= 0) {
       alert('Please enter a valid quantity')
@@ -478,15 +482,15 @@ export default function InventoryPage() {
 
       // Immediately update the item in the state using the API response
       if (result.data) {
-        setItems(prevItems => 
-          prevItems.map(item => 
-            item.id === itemId 
+        setItems(prevItems =>
+          prevItems.map(item =>
+            item.id === itemId
               ? {
-                  ...item,
-                  quantityIn: result.data.quantityIn,
-                  quantityOut: result.data.quantityOut,
-                  currentStock: result.data.currentStock
-                }
+                ...item,
+                quantityIn: result.data.quantityIn,
+                quantityOut: result.data.quantityOut,
+                currentStock: result.data.currentStock
+              }
               : item
           )
         )
@@ -524,7 +528,7 @@ export default function InventoryPage() {
 
   const handleBulkStockUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       let successCount = 0
       let errorCount = 0
@@ -661,75 +665,61 @@ export default function InventoryPage() {
   return (
     <AdminLayout>
       <div>
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
-          <div className="flex gap-3">
-            <button
-              onClick={exportToExcel}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Export to Excel
-            </button>
-            <button
-              onClick={() => {
-                resetForm()
-                setShowModal(true)
-              }}
-              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              ➕ Add New Item
-            </button>
-            <button
-              onClick={openBulkStockModal}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              📦 Bulk Stock Update
-            </button>
-          </div>
-        </div>
-
-        {/* Search and Filter Bar */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search Inventory</label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by dress code, dress name, or supplier name..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Supplier</label>
-              <select
-                value={supplierFilter}
-                onChange={(e) => setSupplierFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+        <PageHeader
+          title="Inventory Management"
+          description="Manage your product inventory and stock levels"
+          searchPlaceholder="Search by dress code, name, or supplier..."
+          onSearch={(value) => setSearchQuery(value)}
+          action={
+            <div className="flex gap-3">
+              <ActionButton
+                icon={Download}
+                variant="success"
+                onClick={exportToExcel}
               >
-                <option value="All">All Suppliers</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier} value={supplier}>{supplier}</option>
-                ))}
-              </select>
+                Export Excel
+              </ActionButton>
+              <ActionButton
+                icon={Package2}
+                variant="secondary"
+                onClick={openBulkStockModal}
+              >
+                Bulk Stock
+              </ActionButton>
+              <ActionButton
+                icon={Plus}
+                variant="primary"
+                onClick={() => {
+                  resetForm()
+                  setShowModal(true)
+                }}
+              >
+                Add Item
+              </ActionButton>
             </div>
-            <div className="flex items-end">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={groupBySupplier}
-                  onChange={(e) => setGroupBySupplier(e.target.checked)}
-                  className="mr-2 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Group by Supplier</span>
-              </label>
-            </div>
-          </div>
-        </div>
+          }
+        >
+          {/* Filter Chips */}
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+          >
+            <option value="All">All Suppliers</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier} value={supplier}>{supplier}</option>
+            ))}
+          </select>
+          <label className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition-all">
+            <input
+              type="checkbox"
+              checked={groupBySupplier}
+              onChange={(e) => setGroupBySupplier(e.target.checked)}
+              className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+            />
+            <span className="text-sm font-medium text-gray-700">Group by Supplier</span>
+          </label>
+        </PageHeader>
 
         {items.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
@@ -746,7 +736,7 @@ export default function InventoryPage() {
               acc[supplier].push(item)
               return acc
             }, {} as Record<string, InventoryItem[]>)
-            
+
             return (
               <div className="space-y-4">
                 {Object.entries(groupedItems).map(([supplier, supplierItems]) => (
@@ -757,7 +747,7 @@ export default function InventoryPage() {
                       </h3>
                     </div>
                     {/* Top Scrollbar for Grouped View */}
-                    <div 
+                    <div
                       className="table-wrapper-top-scrollbar"
                       style={{ overflowX: 'auto', overflowY: 'hidden', height: '20px', borderBottom: '2px solid #e2e8f0' }}
                       onScroll={(e) => {
@@ -770,8 +760,8 @@ export default function InventoryPage() {
                     >
                       <div style={{ height: '1px', minWidth: '3000px' }}></div>
                     </div>
-                    <div 
-                      className="table-wrapper" 
+                    <div
+                      className="table-wrapper"
                       style={{ overflowX: 'auto', overflowY: 'visible' }}
                       onScroll={(e) => {
                         const target = e.currentTarget
@@ -800,8 +790,8 @@ export default function InventoryPage() {
                           {supplierItems.map((item) => {
                             const profit = item.sellingPrice - item.wholesalePrice
                             return (
-                              <tr 
-                                key={item.id} 
+                              <tr
+                                key={item.id}
                                 className="hover:bg-gray-50 cursor-pointer"
                                 onClick={() => {
                                   setSelectedItem(item)
@@ -810,21 +800,21 @@ export default function InventoryPage() {
                               >
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                   {(() => {
-                                    const images = item.productImages && item.productImages.length > 0 
-                                      ? item.productImages 
+                                    const images = item.productImages && item.productImages.length > 0
+                                      ? item.productImages
                                       : (item.imageUrl ? [item.imageUrl] : [])
-                                    
+
                                     if (images.length === 0) {
                                       return (
                                         <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No Image</div>
                                       )
                                     }
-                                    
+
                                     return (
                                       <div className="flex gap-1 items-center">
                                         {images.slice(0, 3).map((img, idx) => (
-                                          <div 
-                                            key={idx} 
+                                          <div
+                                            key={idx}
                                             className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded"
                                             onClick={(e) => {
                                               e.stopPropagation()
@@ -834,17 +824,17 @@ export default function InventoryPage() {
                                             }}
                                             title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
                                           >
-                                      <Image 
-                                              src={img} 
-                                              alt={`${item.dressName} - Image ${idx + 1}`} 
-                                        fill
-                                        className="object-cover rounded"
-                                        sizes="(max-width: 640px) 48px, 64px"
-                                      />
-                                    </div>
+                                            <Image
+                                              src={img}
+                                              alt={`${item.dressName} - Image ${idx + 1}`}
+                                              fill
+                                              className="object-cover rounded"
+                                              sizes="(max-width: 640px) 48px, 64px"
+                                            />
+                                          </div>
                                         ))}
                                         {images.length > 3 && (
-                                          <div 
+                                          <div
                                             className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-600"
                                             onClick={(e) => {
                                               e.stopPropagation()
@@ -856,7 +846,7 @@ export default function InventoryPage() {
                                           >
                                             +{images.length - 3}
                                           </div>
-                                  )}
+                                        )}
                                       </div>
                                     )
                                   })()}
@@ -879,10 +869,9 @@ export default function InventoryPage() {
                                       >
                                         +
                                       </button>
-                                      <span className={`font-bold text-sm min-w-[60px] text-center ${
-                                        (item.currentStock || 0) > 10 ? 'text-green-600' :
-                                        (item.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
-                                      }`}>
+                                      <span className={`font-bold text-sm min-w-[60px] text-center ${(item.currentStock || 0) > 10 ? 'text-green-600' :
+                                          (item.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
+                                        }`}>
                                         Stock: {item.currentStock || 0}
                                       </span>
                                       <button
@@ -894,7 +883,7 @@ export default function InventoryPage() {
                                         -
                                       </button>
                                     </div>
-                                    
+
                                     {/* Quantity Sold (Out) - Primary Control */}
                                     <div className="flex items-center gap-1">
                                       <button
@@ -947,7 +936,7 @@ export default function InventoryPage() {
         ) : (
           <div className="bg-white rounded-lg shadow-md">
             {/* Top Scrollbar */}
-            <div 
+            <div
               ref={topScrollbarRef}
               className="table-wrapper-top-scrollbar"
               style={{ overflowX: 'auto', overflowY: 'hidden', height: '20px', borderBottom: '2px solid #e2e8f0' }}
@@ -956,175 +945,174 @@ export default function InventoryPage() {
             </div>
             <div className="table-wrapper" ref={tableWrapperRef} style={{ overflowX: 'auto', overflowY: 'visible' }}>
               <table className="divide-y divide-gray-200" style={{ minWidth: '3000px', width: 'max-content' }}>
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '100px' }}>Image</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '250px' }}>Dress Name</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Type</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Code</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Sizes</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '300px' }}>Supplier</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Wholesale</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Selling</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Profit</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '200px' }}>Stock</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {items.map((item) => {
-                  const profit = item.sellingPrice - item.wholesalePrice
-                  return (
-                    <tr 
-                      key={item.id} 
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() => {
-                        setSelectedItem(item)
-                        setShowDetailModal(true)
-                      }}
-                    >
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        {(() => {
-                          const images = item.productImages && item.productImages.length > 0 
-                            ? item.productImages 
-                            : (item.imageUrl ? [item.imageUrl] : [])
-                          
-                          if (images.length === 0) {
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '100px' }}>Image</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '250px' }}>Dress Name</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Type</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Code</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Sizes</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '300px' }}>Supplier</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Wholesale</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Selling</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Profit</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '200px' }}>Stock</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {items.map((item) => {
+                    const profit = item.sellingPrice - item.wholesalePrice
+                    return (
+                      <tr
+                        key={item.id}
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => {
+                          setSelectedItem(item)
+                          setShowDetailModal(true)
+                        }}
+                      >
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                          {(() => {
+                            const images = item.productImages && item.productImages.length > 0
+                              ? item.productImages
+                              : (item.imageUrl ? [item.imageUrl] : [])
+
+                            if (images.length === 0) {
+                              return (
+                                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No Image</div>
+                              )
+                            }
+
                             return (
-                              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">No Image</div>
+                              <div className="flex gap-1 items-center">
+                                {images.slice(0, 3).map((img, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setLightboxImages(images)
+                                      setLightboxIndex(idx)
+                                      setShowImageLightbox(true)
+                                    }}
+                                    title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
+                                  >
+                                    <Image
+                                      src={img}
+                                      alt={`${item.dressName} - Image ${idx + 1}`}
+                                      fill
+                                      className="object-cover rounded"
+                                      sizes="(max-width: 640px) 48px, 64px"
+                                    />
+                                  </div>
+                                ))}
+                                {images.length > 3 && (
+                                  <div
+                                    className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setLightboxImages(images)
+                                      setLightboxIndex(0)
+                                      setShowImageLightbox(true)
+                                    }}
+                                    title={`+${images.length - 3} more images - Click to view all`}
+                                  >
+                                    +{images.length - 3}
+                                  </div>
+                                )}
+                              </div>
                             )
-                          }
-                          
-                          return (
-                            <div className="flex gap-1 items-center">
-                              {images.slice(0, 3).map((img, idx) => (
-                                <div 
-                                  key={idx} 
-                                  className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setLightboxImages(images)
-                                    setLightboxIndex(idx)
-                                    setShowImageLightbox(true)
-                                  }}
-                                  title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
-                                >
-                            <Image 
-                                    src={img} 
-                                    alt={`${item.dressName} - Image ${idx + 1}`} 
-                              fill
-                              className="object-cover rounded"
-                              sizes="(max-width: 640px) 48px, 64px"
-                            />
-                          </div>
-                              ))}
-                              {images.length > 3 && (
-                                <div 
-                                  className="relative w-12 h-12 sm:w-16 sm:h-16 cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setLightboxImages(images)
-                                    setLightboxIndex(0)
-                                    setShowImageLightbox(true)
-                                  }}
-                                  title={`+${images.length - 3} more images - Click to view all`}
-                                >
-                                  +{images.length - 3}
-                                </div>
-                        )}
+                          })()}
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.dressName}</td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressCode}</td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.sizes.join(', ')}</td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {item.supplierName ? (
+                            <div>
+                              <p className="font-medium">{item.supplierName}</p>
+                              {item.supplierPhone && (
+                                <p className="text-xs text-gray-400">{item.supplierPhone}</p>
+                              )}
                             </div>
-                          )
-                        })()}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.dressName}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressCode}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.sizes.join(', ')}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.supplierName ? (
-                          <div>
-                            <p className="font-medium">{item.supplierName}</p>
-                            {item.supplierPhone && (
-                              <p className="text-xs text-gray-400">{item.supplierPhone}</p>
-                            )}
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.wholesalePrice}</td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.sellingPrice}</td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">₹{profit}</td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-col gap-2">
+                            {/* Available Stock - Primary Control */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => quickStockUpdate(item.id, 'add-stock', 1)}
+                                className="px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded text-xs font-bold border border-green-200"
+                                title="Add Available Stock"
+                              >
+                                +
+                              </button>
+                              <span className={`font-bold text-sm min-w-[60px] text-center ${(item.currentStock || 0) > 10 ? 'text-green-600' :
+                                  (item.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
+                                }`}>
+                                Stock: {item.currentStock || 0}
+                              </span>
+                              <button
+                                onClick={() => quickStockUpdate(item.id, 'remove-stock', 1)}
+                                className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded text-xs font-bold border border-red-200"
+                                title="Remove Available Stock"
+                                disabled={(item.currentStock || 0) <= 0}
+                              >
+                                -
+                              </button>
+                            </div>
+
+                            {/* Quantity Sold (Out) - Primary Control */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => quickStockUpdate(item.id, 'out', 1)}
+                                className="px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded text-xs font-bold border border-orange-200"
+                                title="Record Sale (Increase Sold Quantity)"
+                              >
+                                +
+                              </button>
+                              <span className="text-xs font-medium text-gray-700 min-w-[55px]">Sold: {item.quantityOut || 0}</span>
+                              <button
+                                onClick={() => quickStockUpdate(item.id, 'remove-out', 1)}
+                                className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded text-xs font-bold border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Reverse Sale (Decrease Sold Quantity)"
+                              >
+                                -
+                              </button>
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.wholesalePrice}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.sellingPrice}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">₹{profit}</td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex flex-col gap-2">
-                          {/* Available Stock - Primary Control */}
-                          <div className="flex items-center gap-1">
+                        </td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center space-x-1 sm:space-x-2">
                             <button
-                              onClick={() => quickStockUpdate(item.id, 'add-stock', 1)}
-                              className="px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded text-xs font-bold border border-green-200"
-                              title="Add Available Stock"
+                              onClick={() => handleEdit(item)}
+                              className="px-2 py-1.5 sm:px-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-blue-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
+                              title="Edit"
                             >
-                              +
+                              <span className="hidden sm:inline">✏️ </span>Edit
                             </button>
-                            <span className={`font-bold text-sm min-w-[60px] text-center ${
-                              (item.currentStock || 0) > 10 ? 'text-green-600' :
-                              (item.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
-                            }`}>
-                              Stock: {item.currentStock || 0}
-                            </span>
                             <button
-                              onClick={() => quickStockUpdate(item.id, 'remove-stock', 1)}
-                              className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded text-xs font-bold border border-red-200"
-                              title="Remove Available Stock"
-                              disabled={(item.currentStock || 0) <= 0}
+                              onClick={() => handleDelete(item.id)}
+                              className="px-2 py-1.5 sm:px-3 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-red-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
+                              title="Delete"
                             >
-                              -
+                              <span className="hidden sm:inline">🗑️ </span>Delete
                             </button>
                           </div>
-                          
-                          {/* Quantity Sold (Out) - Primary Control */}
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => quickStockUpdate(item.id, 'out', 1)}
-                              className="px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded text-xs font-bold border border-orange-200"
-                              title="Record Sale (Increase Sold Quantity)"
-                            >
-                              +
-                            </button>
-                            <span className="text-xs font-medium text-gray-700 min-w-[55px]">Sold: {item.quantityOut || 0}</span>
-                            <button
-                              onClick={() => quickStockUpdate(item.id, 'remove-out', 1)}
-                              className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded text-xs font-bold border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Reverse Sale (Decrease Sold Quantity)"
-                            >
-                              -
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center space-x-1 sm:space-x-2">
-                          <button
-                            onClick={() => handleEdit(item)}
-                            className="px-2 py-1.5 sm:px-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-blue-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
-                            title="Edit"
-                          >
-                            <span className="hidden sm:inline">✏️ </span>Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="px-2 py-1.5 sm:px-3 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-red-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
-                            title="Delete"
-                          >
-                            <span className="hidden sm:inline">🗑️ </span>Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -1214,7 +1202,7 @@ export default function InventoryPage() {
                     />
                   </div>
                 </div>
-                
+
                 {/* Pricing Unit Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Pricing Unit (Optional)</label>
@@ -1250,7 +1238,7 @@ export default function InventoryPage() {
                       <span className="text-sm">None</span>
                     </label>
                   </div>
-                  
+
                   {formData.pricingUnit === 'piece' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Price Per Piece (₹) (optional)</label>
@@ -1265,7 +1253,7 @@ export default function InventoryPage() {
                       <p className="text-xs text-gray-500 mt-1">Set price per piece if selling by individual pieces</p>
                     </div>
                   )}
-                  
+
                   {formData.pricingUnit === 'meter' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Price Per Meter (₹) (optional)</label>
@@ -1281,7 +1269,7 @@ export default function InventoryPage() {
                     </div>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Images (optional)</label>
                   <div className="space-y-3">
@@ -1412,10 +1400,10 @@ export default function InventoryPage() {
                 {/* Images Section */}
                 <div>
                   {(() => {
-                    const images = (selectedItem.productImages && selectedItem.productImages.length > 0) 
-                      ? selectedItem.productImages 
+                    const images = (selectedItem.productImages && selectedItem.productImages.length > 0)
+                      ? selectedItem.productImages
                       : (selectedItem.imageUrl ? [selectedItem.imageUrl] : [])
-                    
+
                     if (images.length === 0) {
                       return (
                         <div className="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
@@ -1423,11 +1411,11 @@ export default function InventoryPage() {
                         </div>
                       )
                     }
-                    
+
                     return (
-                    <div className="space-y-4">
+                      <div className="space-y-4">
                         {/* Main Large Image */}
-                        <div 
+                        <div
                           className="relative w-full h-96 sm:h-[500px] cursor-pointer hover:opacity-90 transition-opacity rounded-lg border-2 border-gray-300 overflow-hidden bg-gray-100"
                           onClick={() => {
                             setLightboxImages(images)
@@ -1449,15 +1437,15 @@ export default function InventoryPage() {
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Thumbnail Grid for Multiple Images */}
                         {images.length > 1 && (
                           <div className="space-y-2">
                             <p className="text-sm font-medium text-gray-700">Additional Images ({images.length} total):</p>
                             <div className="grid grid-cols-4 gap-2">
                               {images.map((imageUrl, index) => (
-                                <div 
-                                  key={index} 
+                                <div
+                                  key={index}
                                   className="relative w-full h-24 sm:h-32 cursor-pointer hover:opacity-80 transition-opacity rounded-lg border-2 border-gray-200 overflow-hidden hover:border-purple-500"
                                   onClick={() => {
                                     setLightboxImages(images)
@@ -1465,26 +1453,26 @@ export default function InventoryPage() {
                                     setShowImageLightbox(true)
                                   }}
                                 >
-                            <Image
-                              src={imageUrl || ''}
-                              alt={`${selectedItem.dressName} - Image ${index + 1}`}
-                              fill
+                                  <Image
+                                    src={imageUrl || ''}
+                                    alt={`${selectedItem.dressName} - Image ${index + 1}`}
+                                    fill
                                     className="object-cover"
                                     sizes="(max-width: 640px) 25vw, 12.5vw"
-                            />
+                                  />
                                   {index === 0 && (
                                     <div className="absolute top-1 left-1 bg-purple-600 text-white text-xs px-1.5 py-0.5 rounded">
                                       Main
                                     </div>
                                   )}
-                          </div>
-                        ))}
-                      </div>
+                                </div>
+                              ))}
+                            </div>
                             <p className="text-xs text-gray-500 text-center">
                               Click any image to view full size with navigation
-                        </p>
-                    </div>
-                  )}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )
                   })()}
@@ -1551,10 +1539,9 @@ export default function InventoryPage() {
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="text-xs font-medium text-gray-400">Available Stock</label>
-                        <p className={`text-xl font-bold ${
-                          (selectedItem.currentStock || 0) > 10 ? 'text-green-600' :
-                          (selectedItem.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
-                        }`}>
+                        <p className={`text-xl font-bold ${(selectedItem.currentStock || 0) > 10 ? 'text-green-600' :
+                            (selectedItem.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
                           {selectedItem.currentStock || 0}
                         </p>
                       </div>
@@ -1586,7 +1573,7 @@ export default function InventoryPage() {
                           -
                         </button>
                       </div>
-                      
+
                       {/* Quantity Sold (Out) Quick Actions */}
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-700 min-w-[100px]">Sold:</span>
@@ -1672,16 +1659,16 @@ export default function InventoryPage() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
               <h2 className="text-2xl font-bold mb-6">
-                {stockFormData.type === 'in' ? 'Add Stock' : 
-                 stockFormData.type === 'out' ? 'Remove Stock' : 
-                 'Reverse Quantity Out'}
+                {stockFormData.type === 'in' ? 'Add Stock' :
+                  stockFormData.type === 'out' ? 'Remove Stock' :
+                    'Reverse Quantity Out'}
               </h2>
               <form onSubmit={handleStockUpdate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {stockFormData.type === 'in' ? 'Quantity In' : 
-                     stockFormData.type === 'out' ? 'Quantity Out' : 
-                     'Quantity to Reverse'} *
+                    {stockFormData.type === 'in' ? 'Quantity In' :
+                      stockFormData.type === 'out' ? 'Quantity Out' :
+                        'Quantity to Reverse'} *
                   </label>
                   {stockFormData.type === 'remove-out' && (
                     <p className="text-xs text-gray-500 mb-2">
@@ -1726,19 +1713,18 @@ export default function InventoryPage() {
                   </button>
                   <button
                     type="submit"
-                    className={`flex-1 text-white px-4 py-2 rounded-lg transition-colors ${
-                      stockFormData.type === 'in'
+                    className={`flex-1 text-white px-4 py-2 rounded-lg transition-colors ${stockFormData.type === 'in'
                         ? 'bg-green-600 hover:bg-green-700'
                         : stockFormData.type === 'out'
-                        ? 'bg-red-600 hover:bg-red-700'
-                        : stockFormData.type === 'remove-out'
-                        ? 'bg-purple-600 hover:bg-purple-700'
-                        : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
+                          ? 'bg-red-600 hover:bg-red-700'
+                          : stockFormData.type === 'remove-out'
+                            ? 'bg-purple-600 hover:bg-purple-700'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
                   >
-                    {stockFormData.type === 'in' ? 'Add Stock' : 
-                     stockFormData.type === 'out' ? 'Remove Stock' : 
-                     stockFormData.type === 'remove-out' ? 'Reverse Out' : 'Set Stock'}
+                    {stockFormData.type === 'in' ? 'Add Stock' :
+                      stockFormData.type === 'out' ? 'Remove Stock' :
+                        stockFormData.type === 'remove-out' ? 'Reverse Out' : 'Set Stock'}
                   </button>
                 </div>
               </form>

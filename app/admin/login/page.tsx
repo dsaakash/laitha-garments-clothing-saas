@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { login, checkAuth } from '@/lib/auth'
+import { Crown, User, Mail, Lock, ArrowRight, Loader2, Building2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function AdminLogin() {
   const router = useRouter()
@@ -11,33 +12,32 @@ export default function AdminLogin() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
-  const [activeTab, setActiveTab] = useState<'admin' | 'user'>('admin')
+  const [activeTab, setActiveTab] = useState<'business' | 'admin' | 'user'>('business')
 
   useEffect(() => {
-    checkAuth().then((authenticated) => {
-      if (authenticated) {
-        // Check user role to redirect appropriately
-        fetch('/api/auth/check', { credentials: 'include' })
-          .then(res => res.json())
-          .then(data => {
-            if (data.authenticated && data.admin) {
-              const role = (data.admin.role || 'admin').toLowerCase().trim()
-              if (role === 'user') {
-                router.push('/admin/products')
-              } else {
-                router.push('/admin/dashboard')
-              }
-            } else {
-              router.push('/admin/dashboard')
-            }
-          })
-          .catch(() => {
+    // Check if already authenticated
+    fetch('/api/auth/check', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated && data.admin) {
+          const role = (data.admin.role || 'admin').toLowerCase().trim()
+          const tenantId = data.admin.tenant_id
+
+          if (tenantId) {
+            // Business user
             router.push('/admin/dashboard')
-          })
-      } else {
+          } else if (role === 'user') {
+            router.push('/admin/products')
+          } else {
+            router.push('/admin/dashboard')
+          }
+        } else {
+          setChecking(false)
+        }
+      })
+      .catch(() => {
         setChecking(false)
-      }
-    })
+      })
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,162 +46,210 @@ export default function AdminLogin() {
     setLoading(true)
 
     try {
-      const result = await login(email, password)
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          loginType: activeTab  // Pass selected tab
+        }),
+        credentials: 'include'
+      })
+
+      const result = await response.json()
+
       if (result.success) {
-        // Check user role to redirect appropriately
-        // If user tab is selected, try to verify it's actually a user
-        if (activeTab === 'user') {
-          // Verify the logged-in user is actually a user
-          const checkRes = await fetch('/api/auth/check', { credentials: 'include' })
-          const checkData = await checkRes.json()
-          if (checkData.authenticated && checkData.admin) {
-            const role = (checkData.admin.role || 'admin').toLowerCase().trim()
-            if (role === 'user') {
-              router.push('/admin/products')
-            } else {
-              setError('This account is not a user account. Please use the Admin tab.')
-              setLoading(false)
-              return
-            }
-          }
+        const tenantId = result.admin?.tenant_id
+        const role = (result.admin?.role || 'admin').toLowerCase().trim()
+
+        // Redirect based on user type
+        if (tenantId) {
+          router.push('/admin/dashboard')  // Business dashboard
+        } else if (role === 'user') {
+          router.push('/admin/products')   // User dashboard
         } else {
-          // Admin tab - check if it's actually an admin
-          const checkRes = await fetch('/api/auth/check', { credentials: 'include' })
-          const checkData = await checkRes.json()
-          if (checkData.authenticated && checkData.admin) {
-            const role = (checkData.admin.role || 'admin').toLowerCase().trim()
-            if (role === 'user') {
-              setError('This account is a user account. Please use the User tab.')
-              setLoading(false)
-              return
-            } else {
-              router.push('/admin/dashboard')
-            }
-          } else {
-            router.push('/admin/dashboard')
-          }
+          router.push('/admin/dashboard')  // Super admin dashboard
         }
       } else {
         setError(result.message || 'Invalid credentials')
+        setLoading(false)
       }
     } catch (err) {
-      setError('An error occurred. Please try again.')
-    } finally {
+      setError('Network error. Please try again.')
       setLoading(false)
     }
   }
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking authentication...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800">
+        <Loader2 className="w-8 h-8 text-white animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Login
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Lalitha Garments Portal
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md"
+      >
+        {/* Logo/Title */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">Lalitha Garments</h1>
+          <p className="text-purple-100">Business Management Platform</p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('admin')
-              setError('')
-              setEmail('')
-              setPassword('')
-            }}
-            className={`flex-1 py-3 px-4 text-center font-medium text-sm transition-colors ${
-              activeTab === 'admin'
-                ? 'border-b-2 border-purple-600 text-purple-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            👑 Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('user')
-              setError('')
-              setEmail('')
-              setPassword('')
-            }}
-            className={`flex-1 py-3 px-4 text-center font-medium text-sm transition-colors ${
-              activeTab === 'user'
-                ? 'border-b-2 border-purple-600 text-purple-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            👤 User
-          </button>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
+        {/* Login Card */}
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+          {/* Three Tabs */}
+          <div className="flex border-b border-gray-200">
             <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => { setActiveTab('business'); setError('') }}
+              className={`flex-1 py-4 px-4 text-sm font-semibold transition-all ${activeTab === 'business'
+                  ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
             >
-              {loading ? 'Signing in...' : `Sign in as ${activeTab === 'admin' ? 'Admin' : 'User'}`}
+              <Building2 className="w-4 h-4 inline mr-2" />
+              Business
+            </button>
+            <button
+              onClick={() => { setActiveTab('admin'); setError('') }}
+              className={`flex-1 py-4 px-4 text-sm font-semibold transition-all ${activeTab === 'admin'
+                  ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              <Crown className="w-4 h-4 inline mr-2" />
+              Admin
+            </button>
+            <button
+              onClick={() => { setActiveTab('user'); setError('') }}
+              className={`flex-1 py-4 px-4 text-sm font-semibold transition-all ${activeTab === 'user'
+                  ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              <User className="w-4 h-4 inline mr-2" />
+              User
             </button>
           </div>
-        </form>
-      </div>
+
+          {/* Login Form */}
+          <div className="p-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {/* Tab-specific title */}
+                <div className="mb-6">
+                  {activeTab === 'business' && (
+                    <>
+                      <h2 className="text-2xl font-bold text-gray-900">Business Login</h2>
+                      <p className="text-sm text-gray-600 mt-1">Login to manage your business</p>
+                    </>
+                  )}
+                  {activeTab === 'admin' && (
+                    <>
+                      <h2 className="text-2xl font-bold text-gray-900">Admin Portal</h2>
+                      <p className="text-sm text-gray-600 mt-1">Super admin access</p>
+                    </>
+                  )}
+                  {activeTab === 'user' && (
+                    <>
+                      <h2 className="text-2xl font-bold text-gray-900">Lalitha Garments</h2>
+                      <p className="text-sm text-gray-600 mt-1">Employee login</p>
+                    </>
+                  )}
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        placeholder="you@example.com"
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        placeholder="••••••••"
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Logging in...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Login</span>
+                        <ArrowRight className="w-5 h-5" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-purple-100 text-sm mt-6">
+          © 2026 Lalitha Garments. All rights reserved.
+        </p>
+      </motion.div>
     </div>
   )
 }
-
