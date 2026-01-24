@@ -187,10 +187,12 @@ export async function POST(request: NextRequest) {
       ? JSON.stringify(firstProduct.images)
       : '[]'
 
-    // Process reference links (ensure it's JSONB compatible)
-    const referenceLinks = body.referenceLinks && Array.isArray(body.referenceLinks) && body.referenceLinks.length > 0
+    // Process reference links (ensure it's JSONB compatible) - always save as array, even if empty
+    console.log('POST - Received referenceLinks:', body.referenceLinks)
+    const referenceLinks = body.referenceLinks && Array.isArray(body.referenceLinks)
       ? JSON.stringify(body.referenceLinks)
       : '[]'
+    console.log('POST - Processed referenceLinks for DB:', referenceLinks)
 
     // Process tags (ensure it's array)
     const tags = body.tags && Array.isArray(body.tags) ? body.tags : []
@@ -233,6 +235,22 @@ export async function POST(request: NextRequest) {
     // Parse products array
     const parsedProducts = entry.products ? (Array.isArray(entry.products) ? entry.products : JSON.parse(entry.products)) : []
     
+    // Parse reference links - handle both JSONB and string formats
+    let parsedReferenceLinks = []
+    if (entry.reference_links) {
+      if (Array.isArray(entry.reference_links)) {
+        parsedReferenceLinks = entry.reference_links
+      } else if (typeof entry.reference_links === 'string') {
+        try {
+          parsedReferenceLinks = JSON.parse(entry.reference_links)
+        } catch (e) {
+          console.error('Error parsing reference_links in POST response:', e)
+          parsedReferenceLinks = []
+        }
+      }
+    }
+    console.log('POST - Parsed referenceLinks from DB:', parsedReferenceLinks)
+    
     const newEntry = {
       id: entry.id.toString(),
       supplierName: entry.supplier_name,
@@ -252,7 +270,7 @@ export async function POST(request: NextRequest) {
       materialImages: entry.material_images ? (Array.isArray(entry.material_images) ? entry.material_images : JSON.parse(entry.material_images)) : [],
       // New products array
       products: parsedProducts,
-      referenceLinks: entry.reference_links ? (Array.isArray(entry.reference_links) ? entry.reference_links : JSON.parse(entry.reference_links)) : [],
+      referenceLinks: parsedReferenceLinks,
       researchNotes: entry.research_notes || '',
       status: entry.status || 'New',
       tags: entry.tags || [],

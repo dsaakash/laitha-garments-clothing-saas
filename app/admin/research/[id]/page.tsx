@@ -43,7 +43,7 @@ interface ResearchEntry {
   priceNotes: string
   materialImages: string[]
   products: Product[]
-  referenceLinks: ReferenceLink[]
+  referenceLinks: string | ReferenceLink[] // Can be string (new) or array (backward compatibility)
   researchNotes: string
   status: 'New' | 'Reviewed' | 'Interested' | 'Not Suitable'
   tags: string[]
@@ -76,6 +76,16 @@ export default function ResearchDetailPage() {
     }
   }, [id])
 
+  // Debug: Log entry changes
+  useEffect(() => {
+    if (entry) {
+      console.log('Entry loaded - referenceLinks:', entry.referenceLinks)
+      console.log('Entry loaded - referenceLinks type:', typeof entry.referenceLinks)
+      console.log('Entry loaded - referenceLinks is array?', Array.isArray(entry.referenceLinks))
+      console.log('Entry loaded - referenceLinks length:', entry.referenceLinks?.length)
+    }
+  }, [entry])
+
   const loadEntry = async () => {
     try {
       setLoading(true)
@@ -83,7 +93,22 @@ export default function ResearchDetailPage() {
       const result = await response.json()
 
       if (result.success) {
-        setEntry(result.data)
+        // Handle referenceLinks - can be string or array (backward compatibility)
+        let referenceLinksValue: string | ReferenceLink[] = ''
+        
+        if (typeof result.data.referenceLinks === 'string') {
+          referenceLinksValue = result.data.referenceLinks
+        } else if (Array.isArray(result.data.referenceLinks) && result.data.referenceLinks.length > 0) {
+          // Backward compatibility - extract URL from first link
+          referenceLinksValue = result.data.referenceLinks[0]?.url || ''
+        }
+        
+        const entryData = {
+          ...result.data,
+          referenceLinks: referenceLinksValue
+        }
+        
+        setEntry(entryData)
       } else {
         alert(result.message || 'Failed to load research entry')
         router.push('/admin/research')
@@ -134,9 +159,14 @@ export default function ResearchDetailPage() {
   }
 
   const getYouTubeEmbedUrl = (url: string) => {
+    if (!url) return null
+    
+    // Handle various YouTube URL formats
     const patterns = [
       /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+      /youtube\.com\/v\/([^&\n?#]+)/,
+      /youtube\.com\/.*[?&]v=([^&\n?#]+)/
     ]
     
     for (const pattern of patterns) {
@@ -145,6 +175,14 @@ export default function ResearchDetailPage() {
         return `https://www.youtube.com/embed/${match[1]}`
       }
     }
+    
+    // If no pattern matches, try to extract video ID from the URL directly
+    // This handles edge cases
+    const videoIdMatch = url.match(/(?:v=|v\/|embed\/)([a-zA-Z0-9_-]{11})/)
+    if (videoIdMatch && videoIdMatch[1]) {
+      return `https://www.youtube.com/embed/${videoIdMatch[1]}`
+    }
+    
     return null
   }
 
@@ -498,65 +536,35 @@ export default function ResearchDetailPage() {
             {activeTab === 5 && (
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">YouTube Reference Links</h2>
-                {entry.referenceLinks && entry.referenceLinks.length > 0 ? (
-                  <div className="space-y-4">
-                    {entry.referenceLinks.map((link, idx) => {
-                      const youtubeEmbed = link.type === 'youtube' && link.embeddable ? getYouTubeEmbedUrl(link.url) : null
-                      const vimeoEmbed = link.type === 'vimeo' && link.embeddable ? getVimeoEmbedUrl(link.url) : null
-
-                      return (
-                        <div key={idx} className="border border-gray-200 rounded-lg p-4">
-                          {youtubeEmbed && (
-                            <div className="mb-4">
-                              <iframe
-                                width="100%"
-                                height="315"
-                                src={youtubeEmbed}
-                                title={link.title || `Video ${idx + 1}`}
-                                frameBorder="0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                className="rounded-lg"
-                              ></iframe>
-                            </div>
-                          )}
-                          {vimeoEmbed && (
-                            <div className="mb-4">
-                              <iframe
-                                src={vimeoEmbed}
-                                width="100%"
-                                height="315"
-                                frameBorder="0"
-                                allow="autoplay; fullscreen; picture-in-picture"
-                                allowFullScreen
-                                className="rounded-lg"
-                              ></iframe>
-                            </div>
-                          )}
-                          <div>
-                            <a
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2"
-                            >
-                              {link.title || link.url}
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                            {link.description && (
-                              <p className="text-gray-600 text-sm mt-1">{link.description}</p>
-                            )}
-                            <span className="inline-block mt-2 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                              {link.type}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No reference links added</p>
-                )}
+                <div className="space-y-4">
+                  {entry.referenceLinks && (() => {
+                    // Handle both string and array formats
+                    let youtubeUrl = ''
+                    if (typeof entry.referenceLinks === 'string' && entry.referenceLinks.trim() !== '') {
+                      youtubeUrl = entry.referenceLinks
+                    } else if (Array.isArray(entry.referenceLinks) && entry.referenceLinks.length > 0) {
+                      youtubeUrl = entry.referenceLinks[0]?.url || ''
+                    }
+                    
+                    return youtubeUrl ? (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 mb-2 block">YouTube Link</label>
+                        <a
+                          href={youtubeUrl.startsWith('http') ? youtubeUrl : `https://${youtubeUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-purple-600 hover:text-purple-700 flex items-center gap-2 break-all"
+                        >
+                          <Video className="w-4 h-4" />
+                          {youtubeUrl}
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No YouTube link provided</p>
+                    )
+                  })()}
+                </div>
               </div>
             )}
           </div>

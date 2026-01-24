@@ -115,13 +115,16 @@ export default function NewResearchPage() {
   }
 
   const detectLinkType = (url: string): { type: string; embeddable: boolean } => {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    if (!url) return { type: 'website', embeddable: false }
+    
+    const lowerUrl = url.toLowerCase()
+    if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
       return { type: 'youtube', embeddable: true }
     }
-    if (url.includes('vimeo.com')) {
+    if (lowerUrl.includes('vimeo.com')) {
       return { type: 'vimeo', embeddable: true }
     }
-    if (url.includes('instagram.com')) {
+    if (lowerUrl.includes('instagram.com')) {
       return { type: 'instagram', embeddable: true }
     }
     return { type: 'website', embeddable: false }
@@ -174,33 +177,37 @@ export default function NewResearchPage() {
     setLoading(true)
 
     try {
+      const payload = {
+        supplierName: formData.supplierName,
+        contactNumber: formData.contactNumber,
+        email: formData.email,
+        whatsappNumber: formData.whatsappNumber,
+        address: formData.address,
+        mapLocation: formData.mapLocation,
+        mapPinGroup: formData.mapPinGroup,
+        products: formData.products.map(p => ({
+          name: p.name,
+          type: p.type,
+          description: p.description,
+          price: p.price ? parseFloat(p.price) : null,
+          priceCurrency: p.priceCurrency,
+          priceNotes: p.priceNotes,
+          images: p.images
+        })),
+        referenceLinks: formData.referenceLinks,
+        researchNotes: formData.researchNotes,
+        status: formData.status,
+        tags: formData.tags,
+        researchDate: formData.researchDate,
+        followUpDate: formData.followUpDate || null,
+      }
+      
+      console.log('Submitting research entry with referenceLinks:', payload.referenceLinks)
+      
       const response = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supplierName: formData.supplierName,
-          contactNumber: formData.contactNumber,
-          email: formData.email,
-          whatsappNumber: formData.whatsappNumber,
-          address: formData.address,
-          mapLocation: formData.mapLocation,
-          mapPinGroup: formData.mapPinGroup,
-          products: formData.products.map(p => ({
-            name: p.name,
-            type: p.type,
-            description: p.description,
-            price: p.price ? parseFloat(p.price) : null,
-            priceCurrency: p.priceCurrency,
-            priceNotes: p.priceNotes,
-            images: p.images
-          })),
-          referenceLinks: formData.referenceLinks,
-          researchNotes: formData.researchNotes,
-          status: formData.status,
-          tags: formData.tags,
-          researchDate: formData.researchDate,
-          followUpDate: formData.followUpDate || null,
-        }),
+        body: JSON.stringify(payload),
         credentials: 'include'
       })
 

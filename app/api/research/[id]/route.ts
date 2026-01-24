@@ -36,6 +36,39 @@ export async function GET(
     // Parse products array
     const products = entry.products ? (Array.isArray(entry.products) ? entry.products : JSON.parse(entry.products)) : []
     
+    // Parse reference links - extract URL string (like mapLocation)
+    let referenceLinks: string | ReferenceLink[] = ''
+    
+    if (entry.reference_links) {
+      // If it's already an array (JSONB array from PostgreSQL)
+      if (Array.isArray(entry.reference_links) && entry.reference_links.length > 0) {
+        // Extract URL from first link
+        const firstLink = entry.reference_links[0]
+        referenceLinks = firstLink?.url || ''
+      } 
+      // If it's a string (stringified JSON)
+      else if (typeof entry.reference_links === 'string') {
+        try {
+          const trimmed = entry.reference_links.trim()
+          if (trimmed && trimmed !== '[]' && trimmed !== 'null') {
+            const parsed = JSON.parse(trimmed)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              referenceLinks = parsed[0]?.url || ''
+            } else if (parsed && typeof parsed === 'object' && parsed.url) {
+              referenceLinks = parsed.url
+            }
+          }
+        } catch (e) {
+          // If parsing fails, might be a plain URL string
+          referenceLinks = trimmed
+        }
+      } 
+      // If it's an object (single link object)
+      else if (typeof entry.reference_links === 'object' && entry.reference_links.url) {
+        referenceLinks = entry.reference_links.url
+      }
+    }
+    
     const researchEntry = {
       id: entry.id.toString(),
       supplierName: entry.supplier_name,
@@ -55,7 +88,7 @@ export async function GET(
       materialImages: entry.material_images ? (Array.isArray(entry.material_images) ? entry.material_images : JSON.parse(entry.material_images)) : [],
       // New products array
       products: products,
-      referenceLinks: entry.reference_links ? (Array.isArray(entry.reference_links) ? entry.reference_links : JSON.parse(entry.reference_links)) : [],
+      referenceLinks: referenceLinks, // Simple string like mapLocation
       researchNotes: entry.research_notes || '',
       status: entry.status || 'New',
       tags: entry.tags || [],
@@ -117,20 +150,43 @@ export async function PUT(
       ? JSON.stringify(firstProduct.images)
       : '[]'
 
-    // Process reference links
-    const referenceLinks = body.referenceLinks && Array.isArray(body.referenceLinks) && body.referenceLinks.length > 0
-      ? JSON.stringify(body.referenceLinks)
-      : '[]'
+    // Process reference links - simple string like mapLocation
+    // If it's a string, save it directly. If it's an array (backward compatibility), get first URL
+    let referenceLinksValue: string = '[]'
+    
+    if (typeof body.referenceLinks === 'string' && body.referenceLinks.trim() !== '') {
+      // Simple string - wrap in array with URL
+      referenceLinksValue = JSON.stringify([{ type: 'youtube', url: body.referenceLinks.trim(), title: '', description: '', embeddable: true }])
+    } else if (Array.isArray(body.referenceLinks) && body.referenceLinks.length > 0) {
+      // Array format (backward compatibility) - use first link's URL
+      const firstLink = body.referenceLinks[0]
+      if (firstLink && firstLink.url) {
+        referenceLinksValue = JSON.stringify([{ type: 'youtube', url: firstLink.url.trim(), title: firstLink.title || '', description: firstLink.description || '', embeddable: true }])
+      }
+    }
 
     // Process tags
     const tags = body.tags && Array.isArray(body.tags) ? body.tags : []
 
+    // Log what we're about to save
+    console.log('PUT - About to save reference_links:', referenceLinksValue)
+    console.log('PUT - Type of referenceLinksValue variable:', typeof referenceLinksValue)
+    
+    // Ensure referenceLinksValue is valid JSON before saving
+    try {
+      // Test parse to ensure it's valid JSON
+      JSON.parse(referenceLinksValue)
+    } catch (e) {
+      console.error('PUT - Invalid JSON for referenceLinksValue:', referenceLinksValue)
+      referenceLinksValue = '[]'
+    }
+    
     const result = await query(
       `UPDATE research_entries 
        SET supplier_name = $1, contact_number = $2, address = $3, email = $4, whatsapp_number = $5,
            map_location = $6, map_pin_group = $7, material_name = $8, material_type = $9,
            material_description = $10, price = $11, price_currency = $12, price_notes = $13,
-           material_images = $14, products = $15, reference_links = $16, research_notes = $17, status = $18,
+           material_images = $14, products = $15, reference_links = $16::jsonb, research_notes = $17, status = $18,
            tags = $19, research_date = $20, follow_up_date = $21, updated_at = CURRENT_TIMESTAMP
        WHERE id = $22 AND tenant_id IS NULL
        RETURNING *`,
@@ -150,7 +206,7 @@ export async function PUT(
         priceNotes,
         materialImages,
         products,
-        referenceLinks,
+        referenceLinksValue,
         body.researchNotes || null,
         body.status || 'New',
         tags,
@@ -167,10 +223,50 @@ export async function PUT(
       )
     }
 
+    // Verify what was actually saved by querying again
+    const verifyResult = await query(
+      'SELECT reference_links FROM research_entries WHERE id = $1 AND tenant_id IS NULL',
+      [parseInt(params.id)]
+    )
+    console.log('PUT - Verification query - reference_links from DB:', verifyResult.rows[0]?.reference_links)
+    console.log('PUT - Verification query - type:', typeof verifyResult.rows[0]?.reference_links)
+    console.log('PUT - Verification query - is array?', Array.isArray(verifyResult.rows[0]?.reference_links))
+
     const entry = result.rows[0]
+    
+    // Log what was actually saved to the database
+    console.log('PUT - Entry returned from DB after UPDATE:')
+    console.log('PUT - entry.reference_links raw:', entry.reference_links)
+    console.log('PUT - entry.reference_links type:', typeof entry.reference_links)
+    console.log('PUT - entry.reference_links is array?', Array.isArray(entry.reference_links))
     
     // Parse products array
     const parsedProducts = entry.products ? (Array.isArray(entry.products) ? entry.products : JSON.parse(entry.products)) : []
+    
+    // Parse reference links - extract URL string (like mapLocation)
+    let parsedReferenceLinks: string | ReferenceLink[] = ''
+    
+    if (entry.reference_links) {
+      if (Array.isArray(entry.reference_links) && entry.reference_links.length > 0) {
+        parsedReferenceLinks = entry.reference_links[0]?.url || ''
+      } else if (typeof entry.reference_links === 'string') {
+        try {
+          const trimmed = entry.reference_links.trim()
+          if (trimmed && trimmed !== '[]' && trimmed !== 'null') {
+            const parsed = JSON.parse(trimmed)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              parsedReferenceLinks = parsed[0]?.url || ''
+            } else if (parsed && typeof parsed === 'object' && parsed.url) {
+              parsedReferenceLinks = parsed.url
+            }
+          }
+        } catch (e) {
+          parsedReferenceLinks = entry.reference_links
+        }
+      } else if (typeof entry.reference_links === 'object' && entry.reference_links.url) {
+        parsedReferenceLinks = entry.reference_links.url
+      }
+    }
     
     const updatedEntry = {
       id: entry.id.toString(),
@@ -191,7 +287,7 @@ export async function PUT(
       materialImages: entry.material_images ? (Array.isArray(entry.material_images) ? entry.material_images : JSON.parse(entry.material_images)) : [],
       // New products array
       products: parsedProducts,
-      referenceLinks: entry.reference_links ? (Array.isArray(entry.reference_links) ? entry.reference_links : JSON.parse(entry.reference_links)) : [],
+      referenceLinks: parsedReferenceLinks,
       researchNotes: entry.research_notes || '',
       status: entry.status || 'New',
       tags: entry.tags || [],

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
-import { ArrowLeft, Save, Plus, X, MapPin, Video, Image as ImageIcon, User, Package, Home, Globe, Link2 } from 'lucide-react'
+import { ArrowLeft, Save, MapPin, Video, Image as ImageIcon, User, Package, Home, Globe, Link2 } from 'lucide-react'
 import { uploadImage } from '@/lib/cloudinary'
 
 interface ReferenceLink {
@@ -43,14 +43,13 @@ export default function EditResearchPage() {
     mapLocation: '',
     mapPinGroup: '',
     products: [] as Product[],
-    referenceLinks: [] as ReferenceLink[],
+    referenceLinks: '', // Changed to simple string like mapLocation
     researchNotes: '',
     status: 'New' as 'New' | 'Reviewed' | 'Interested' | 'Not Suitable',
     tags: [] as string[],
     researchDate: new Date().toISOString().split('T')[0],
     followUpDate: '',
   })
-  const [newLink, setNewLink] = useState({ type: 'youtube', url: '', title: '', description: '' })
 
   const tabs = [
     { id: 1, label: 'Supplier Details', icon: User },
@@ -65,6 +64,7 @@ export default function EditResearchPage() {
       loadEntry()
     }
   }, [id])
+
 
   const loadEntry = async () => {
     try {
@@ -111,13 +111,17 @@ export default function EditResearchPage() {
           mapLocation: data.mapLocation || '',
           mapPinGroup: data.mapPinGroup || '',
           products: products,
-          referenceLinks: Array.isArray(data.referenceLinks) ? data.referenceLinks.map((link: any) => ({
-            type: link.type || 'website',
-            url: link.url || '',
-            title: link.title || '',
-            description: link.description || '',
-            embeddable: link.embeddable !== undefined ? link.embeddable : false
-          })) : [],
+          referenceLinks: (() => {
+            // If it's an array, get the first URL, otherwise use as string
+            if (Array.isArray(data.referenceLinks) && data.referenceLinks.length > 0) {
+              return data.referenceLinks[0]?.url || ''
+            } else if (typeof data.referenceLinks === 'string') {
+              return data.referenceLinks
+            } else if (data.referenceLinks && typeof data.referenceLinks === 'object' && data.referenceLinks.url) {
+              return data.referenceLinks.url
+            }
+            return ''
+          })(),
           researchNotes: data.researchNotes || '',
           status: data.status || 'New',
           tags: Array.isArray(data.tags) ? data.tags : [],
@@ -194,42 +198,7 @@ export default function EditResearchPage() {
     }
   }
 
-  const detectLinkType = (url: string): { type: string; embeddable: boolean } => {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      return { type: 'youtube', embeddable: true }
-    }
-    if (url.includes('vimeo.com')) {
-      return { type: 'vimeo', embeddable: true }
-    }
-    if (url.includes('instagram.com')) {
-      return { type: 'instagram', embeddable: true }
-    }
-    return { type: 'website', embeddable: false }
-  }
 
-  const addReferenceLink = () => {
-    if (newLink.url.trim()) {
-      const { type, embeddable } = detectLinkType(newLink.url)
-      setFormData(prev => ({
-        ...prev,
-        referenceLinks: [...prev.referenceLinks, {
-          type,
-          url: newLink.url.trim(),
-          title: newLink.title.trim(),
-          description: newLink.description.trim(),
-          embeddable
-        }]
-      }))
-      setNewLink({ type: 'youtube', url: '', title: '', description: '' })
-    }
-  }
-
-  const removeReferenceLink = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      referenceLinks: prev.referenceLinks.filter((_, i) => i !== index)
-    }))
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -253,47 +222,52 @@ export default function EditResearchPage() {
     setLoading(true)
 
     try {
+      const payload = {
+        supplierName: formData.supplierName,
+        contactNumber: formData.contactNumber,
+        email: formData.email,
+        whatsappNumber: formData.whatsappNumber,
+        address: formData.address,
+        mapLocation: formData.mapLocation,
+        mapPinGroup: formData.mapPinGroup,
+        products: formData.products.map(p => ({
+          name: p.name,
+          type: p.type,
+          description: p.description,
+          price: p.price ? parseFloat(p.price) : null,
+          priceCurrency: p.priceCurrency,
+          priceNotes: p.priceNotes,
+          images: p.images
+        })),
+        referenceLinks: formData.referenceLinks || '', // Simple string like mapLocation
+        researchNotes: formData.researchNotes,
+        status: formData.status,
+        tags: formData.tags,
+        researchDate: formData.researchDate,
+        followUpDate: formData.followUpDate || null,
+      }
+      
+      
       const response = await fetch(`/api/research/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supplierName: formData.supplierName,
-          contactNumber: formData.contactNumber,
-          email: formData.email,
-          whatsappNumber: formData.whatsappNumber,
-          address: formData.address,
-          mapLocation: formData.mapLocation,
-          mapPinGroup: formData.mapPinGroup,
-          products: formData.products.map(p => ({
-            name: p.name,
-            type: p.type,
-            description: p.description,
-            price: p.price ? parseFloat(p.price) : null,
-            priceCurrency: p.priceCurrency,
-            priceNotes: p.priceNotes,
-            images: p.images
-          })),
-          referenceLinks: formData.referenceLinks,
-          researchNotes: formData.researchNotes,
-          status: formData.status,
-          tags: formData.tags,
-          researchDate: formData.researchDate,
-          followUpDate: formData.followUpDate || null,
-        }),
+        body: JSON.stringify(payload),
         credentials: 'include'
       })
 
       const result = await response.json()
 
       if (result.success) {
+        alert('Research entry updated successfully!')
         router.push(`/admin/research/${id}`)
       } else {
-        alert(result.message || 'Failed to update research entry')
+        console.error('Update failed:', result.message)
+        alert(result.message || 'Failed to update research entry. Please check the console for details.')
         setLoading(false)
       }
     } catch (error) {
       console.error('Failed to update research:', error)
-      alert('Failed to update research entry')
+      alert('Failed to update research entry. Please check the console for details.')
       setLoading(false)
     }
   }
@@ -635,84 +609,29 @@ export default function EditResearchPage() {
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">YouTube Reference Links</h2>
                 <div className="space-y-4">
-                  {formData.referenceLinks.map((link, index) => (
-                    <div key={index} className="p-4 bg-gray-50 rounded-lg flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Video className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium text-gray-700">{link.type.toUpperCase()}</span>
-                          {link.embeddable && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Embeddable</span>}
-                        </div>
-                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-sm text-purple-600 hover:underline break-all">
-                          {link.url}
-                        </a>
-                        {link.title && <p className="text-sm text-gray-600 mt-1 font-medium">{link.title}</p>}
-                        {link.description && <p className="text-sm text-gray-500 mt-1">{link.description}</p>}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeReferenceLink(index)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Link Type</label>
-                        <select
-                          value={newLink.type}
-                          onChange={(e) => setNewLink({ ...newLink, type: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">YouTube Link</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={formData.referenceLinks}
+                        onChange={(e) => setFormData({ ...formData, referenceLinks: e.target.value })}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="https://youtube.com/watch?v=... or https://youtu.be/..."
+                      />
+                      {formData.referenceLinks && (
+                        <a
+                          href={formData.referenceLinks.startsWith('http') ? formData.referenceLinks : `https://${formData.referenceLinks}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors inline-flex items-center gap-2"
                         >
-                          <option value="youtube">YouTube Video</option>
-                          <option value="vimeo">Vimeo</option>
-                          <option value="instagram">Instagram</option>
-                          <option value="website">Website</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Link URL *</label>
-                        <input
-                          type="url"
-                          value={newLink.url}
-                          onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="https://youtube.com/watch?v=..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Title (Optional)</label>
-                        <input
-                          type="text"
-                          value={newLink.title}
-                          onChange={(e) => setNewLink({ ...newLink, title: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Link title"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
-                        <input
-                          type="text"
-                          value={newLink.description}
-                          onChange={(e) => setNewLink({ ...newLink, description: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Link description"
-                        />
-                      </div>
+                          <Video className="w-4 h-4" />
+                          Open YouTube
+                        </a>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={addReferenceLink}
-                      className="w-full px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors font-medium"
-                    >
-                      <Plus className="w-4 h-4 inline mr-2" />
-                      Add Reference Link
-                    </button>
+                    <p className="text-sm text-gray-500 mt-1">Enter a YouTube video URL. It will be saved and clickable in the detail view.</p>
                   </div>
                 </div>
               </div>
