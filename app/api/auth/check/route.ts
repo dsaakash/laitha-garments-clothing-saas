@@ -45,18 +45,23 @@ export async function GET(request: NextRequest) {
             email: tenant.owner_email,
             role: 'admin',
             type: 'tenant',
-            tenant_id: tenantId
+            tenant_id: tenantId,
+            modules: tenant.modules || [],
+            permissions: { '*': ['manage'] }
           }
         }
       }
-    } else if (userType === 'superadmin') {
-      // Superadmin from admin table
+    } else if (userType === 'superadmin' || userType === 'admin') {
+      // Admin from admin table (Superadmin or Tenant Sub-admin)
       const userIdNum = parseInt(userId)
       if (!isNaN(userIdNum)) {
         admin = await getAdminById(userIdNum)
         if (admin) {
-          admin.type = 'superadmin'
-          admin.tenant_id = null
+          admin.type = userType
+          // For superadmin, tenant_id should be null. For admin, it should be whatever is in the DB.
+          if (userType === 'superadmin') {
+            admin.tenant_id = null
+          }
           admin.permissions = admin.role_permissions || {}
           // Use dynamic role name if available, else fallback to legacy
           if (admin.role_name) {

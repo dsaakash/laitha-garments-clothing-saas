@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTenantById, updateTenant, deleteTenant } from '@/lib/db-tenants'
+import { getTenantById, updateTenant, deleteTenant, hardDeleteTenant } from '@/lib/db-tenants'
 
 // Transform DB result to frontend format
 function transformTenant(dbTenant: any): any {
@@ -25,6 +25,7 @@ function transformTenant(dbTenant: any): any {
         subdomain: dbTenant.subdomain,
         workflowEnabled: dbTenant.workflow_enabled,
         websiteBuilderEnabled: dbTenant.website_builder_enabled,
+        modules: dbTenant.modules || [],
         createdAt: dbTenant.created_at,
         updatedAt: dbTenant.updated_at,
         createdBy: dbTenant.created_by,
@@ -73,7 +74,24 @@ export async function PUT(
 ) {
     try {
         const body = await request.json()
-        
+        const {
+            businessName,
+            ownerName,
+            phone,
+            whatsapp,
+            address,
+            gstNumber,
+            plan,
+            status,
+            subscriptionStatus,
+            billingCycle,
+            monthlyRevenue,
+            subdomain,
+            workflowEnabled,
+            websiteBuilderEnabled,
+            modules
+        } = body
+
         // Get current tenant to check plan changes
         const currentTenant = await getTenantById(params.id)
         if (!currentTenant) {
@@ -85,30 +103,27 @@ export async function PUT(
 
         // Prepare update data - convert camelCase to snake_case for database
         const updateData: any = {}
-        
-        if (body.plan !== undefined) {
-            updateData.plan = body.plan
-        }
-        if (body.status !== undefined) {
-            updateData.status = body.status
-        }
-        if (body.subscriptionStatus !== undefined) {
-            updateData.subscription_status = body.subscriptionStatus
-        }
-        if (body.monthlyRevenue !== undefined) {
-            updateData.monthly_revenue = body.monthlyRevenue
-        }
-        if (body.workflowEnabled !== undefined) {
-            updateData.workflow_enabled = body.workflowEnabled
-        }
-        if (body.websiteBuilderEnabled !== undefined) {
-            updateData.website_builder_enabled = body.websiteBuilderEnabled
-        }
+
+        if (businessName) updateData.business_name = businessName
+        if (ownerName) updateData.owner_name = ownerName
+        if (phone) updateData.phone = phone
+        if (whatsapp) updateData.whatsapp = whatsapp
+        if (address) updateData.address = address
+        if (gstNumber !== undefined) updateData.gst_number = gstNumber
+        if (plan) updateData.plan = plan
+        if (status) updateData.status = status
+        if (subscriptionStatus) updateData.subscription_status = subscriptionStatus
+        if (billingCycle) updateData.billing_cycle = billingCycle
+        if (monthlyRevenue !== undefined) updateData.monthly_revenue = monthlyRevenue
+        if (subdomain) updateData.subdomain = subdomain
+        if (workflowEnabled !== undefined) updateData.workflow_enabled = workflowEnabled
+        if (websiteBuilderEnabled !== undefined) updateData.website_builder_enabled = websiteBuilderEnabled
+        if (modules) updateData.modules = modules
 
         // Handle plan upgrade logic
-        if (body.plan && body.plan !== currentTenant.plan) {
+        if (plan && plan !== currentTenant.plan) {
             // If upgrading to a paid plan from trial, set status to active
-            if (body.plan !== 'free' && currentTenant.status === 'trial') {
+            if (plan !== 'free' && currentTenant.status === 'trial') {
                 updateData.status = 'active'
                 updateData.subscription_status = 'active'
             }
@@ -140,13 +155,18 @@ export async function PUT(
     }
 }
 
-// DELETE /api/tenants/[id] - Delete tenant (soft delete)
+// DELETE /api/tenants/[id] - Delete tenant
 export async function DELETE(
     request: NextRequest,
     { params }: { params: { id: string } }
 ) {
     try {
-        const deleted = await deleteTenant(params.id)
+        const { searchParams } = new URL(request.url)
+        const isHardDelete = searchParams.get('hard') === 'true'
+
+        const deleted = isHardDelete
+            ? await hardDeleteTenant(params.id)
+            : await deleteTenant(params.id)
 
         if (!deleted) {
             return NextResponse.json(
@@ -157,7 +177,7 @@ export async function DELETE(
 
         return NextResponse.json({
             success: true,
-            message: 'Tenant deleted successfully'
+            message: `Tenant ${isHardDelete ? 'permanently' : 'soft'} deleted successfully`
         })
     } catch (error) {
         console.error('Error deleting tenant:', error)

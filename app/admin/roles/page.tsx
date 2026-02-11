@@ -20,8 +20,30 @@ interface Role {
 const RESOURCES = [
     'dashboard', 'suppliers', 'purchases', 'inventory', 'customers',
     'products', 'catalogues', 'sales', 'invoices', 'business',
-    'enquiries', 'admins', 'users', 'roles', 'workflow', 'categories'
+    'enquiries', 'admins', 'users', 'roles', 'workflow', 'categories',
+    'research', 'setup' // Added missing resources
 ]
+
+// Mapping of Modules to Resources
+const MODULE_RESOURCES: Record<string, string[]> = {
+    'pos': ['sales', 'invoices', 'customers', 'products'],
+    'inventory': ['inventory', 'products', 'categories', 'catalogues'],
+    'purchases': ['purchases', 'suppliers', 'inventory', 'products'],
+    'sales': ['sales', 'invoices', 'customers', 'products'],
+    'invoices': ['invoices', 'sales', 'customers'],
+    'customers': ['customers', 'sales', 'invoices'],
+    'enquiries': ['enquiries', 'customers'],
+    'suppliers': ['suppliers', 'purchases', 'products'],
+    'workflow': ['workflow'],
+    'website': [], // Website might have its own specific resources later
+    'accounting': ['invoices', 'sales', 'purchases'],
+    'research': ['research'],
+    'setup': ['setup'],
+    'business': ['business'],
+    'admins': ['admins'],
+    'roles': ['roles'],
+    'users': ['users']
+}
 
 const ACTIONS = ['read', 'write', 'delete', 'manage']
 
@@ -30,6 +52,8 @@ export default function RolesPage() {
     const [loading, setLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
     const [editingRole, setEditingRole] = useState<Role | null>(null)
+    const [userRole, setUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
+    const [tenantModules, setTenantModules] = useState<string[]>([])
 
     const [formData, setFormData] = useState({
         name: '',
@@ -39,7 +63,25 @@ export default function RolesPage() {
 
     useEffect(() => {
         fetchRoles()
+        fetchUserDetails()
     }, [])
+
+    const fetchUserDetails = async () => {
+        try {
+            const res = await fetch('/api/auth/check')
+            const data = await res.json()
+            if (data.authenticated && data.admin) {
+                let role = data.admin.role
+                if (data.admin.type === 'tenant') role = 'admin'
+                else if (data.admin.type === 'superadmin') role = 'superadmin'
+
+                setUserRole(role)
+                setTenantModules(data.admin.modules || [])
+            }
+        } catch (error) {
+            console.error('Error fetching user details:', error)
+        }
+    }
 
     const fetchRoles = async () => {
         try {
@@ -138,6 +180,34 @@ export default function RolesPage() {
             return { ...prev, permissions: newPermissions }
         })
     }
+
+    // Filter resources based on tenant modules
+    const filteredResources = (() => {
+        // Superadmin sees everything
+        if (userRole === 'superadmin') return RESOURCES
+
+        // If no role loaded yet, show nothing or everything? (Safe default: dashboard only until loaded)
+        if (!userRole) return ['dashboard']
+
+        // Current tenant's active resources
+        const activeResources = new Set<string>()
+        activeResources.add('dashboard') // Everyone gets dashboard
+
+        // Add resources from enabled modules
+        tenantModules.forEach(module => {
+            const moduleResources = MODULE_RESOURCES[module] || []
+            moduleResources.forEach(r => activeResources.add(r))
+        })
+
+        // Also add any resources that were ALREADY assigned to the role being edited
+        // (This prevents accidentally hiding permissions that were set previously, even if module was disabled)
+        if (editingRole && editingRole.permissions) {
+            Object.keys(editingRole.permissions).forEach(r => activeResources.add(r))
+        }
+
+        // Return resources that exist in both RESOURCES list and our active set
+        return RESOURCES.filter(r => activeResources.has(r))
+    })()
 
     return (
         <AdminLayout>
@@ -258,7 +328,7 @@ export default function RolesPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
-                                                {RESOURCES.map(resource => (
+                                                {filteredResources.map(resource => (
                                                     <tr key={resource} className="hover:bg-gray-50">
                                                         <td className="px-4 py-3 font-medium text-gray-900 capitalize">
                                                             {resource.replace('_', ' ')}
@@ -278,6 +348,13 @@ export default function RolesPage() {
                                                         })}
                                                     </tr>
                                                 ))}
+                                                {filteredResources.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                                                            No resources available for your current subscription.
+                                                        </td>
+                                                    </tr>
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>

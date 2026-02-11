@@ -7,6 +7,7 @@ export interface Admin {
   name?: string
   role: 'superadmin' | 'admin' | 'user'
   role_id?: number
+  tenant_id?: string
   created_at: Date
   updated_at: Date
 }
@@ -37,12 +38,12 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
   }
 }
 
-export async function createAdmin(email: string, password: string, name?: string, role: 'superadmin' | 'admin' | 'user' = 'admin', roleId?: number): Promise<Admin> {
+export async function createAdmin(email: string, password: string, name?: string, role: 'superadmin' | 'admin' | 'user' = 'admin', roleId?: number, tenantId?: string): Promise<Admin> {
   const passwordHash = await hashPassword(password)
 
   const result = await query(
-    'INSERT INTO admins (email, password_hash, name, role, role_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, role_id, created_at, updated_at',
-    [email, passwordHash, name || null, role, roleId || null]
+    'INSERT INTO admins (email, password_hash, name, role, role_id, tenant_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, name, role, role_id, tenant_id, created_at, updated_at',
+    [email, passwordHash, name || null, role, roleId || null, tenantId || null]
   )
 
   return result.rows[0]
@@ -87,7 +88,7 @@ export async function getUserByEmail(email: string): Promise<(User & { password_
 
 export async function getAdminById(id: number): Promise<Admin | null> {
   const result = await query(
-    `SELECT a.id, a.email, a.name, a.role, a.role_id, a.created_at, a.updated_at,
+    `SELECT a.id, a.email, a.name, a.role, a.role_id, a.tenant_id, a.created_at, a.updated_at,
             r.name as role_name, r.permissions as role_permissions
      FROM admins a
      LEFT JOIN roles r ON a.role_id = r.id
@@ -130,10 +131,18 @@ export async function verifyAdmin(email: string, password: string): Promise<Admi
   return adminWithoutPassword
 }
 
-export async function getAllAdmins(): Promise<Admin[]> {
-  const result = await query(
-    'SELECT id, email, name, role, created_at, updated_at FROM admins ORDER BY created_at DESC'
-  )
+export async function getAllAdmins(tenantId?: string): Promise<Admin[]> {
+  let queryText = 'SELECT id, email, name, role, role_id, tenant_id, created_at, updated_at FROM admins'
+  const params: any[] = []
+
+  if (tenantId) {
+    queryText += ' WHERE tenant_id = $1'
+    params.push(tenantId)
+  }
+
+  queryText += ' ORDER BY created_at DESC'
+
+  const result = await query(queryText, params)
 
   return result.rows
 }

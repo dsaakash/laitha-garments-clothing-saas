@@ -42,6 +42,47 @@ export default function TenantsPage() {
         }
     }
 
+    const handleDelete = async (id: string, name: string) => {
+        const choice = prompt(
+            `Choose delete type for ${name}:\n\n` +
+            `Type 'SOFT' to disable access and mark as cancelled.\n` +
+            `Type 'HARD' to permanently delete ALL business data.\n\n` +
+            `This action cannot be undone.`
+        )
+
+        if (!choice) return
+
+        const isHard = choice.toUpperCase() === 'HARD'
+        const isSoft = choice.toUpperCase() === 'SOFT'
+
+        if (!isHard && !isSoft) {
+            alert('Invalid choice. Please type SOFT or HARD.')
+            return
+        }
+
+        if (isHard && !confirm(`WARNING: This will permanently delete ${name} and ALL associated records. Are you absolutely sure?`)) {
+            return
+        }
+
+        try {
+            const url = `/api/tenants/${id}${isHard ? '?hard=true' : ''}`
+            const response = await fetch(url, {
+                method: 'DELETE',
+            })
+            const result = await response.json()
+
+            if (result.success) {
+                alert(result.message || 'Tenant deleted successfully')
+                loadTenants()
+            } else {
+                alert(result.message || 'Failed to delete tenant')
+            }
+        } catch (error) {
+            console.error('Failed to delete tenant:', error)
+            alert('Failed to delete tenant')
+        }
+    }
+
     const filteredTenants = tenants.filter(tenant =>
         tenant.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         tenant.ownerName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -256,6 +297,13 @@ export default function TenantsPage() {
                                                     onClick={() => {/* TODO: Implement impersonate */ }}
                                                 >
                                                     Login As
+                                                </ActionButton>
+                                                <ActionButton
+                                                    variant="danger"
+                                                    size="sm"
+                                                    onClick={() => handleDelete(tenant.id, tenant.businessName)}
+                                                >
+                                                    Delete
                                                 </ActionButton>
                                             </div>
                                         </div>

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getTenantContext, buildTenantFilter } from '@/lib/tenant-context'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+
+    // Get tenant context from middleware-injected headers
+    const context = getTenantContext(request)
+    const tenantFilter = buildTenantFilter(context)
 
     let queryText = `
       SELECT 
@@ -14,15 +19,26 @@ export async function GET(request: NextRequest) {
         i.image_url as product_image_url
       FROM customer_enquiries e
       LEFT JOIN inventory i ON e.product_id = i.id
-      WHERE 1=1
     `
-    const params: any[] = []
-    
+
+    // Build WHERE clause
+    const conditions: string[] = []
+    const params: any[] = [...tenantFilter.params]
+
+    // Add tenant filter
+    if (tenantFilter.where) {
+      conditions.push(tenantFilter.where.replace('WHERE ', '').replace('tenant_id', 'e.tenant_id'))
+    }
+
     if (status) {
-      queryText += ` AND e.status = $1`
+      conditions.push(`e.status = $${params.length + 1}`)
       params.push(status)
     }
-    
+
+    if (conditions.length > 0) {
+      queryText += ' WHERE ' + conditions.join(' AND ')
+    }
+
     queryText += ` ORDER BY e.created_at DESC`
 
     const result = await query(queryText, params.length > 0 ? params : undefined)
@@ -43,13 +59,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
-      customerName, 
-      customerPhone, 
-      productId, 
-      productName, 
-      productCode, 
-      fabricType, 
+    const {
+      customerName,
+      customerPhone,
+      productId,
+      productName,
+      productCode,
+      fabricType,
       enquiryMethod = 'form',
       bookingType,
       meetingLink,
@@ -85,8 +101,12 @@ export async function POST(request: NextRequest) {
       WHERE table_name = 'customer_enquiries' 
       AND column_name IN ('booking_type', 'meeting_link', 'appointment_date', 'appointment_time', 'calendar_event_id')
     `)
-    
+
     const hasBookingFields = checkColumns.rows.length > 0
+
+    // Get tenant context for tenant_id
+    const context = getTenantContext(request)
+    const tenantId = context.isTenant ? context.tenantId : null
 
     let result
     if (hasBookingFields) {
@@ -94,33 +114,34 @@ export async function POST(request: NextRequest) {
       result = await query(
         `INSERT INTO customer_enquiries 
          (customer_name, customer_phone, product_id, product_name, product_code, fabric_type, 
-          enquiry_method, status, booking_type, meeting_link, appointment_date, appointment_time, calendar_event_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12)
+          enquiry_method, status, booking_type, meeting_link, appointment_date, appointment_time, calendar_event_id, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $13)
          RETURNING *`,
         [
-          customerName, 
-          customerPhoneValue, 
-          productIdInt, 
-          productName, 
-          productCode || null, 
-          fabricType || null, 
+          customerName,
+          customerPhoneValue,
+          productIdInt,
+          productName,
+          productCode || null,
+          fabricType || null,
           enquiryMethod,
           bookingType || null,
           meetingLink || null,
           appointmentDate || null,
           appointmentTime || null,
-          calendarEventId || null
+          calendarEventId || null,
+          tenantId
         ]
       )
     } else {
       // Insert without booking fields (backward compatibility)
       result = await query(
-      `INSERT INTO customer_enquiries 
-       (customer_name, customer_phone, product_id, product_name, product_code, fabric_type, enquiry_method, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+        `INSERT INTO customer_enquiries 
+       (customer_name, customer_phone, product_id, product_name, product_code, fabric_type, enquiry_method, status, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
        RETURNING *`,
-        [customerName, customerPhoneValue, productIdInt, productName, productCode || null, fabricType || null, enquiryMethod]
-    )
+        [customerName, customerPhoneValue, productIdInt, productName, productCode || null, fabricType || null, enquiryMethod, tenantId]
+      )
     }
 
     return NextResponse.json({
@@ -131,11 +152,11 @@ export async function POST(request: NextRequest) {
     console.error('Error creating enquiry:', error)
     console.error('Error stack:', error.stack)
     console.error('Error details:', JSON.stringify(error, null, 2))
-    
+
     // Provide more specific error messages
     let errorMessage = 'Failed to create enquiry'
     let errorDetails = error.message || 'Unknown error'
-    
+
     if (error.message) {
       if (error.message.includes('does not exist') || error.message.includes('relation') || error.message.includes('table')) {
         errorMessage = 'Database table does not exist. Please run the migration script: scripts/migrate-customer-enquiries.sql'
@@ -144,10 +165,10 @@ export async function POST(request: NextRequest) {
         errorMessage = error.message
       }
     }
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: errorMessage,
         details: errorDetails,
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined

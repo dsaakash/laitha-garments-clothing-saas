@@ -17,7 +17,16 @@ export default function AdminsPage() {
     roleId: '' as string | number
   })
 
+  const [currentUserRole, setCurrentUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
+
   useEffect(() => {
+    fetch('/api/auth/check')
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated && data.admin) {
+          setCurrentUserRole(data.admin.role)
+        }
+      })
     loadAdmins()
     loadRoles()
   }, [])
@@ -43,7 +52,13 @@ export default function AdminsPage() {
       if (selectedRole) {
         // Map dynamic roles to legacy roles for backward compatibility
         if (selectedRole.name.toLowerCase().includes('super')) {
-          setFormData(prev => ({ ...prev, role: 'superadmin' }))
+          // Only allow superadmin role if current user is superadmin
+          if (currentUserRole === 'superadmin') {
+            setFormData(prev => ({ ...prev, role: 'superadmin' }))
+          } else {
+            // Fallback to admin if they somehow selected a superadmin role
+            setFormData(prev => ({ ...prev, role: 'admin' }))
+          }
         } else if (selectedRole.name.toLowerCase() === 'user') {
           setFormData(prev => ({ ...prev, role: 'user' }))
         } else {
@@ -51,7 +66,7 @@ export default function AdminsPage() {
         }
       }
     }
-  }, [formData.roleId, roles])
+  }, [formData.roleId, roles, currentUserRole])
 
   const loadAdmins = async () => {
     try {
@@ -328,9 +343,17 @@ export default function AdminsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-2"
                   >
                     <option value="">Select a Role...</option>
-                    {roles.map(role => (
-                      <option key={role.id} value={role.id}>{role.name}</option>
-                    ))}
+                    {roles
+                      .filter(role => {
+                        // Filter out superadmin roles for non-superadmin users
+                        if (currentUserRole !== 'superadmin') {
+                          return !role.name.toLowerCase().includes('super')
+                        }
+                        return true
+                      })
+                      .map(role => (
+                        <option key={role.id} value={role.id}>{role.name}</option>
+                      ))}
                   </select>
 
                   <div className="text-xs text-gray-500">

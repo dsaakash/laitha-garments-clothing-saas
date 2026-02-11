@@ -33,7 +33,7 @@ export function middleware(request: NextRequest) {
       const response = NextResponse.next()
 
       if (parts.length >= 3) {
-        const userType = parts[0] // 'tenant', 'superadmin', 'user'
+        const userType = parts[0] // 'tenant', 'superadmin', 'admin', 'user'
         const tenantId = parts.length > 4 ? parts[3] : null
 
         // Add tenant context to request headers for API routes

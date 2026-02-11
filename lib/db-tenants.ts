@@ -27,6 +27,7 @@ export interface TenantDB {
     subdomain: string
     workflow_enabled: boolean
     website_builder_enabled: boolean
+    modules: string[]
     created_at: string
     updated_at: string
     created_by: string
@@ -50,6 +51,7 @@ export async function createTenant(data: {
     trialEndDate: string
     subdomain: string
     workflowEnabled: boolean
+    modules?: string[]
     createdBy: string
 }): Promise<TenantDB> {
     // Hash password
@@ -61,9 +63,9 @@ export async function createTenant(data: {
       password_hash, phone, whatsapp, address, gst_number,
       status, plan, trial_start_date, trial_end_date,
       subscription_status, billing_cycle, monthly_revenue,
-      subdomain, workflow_enabled, website_builder_enabled,
+      subdomain, workflow_enabled, website_builder_enabled, modules,
       created_at, updated_at, created_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $21)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $22)
     RETURNING *`,
         [
             data.id,
@@ -86,6 +88,7 @@ export async function createTenant(data: {
             data.subdomain,
             data.workflowEnabled,
             false, // website_builder_enabled
+            data.modules || [], // Default to empty array if not provided
             data.createdBy
         ]
     )
@@ -192,6 +195,44 @@ export async function deleteTenant(id: string): Promise<boolean> {
      WHERE id = $1`,
         [id]
     )
+
+    return (result.rowCount || 0) > 0
+}
+
+// Hard delete tenant (permanently remove all data)
+export async function hardDeleteTenant(id: string): Promise<boolean> {
+    // List of all tables that have a tenant_id column
+    // Ordered to respect foreign key constraints where possible
+    const tables = [
+        'admins',
+        'users',
+        'roles',
+        'business_profile',
+        'suppliers',
+        'customers',
+        'catalogues',
+        'purchase_orders',
+        'inventory',
+        'sales',
+        'categories',
+        'research_entries',
+        'customer_enquiries',
+        'bill_number_sequence',
+        'workflows',
+        'approval_requests'
+    ]
+
+    for (const table of tables) {
+        try {
+            await query(`DELETE FROM ${table} WHERE tenant_id = $1`, [id])
+        } catch (error) {
+            console.warn(`Failed to delete from table ${table}:`, error)
+            // Continue with other tables even if one fails
+        }
+    }
+
+    // Finally delete the tenant itself
+    const result = await query('DELETE FROM tenants WHERE id = $1', [id])
 
     return (result.rowCount || 0) > 0
 }

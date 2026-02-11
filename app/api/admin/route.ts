@@ -16,23 +16,36 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    let tenantId: string | undefined
+
     // Check if user has permission to view admins
     try {
       const decoded = decodeBase64(session.value)
       const parts = decoded.split(':')
+      const userType = parts[0]
       const adminId = parseInt(parts[1])
 
-      if (isNaN(adminId)) {
-        throw new Error('Invalid admin ID')
+      // Extract tenantId if present (index 3)
+      if (parts.length > 3 && parts[3] && parts[3] !== 'null') {
+        tenantId = parts[3]
       }
 
-      const role = await getCurrentUserRole(adminId)
+      // Tenant owners have implicit permission for their own tenant
+      if (userType === 'tenant') {
+        // Proceed
+      } else {
+        if (isNaN(adminId)) {
+          throw new Error('Invalid admin ID')
+        }
 
-      if (!role || !hasPermission(role, 'admins', 'read')) {
-        return NextResponse.json(
-          { success: false, message: 'Insufficient permissions' },
-          { status: 403 }
-        )
+        const role = await getCurrentUserRole(adminId)
+
+        if (!role || !hasPermission(role, 'admins', 'read')) {
+          return NextResponse.json(
+            { success: false, message: 'Insufficient permissions' },
+            { status: 403 }
+          )
+        }
       }
     } catch (error) {
       return NextResponse.json(
@@ -41,7 +54,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const admins = await getAllAdmins()
+    const admins = await getAllAdmins(tenantId)
 
     return NextResponse.json({ success: true, admins })
   } catch (error) {
@@ -65,18 +78,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if user has permission to create admins (only superadmin)
+    let tenantId: string | undefined
+    let userType: string = 'admin'
+
+    // Check if user has permission to create admins
     try {
       const decoded = decodeBase64(session.value)
       const parts = decoded.split(':')
+      userType = parts[0]
       const adminId = parseInt(parts[1])
-      const role = await getCurrentUserRole(adminId)
 
-      if (!role || !hasPermission(role, 'admins', 'write')) {
-        return NextResponse.json(
-          { success: false, message: 'Only superadmin can create admins' },
-          { status: 403 }
-        )
+      // Extract tenantId if present
+      if (parts.length > 3 && parts[3] && parts[3] !== 'null') {
+        tenantId = parts[3]
+      }
+
+      if (userType === 'tenant') {
+        // Tenant owners allowed
+      } else {
+        const role = await getCurrentUserRole(adminId)
+
+        if (!role || !hasPermission(role, 'admins', 'write')) {
+          return NextResponse.json(
+            { success: false, message: 'Insufficient permissions' },
+            { status: 403 }
+          )
+        }
       }
     } catch (error) {
       return NextResponse.json(
@@ -91,6 +118,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, message: 'Email and password are required' },
         { status: 400 }
+      )
+    }
+
+    // Prevent non-superadmins from creating superadmins
+    if (role === 'superadmin' && userType !== 'superadmin') {
+      return NextResponse.json(
+        { success: false, message: 'Insufficient permissions to create Superadmin' },
+        { status: 403 }
       )
     }
 
@@ -111,7 +146,8 @@ export async function POST(request: NextRequest) {
       password,
       name,
       validRole as 'superadmin' | 'admin' | 'user',
-      roleId ? parseInt(roleId) : undefined
+      roleId ? parseInt(roleId) : undefined,
+      tenantId
     )
 
     return NextResponse.json({
@@ -122,7 +158,8 @@ export async function POST(request: NextRequest) {
         email: admin.email,
         name: admin.name,
         role: admin.role,
-        role_id: admin.role_id
+        role_id: admin.role_id,
+        tenant_id: admin.tenant_id
       }
     })
   } catch (error: any) {
@@ -154,18 +191,26 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Check if user has permission to delete admins (only superadmin)
+    let userType = 'admin'
+
+    // Check if user has permission to delete admins
     try {
       const decoded = decodeBase64(session.value)
       const parts = decoded.split(':')
+      userType = parts[0]
       const adminId = parseInt(parts[1])
-      const role = await getCurrentUserRole(adminId)
 
-      if (!role || !hasPermission(role, 'admins', 'delete')) {
-        return NextResponse.json(
-          { success: false, message: 'Only superadmin can delete admins' },
-          { status: 403 }
-        )
+      if (userType === 'tenant') {
+        // Tenant Owner allowed
+      } else {
+        const role = await getCurrentUserRole(adminId)
+
+        if (!role || !hasPermission(role, 'admins', 'delete')) {
+          return NextResponse.json(
+            { success: false, message: 'Insufficient permissions' },
+            { status: 403 }
+          )
+        }
       }
     } catch (error) {
       return NextResponse.json(
@@ -235,18 +280,26 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Check if user has permission to update admins (only superadmin)
+    let userType = 'admin'
+
+    // Check if user has permission to update admins
     try {
       const decoded = decodeBase64(session.value)
       const parts = decoded.split(':')
+      userType = parts[0]
       const adminId = parseInt(parts[1])
-      const role = await getCurrentUserRole(adminId)
 
-      if (!role || !hasPermission(role, 'admins', 'write')) {
-        return NextResponse.json(
-          { success: false, message: 'Only superadmin can update admin roles' },
-          { status: 403 }
-        )
+      if (userType === 'tenant') {
+        // Tenant owner allowed
+      } else {
+        const role = await getCurrentUserRole(adminId)
+
+        if (!role || !hasPermission(role, 'admins', 'write')) {
+          return NextResponse.json(
+            { success: false, message: 'Insufficient permissions' },
+            { status: 403 }
+          )
+        }
       }
     } catch (error) {
       return NextResponse.json(
@@ -261,6 +314,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         { success: false, message: 'Admin ID and role are required' },
         { status: 400 }
+      )
+    }
+
+    // Prevent setting superadmin if not superadmin
+    if (role === 'superadmin' && userType !== 'superadmin') {
+      return NextResponse.json(
+        { success: false, message: 'Insufficient permissions to assign Superadmin role' },
+        { status: 403 }
       )
     }
 

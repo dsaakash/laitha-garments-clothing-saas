@@ -52,7 +52,7 @@ export default function UsersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       if (editingUser) {
         alert('User editing not yet implemented. Please delete and recreate if needed.')
@@ -73,7 +73,7 @@ export default function UsersPage() {
           return
         }
       }
-      
+
       resetForm()
       await loadUsers()
       setShowModal(false)

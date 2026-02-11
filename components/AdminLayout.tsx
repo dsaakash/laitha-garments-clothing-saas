@@ -53,6 +53,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [businessName, setBusinessName] = useState<string>('Lalitha Garments')
   const [workflowEnabled, setWorkflowEnabled] = useState<boolean>(false)
+  const [tenantModules, setTenantModules] = useState<string[]>([])
 
   // Check trial expiry for tenants
   useTrialCheck()
@@ -110,14 +111,23 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               // Fetch tenant business name and workflow settings if this is a tenant user
               if (data.admin.tenant_id) {
                 console.log('🏢 Fetching tenant info for:', data.admin.tenant_id)
+
+                // Initialize modules from auth check if available
+                if (data.admin.modules) {
+                  console.log('📦 Tenant modules from auth:', data.admin.modules)
+                  setTenantModules(data.admin.modules)
+                }
+
                 fetch(`/api/tenants/${data.admin.tenant_id}`)
                   .then(res => res.json())
                   .then(tenantData => {
                     if (tenantData.success && tenantData.data) {
                       console.log('🏢 Tenant business name:', tenantData.data.businessName)
                       console.log('🔧 Workflow enabled:', tenantData.data.workflowEnabled)
+                      console.log('📦 Tenant modules:', tenantData.data.modules)
                       setBusinessName(tenantData.data.businessName)
                       setWorkflowEnabled(tenantData.data.workflowEnabled || false)
+                      setTenantModules(tenantData.data.modules || [])
                     }
                   })
                   .catch(err => console.error('Error fetching tenant:', err))
@@ -304,37 +314,46 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   // Updated navItems with Lucide icons
-  // Now includes required permissions
-  const navItems = [
-    { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, resource: 'dashboard' },
-    { href: '/admin/tenants', label: 'Tenants', icon: Building2, resource: 'tenants', action: 'manage' }, // Usually superadmin only
-    { href: '/admin/research', label: 'Raw Research', icon: Search, resource: 'research', action: 'read' },
-    { href: '/admin/setup', label: 'Setup Wizard', icon: Rocket, resource: 'dashboard' },
-    { href: '/admin/business', label: 'Business Setup', icon: Settings, resource: 'business' },
-    {
-      href: '/admin/workflow',
-      label: 'Workflow',
-      icon: Sliders,
-      resource: 'workflow',
-      subItems: [
-        { href: '/admin/workflow/visualize', label: 'Overview' },
-        { href: '/admin/workflow/rules', label: 'Configuration' }
-      ]
-    },
-    { href: '/admin/suppliers', label: 'Suppliers', icon: Factory, resource: 'suppliers' },
-    { href: '/admin/categories', label: 'Categories', icon: Tags, resource: 'categories' },
-    { href: '/admin/purchases', label: 'Purchase Orders', icon: ShoppingCart, resource: 'purchases' },
-    { href: '/admin/inventory', label: 'Inventory', icon: Package, resource: 'inventory' },
-    { href: '/admin/customers', label: 'Customers', icon: Users, resource: 'customers' },
-    { href: '/admin/products', label: 'Products', icon: Shirt, resource: 'products' },
-    { href: '/admin/catalogues', label: 'Catalogues', icon: BookOpen, resource: 'catalogues' },
-    { href: '/admin/sales', label: 'Sales', icon: Banknote, resource: 'sales' },
-    { href: '/admin/invoices', label: 'Invoices', icon: FileText, resource: 'invoices' },
-    { href: '/admin/enquiries', label: 'Customer Enquiries', icon: MessageSquare, resource: 'enquiries' },
-    { href: '/admin/admins', label: 'Admin Management', icon: ShieldCheck, resource: 'admins' },
-    { href: '/admin/users', label: 'User Management', icon: UserCog, resource: 'users' },
-    { href: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, resource: 'roles' }, // New Item
-  ]
+  // Now includes required permissions and subscription modules
+  const navItems: {
+    href: string;
+    label: string;
+    icon: any;
+    resource?: string;
+    action?: string;
+    module?: string;
+    subItems?: { href: string; label: string }[];
+  }[] = [
+      { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, resource: 'dashboard' },
+      { href: '/admin/tenants', label: 'Tenants', icon: Building2, resource: 'tenants', action: 'manage' }, // Usually superadmin only
+      { href: '/admin/research', label: 'Raw Research', icon: Search, resource: 'research', action: 'read', module: 'research' },
+      { href: '/admin/setup', label: 'Setup Wizard', icon: Rocket, resource: 'dashboard', module: 'setup' },
+      { href: '/admin/business', label: 'Business Setup', icon: Settings, resource: 'business', module: 'business' },
+      {
+        href: '/admin/workflow',
+        label: 'Workflow',
+        icon: Sliders,
+        resource: 'workflow',
+        module: 'workflow',
+        subItems: [
+          { href: '/admin/workflow/visualize', label: 'Overview' },
+          { href: '/admin/workflow/rules', label: 'Configuration' }
+        ]
+      },
+      { href: '/admin/suppliers', label: 'Suppliers', icon: Factory, resource: 'suppliers', module: 'suppliers' },
+      { href: '/admin/categories', label: 'Categories', icon: Tags, resource: 'categories', module: 'inventory' },
+      { href: '/admin/purchases', label: 'Purchase Orders', icon: ShoppingCart, resource: 'purchases', module: 'purchases' },
+      { href: '/admin/inventory', label: 'Inventory', icon: Package, resource: 'inventory', module: 'inventory' },
+      { href: '/admin/customers', label: 'Customers', icon: Users, resource: 'customers', module: 'customers' },
+      { href: '/admin/products', label: 'Products', icon: Shirt, resource: 'products', module: 'inventory' },
+      { href: '/admin/catalogues', label: 'Catalogues', icon: BookOpen, resource: 'catalogues', module: 'inventory' },
+      { href: '/admin/sales', label: 'Sales', icon: Banknote, resource: 'sales', module: 'sales' },
+      { href: '/admin/invoices', label: 'Invoices', icon: FileText, resource: 'invoices', module: 'invoices' },
+      { href: '/admin/enquiries', label: 'Customer Enquiries', icon: MessageSquare, resource: 'enquiries', module: 'enquiries' },
+      { href: '/admin/admins', label: 'Admin Management', icon: ShieldCheck, resource: 'admins', module: 'admins' },
+      { href: '/admin/users', label: 'User Management', icon: UserCog, resource: 'users', module: 'users' },
+      { href: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, resource: 'roles', module: 'roles' }, // New Item
+    ]
 
   // Filter nav items based on user role and permissions
   const filteredNavItems = (() => {
@@ -361,13 +380,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       return navItems.filter(item => ['/admin/products', '/admin/catalogues'].includes(item.href))
     }
 
-    // For tenants, conditionally show workflow based on workflowEnabled flag
+    // For tenants, conditionally show items based on enabled modules and subscription
     if (userRole === 'admin') {
       items = items.filter(item => {
-        // If it's the workflow item, only show if workflow is enabled
-        if (item.href === '/admin/workflow') {
-          return workflowEnabled
+        // Explicitly hide Tenants list from non-superadmins
+        if (item.href === '/admin/tenants') {
+          return false
         }
+
+        // If the item belongs to a specific module, check if that module is enabled for this tenant
+        if (item.module && !tenantModules.includes(item.module)) {
+          return false
+        }
+
+        // Use workflowEnabled flag as fallback for workflow specifically (legacy support)
+        if (item.module === 'workflow' && !workflowEnabled && !tenantModules.includes('workflow')) {
+          return false
+        }
+
         return true
       })
     }

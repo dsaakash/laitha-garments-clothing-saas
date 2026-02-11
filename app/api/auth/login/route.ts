@@ -31,32 +31,53 @@ export async function POST(request: NextRequest) {
     // Check credentials based on selected tab
     switch (loginType) {
       case 'business':
-        // Check tenants table
+        // Check tenants table (Owners)
         console.log('🏢 Checking business credentials for:', email)
         const tenant = await verifyTenant(email, password)
-        console.log('🏢 Tenant found:', tenant ? `Yes (ID: ${tenant.id})` : 'No')
+        console.log('🏢 Tenant owner found:', tenant ? `Yes (ID: ${tenant.id})` : 'No')
+
         if (tenant) {
           authenticated = true
           userData = {
-            id: 0, // Tenant admins don't have numeric IDs
+            id: 0, // Tenant owners don't have numeric IDs in admins table
             name: tenant.owner_name,
             email: tenant.owner_email,
             role: 'admin'
           }
           tenantId = tenant.id
           userType = 'tenant'
+        } else {
+          // Check admins table (Tenant Sub-admins)
+          console.log('🏢 Checking sub-admin credentials for:', email)
+          const subAdmin = await verifyAdmin(email, password)
+          if (subAdmin && subAdmin.tenant_id) {
+            console.log('🏢 Sub-admin found for tenant:', subAdmin.tenant_id)
+            authenticated = true
+            userData = subAdmin
+            tenantId = subAdmin.tenant_id
+            userType = 'admin' // Tenant sub-admins use 'admin' type
+          }
         }
         break
 
       case 'admin':
-        // Check admin table (super admin from database)
+        // Check admin table (Super admins only)
         console.log('👑 Checking admin credentials for:', email)
         const admin = await verifyAdmin(email, password)
         console.log('👑 Admin found:', admin ? 'Yes' : 'No')
-        if (admin) {
+
+        // Super admins have no tenant_id
+        if (admin && !admin.tenant_id) {
           authenticated = true
           userData = admin
           userType = 'superadmin'
+        } else if (admin && admin.tenant_id) {
+          console.log('⚠️ Sub-admin tried to login via Superadmin tab')
+          // Force them to use Business tab
+          return NextResponse.json(
+            { success: false, message: 'Please use the Business tab to login' },
+            { status: 401 }
+          )
         }
         break
 
