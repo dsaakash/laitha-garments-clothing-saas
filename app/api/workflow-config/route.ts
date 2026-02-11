@@ -1,66 +1,109 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { customFieldsStorage, CustomField, EntityType } from '@/lib/customFieldsStorage'
+import { query } from '@/lib/db'
+import { getCurrentUserRole, hasPermission } from '@/lib/rbac'
+import { decodeBase64 } from '@/lib/utils'
 
-// GET /api/custom-fields?entityType=inventory
+// Get all workflows
 export async function GET(request: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url)
-        const entityType = searchParams.get('entityType') as EntityType | null
+        const session = request.cookies.get('admin_session')
+        if (!session) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
 
-        const fields = customFieldsStorage.getCustomFields(entityType || undefined)
+        // Check permission
+        try {
+            const decoded = decodeBase64(session.value)
+            const adminId = parseInt(decoded.split(':')[1])
+            const role = await getCurrentUserRole(adminId)
 
-        return NextResponse.json({
-            success: true,
-            data: fields.sort((a, b) => a.displayOrder - b.displayOrder)
-        })
-    } catch (error) {
-        console.error('Error fetching custom fields:', error)
-        return NextResponse.json(
-            { success: false, message: 'Failed to fetch custom fields' },
-            { status: 500 }
+            if (!role || !hasPermission(role, 'workflow', 'read')) {
+                return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
+            }
+        } catch (e) {
+            return NextResponse.json({ success: false, message: 'Invalid session' }, { status: 401 })
+        }
+
+        const result = await query(
+            `SELECT w.*, r.name as approver_role_name 
+       FROM workflows w
+       LEFT JOIN roles r ON w.approver_role_id = r.id
+       ORDER BY w.created_at DESC`
         )
+
+        return NextResponse.json({ success: true, workflows: result.rows })
+    } catch (error) {
+        console.error('Get workflows error:', error)
+        return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 })
     }
 }
 
-// POST /api/custom-fields
+// Create new workflow rule
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
+        const session = request.cookies.get('admin_session')
+        if (!session) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
 
-        // Validate required fields
-        if (!body.entityType || !body.fieldName || !body.fieldType) {
-            return NextResponse.json(
-                { success: false, message: 'Missing required fields: entityType, fieldName, fieldType' },
-                { status: 400 }
-            )
+        // Check permission
+        try {
+            const decoded = decodeBase64(session.value)
+            const adminId = parseInt(decoded.split(':')[1])
+            const role = await getCurrentUserRole(adminId)
+
+            if (!role || !hasPermission(role, 'workflow', 'write')) {
+                return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
+            }
+        } catch (e) {
+            return NextResponse.json({ success: false, message: 'Invalid session' }, { status: 401 })
         }
 
-        // Get existing fields for this entity to determine display order
-        const existingFields = customFieldsStorage.getCustomFields(body.entityType)
-        const maxOrder = existingFields.reduce((max, field) => Math.max(max, field.displayOrder), -1)
+        const { module, trigger_type, trigger_value, action, approver_role_id } = await request.json()
 
-        const newField = customFieldsStorage.addCustomField({
-            entityType: body.entityType,
-            fieldName: body.fieldName,
-            fieldKey: body.fieldKey || '', // Will be auto-generated
-            fieldType: body.fieldType,
-            options: body.options,
-            required: body.required || false,
-            defaultValue: body.defaultValue,
-            placeholder: body.placeholder,
-            helpText: body.helpText,
-            displayOrder: maxOrder + 1
-        })
+        if (!module || !trigger_type || !action || !approver_role_id) {
+            return NextResponse.json({ success: false, message: 'Missing required fields' }, { status: 400 })
+        }
 
-        return NextResponse.json({
-            success: true,
-            data: newField
-        })
-    } catch (error) {
-        console.error('Error creating custom field:', error)
-        return NextResponse.json(
-            { success: false, message: 'Failed to create custom field' },
-            { status: 500 }
+        const result = await query(
+            `INSERT INTO workflows (module, trigger_type, trigger_value, action, approver_role_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+            [module, trigger_type, trigger_value || null, action, approver_role_id]
         )
+
+        return NextResponse.json({ success: true, workflow: result.rows[0] })
+    } catch (error) {
+        console.error('Create workflow error:', error)
+        return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 })
+    }
+}
+
+// Delete workflow rule
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = request.cookies.get('admin_session')
+        if (!session) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+
+        // Check permission
+        try {
+            const decoded = decodeBase64(session.value)
+            const adminId = parseInt(decoded.split(':')[1])
+            const role = await getCurrentUserRole(adminId)
+
+            if (!role || !hasPermission(role, 'workflow', 'delete')) {
+                return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
+            }
+        } catch (e) {
+            return NextResponse.json({ success: false, message: 'Invalid session' }, { status: 401 })
+        }
+
+        const { searchParams } = new URL(request.url)
+        const id = searchParams.get('id')
+
+        if (!id) return NextResponse.json({ success: false, message: 'ID required' }, { status: 400 })
+
+        await query('DELETE FROM workflows WHERE id = $1', [id])
+
+        return NextResponse.json({ success: true, message: 'Workflow deleted' })
+    } catch (error) {
+        console.error('Delete workflow error:', error)
+        return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 })
     }
 }

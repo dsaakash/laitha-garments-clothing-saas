@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { email, password, name, role } = await request.json()
+    const { email, password, name, role, roleId } = await request.json()
 
     if (!email || !password) {
       return NextResponse.json(
@@ -106,7 +106,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const admin = await createAdmin(email, password, name, validRole as 'superadmin' | 'admin' | 'user')
+    const admin = await createAdmin(
+      email,
+      password,
+      name,
+      validRole as 'superadmin' | 'admin' | 'user',
+      roleId ? parseInt(roleId) : undefined
+    )
 
     return NextResponse.json({
       success: true,
@@ -115,7 +121,8 @@ export async function POST(request: NextRequest) {
         id: admin.id,
         email: admin.email,
         name: admin.name,
-        role: admin.role
+        role: admin.role,
+        role_id: admin.role_id
       }
     })
   } catch (error: any) {
@@ -248,7 +255,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const { id, role } = await request.json()
+    const { id, role, roleId } = await request.json()
 
     if (!id || !role) {
       return NextResponse.json(
@@ -264,7 +271,11 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const updated = await updateAdminRole(parseInt(id), role as 'superadmin' | 'admin' | 'user')
+    const updated = await updateAdminRole(
+      parseInt(id),
+      role as 'superadmin' | 'admin' | 'user',
+      roleId ? parseInt(roleId) : undefined
+    )
 
     if (updated) {
       return NextResponse.json({

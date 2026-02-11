@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getTenantContext, buildTenantFilter } from '@/lib/tenant-context'
+import { checkWorkflow, createApprovalRequest } from '@/lib/workflow-engine'
+import { decodeBase64 } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +31,8 @@ export async function GET(request: NextRequest) {
         po.transport_charges,
         po.transport_details,
         po.created_at,
+        po.status,
+        po.rejection_reason,
         po.product_name,
         po.product_image,
         po.sizes,
@@ -81,7 +85,8 @@ export async function GET(request: NextRequest) {
 
     ordersQuery += ` GROUP BY po.id, po.date, po.supplier_id, po.supplier_name, po.custom_po_number, 
       po.invoice_image, po.subtotal, po.gst_amount, po.grand_total, po.gst_type, po.gst_percentage, po.gst_amount_rupees,
-      po.notes, po.transport_charges, po.transport_details, po.created_at, po.product_name, po.product_image, po.sizes, po.fabric_type, po.quantity, po.price_per_piece, po.total_amount
+      po.notes, po.transport_charges, po.transport_details, po.created_at, po.status, po.rejection_reason, 
+      po.product_name, po.product_image, po.sizes, po.fabric_type, po.quantity, po.price_per_piece, po.total_amount
       ORDER BY po.date DESC, po.created_at DESC`
 
     const result = await query(ordersQuery, params)
@@ -164,6 +169,8 @@ export async function GET(request: NextRequest) {
         invoiceDate: transportDetails?.invoiceDate || '',
         contactPersons: transportDetails?.contactPersons || [],
         notes: row.notes || '',
+        status: row.status || 'open',
+        rejectionReason: row.rejection_reason || '',
         createdAt: row.created_at.toISOString(),
         // Legacy fields for backward compatibility
         productName: row.product_name,
@@ -252,6 +259,29 @@ export async function POST(request: NextRequest) {
     const transportCharges = parseFloat(body.transportCharges) || 0
     const grandTotal = subtotal + gstAmount + transportCharges
 
+    // Check for Workflows
+    let poStatus = 'open'
+    let workflowRule = null
+
+    // Attempt to invoke workflow check
+    try {
+      // Need requester info, try to get from session
+      const session = request.cookies.get('admin_session')
+      if (session) {
+        // Just checking context - if session exists, we can extract details if needed for logging
+        // But checkWorkflow mainly needs module and data amount
+        workflowRule = await checkWorkflow('purchases', { ...body, total_amount: grandTotal }, tenantId || undefined)
+
+        if (workflowRule) {
+          poStatus = 'pending_approval'
+          console.log(`Workflow triggered: ${workflowRule.trigger_type} ${workflowRule.trigger_value}`)
+        }
+      }
+    } catch (wfError) {
+      console.error('Workflow check failed:', wfError)
+      // Fallback to open if check fails, to not block business
+    }
+
     // Prepare transport details JSONB
     const transportDetails: any = {}
     if (body.logisticsName) transportDetails.logisticsName = body.logisticsName
@@ -275,12 +305,49 @@ export async function POST(request: NextRequest) {
     // Insert purchase order with tenant_id (if column exists)
     let insertQuery: string
     let insertParams: any[]
-    
+
+    // Now inserting status as well
     if (hasTenantIdColumn) {
       insertQuery = `INSERT INTO purchase_orders 
        (date, supplier_id, supplier_name, custom_po_number, invoice_image,
         subtotal, gst_amount, grand_total, gst_type, gst_percentage, gst_amount_rupees, notes,
-        transport_charges, transport_details, tenant_id,
+        transport_charges, transport_details, tenant_id, status,
+        -- Legacy fields for backward compatibility
+        product_name, product_image, sizes, fabric_type, quantity, price_per_piece, total_amount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+       RETURNING *`
+      insertParams = [
+        body.date,
+        body.supplierId ? parseInt(body.supplierId) : null,
+        body.supplierName,
+        body.customPoNumber || null,
+        body.invoiceImage || null,
+        subtotal,
+        gstAmount,
+        grandTotal,
+        gstType,
+        gstPercentage || null,
+        gstAmountRupees || null,
+        body.notes || null,
+        transportCharges,
+        Object.keys(transportDetails).length > 0 ? JSON.stringify(transportDetails) : null,
+        tenantId,
+        poStatus, // New Status
+        // Legacy fields - use first item or empty
+        items.length > 0 ? items[0].productName : '',
+        items.length > 0 && items[0].productImages?.length > 0 ? items[0].productImages[0] : null,
+        items.length > 0 ? items[0].sizes : [],
+        items.length > 0 ? items[0].fabricType : null,
+        items.length > 0 ? items[0].quantity : 0,
+        items.length > 0 ? items[0].pricePerPiece : 0,
+        grandTotal,
+      ]
+    } else {
+      // Fallback if tenant_id missing, but status is present due to our migration
+      insertQuery = `INSERT INTO purchase_orders 
+       (date, supplier_id, supplier_name, custom_po_number, invoice_image,
+        subtotal, gst_amount, grand_total, gst_type, gst_percentage, gst_amount_rupees, notes,
+        transport_charges, transport_details, status,
         -- Legacy fields for backward compatibility
         product_name, product_image, sizes, fabric_type, quantity, price_per_piece, total_amount)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
@@ -300,40 +367,7 @@ export async function POST(request: NextRequest) {
         body.notes || null,
         transportCharges,
         Object.keys(transportDetails).length > 0 ? JSON.stringify(transportDetails) : null,
-        tenantId,
-        // Legacy fields - use first item or empty
-        items.length > 0 ? items[0].productName : '',
-        items.length > 0 && items[0].productImages?.length > 0 ? items[0].productImages[0] : null,
-        items.length > 0 ? items[0].sizes : [],
-        items.length > 0 ? items[0].fabricType : null,
-        items.length > 0 ? items[0].quantity : 0,
-        items.length > 0 ? items[0].pricePerPiece : 0,
-        grandTotal,
-      ]
-    } else {
-      insertQuery = `INSERT INTO purchase_orders 
-       (date, supplier_id, supplier_name, custom_po_number, invoice_image,
-        subtotal, gst_amount, grand_total, gst_type, gst_percentage, gst_amount_rupees, notes,
-        transport_charges, transport_details,
-        -- Legacy fields for backward compatibility
-        product_name, product_image, sizes, fabric_type, quantity, price_per_piece, total_amount)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-       RETURNING *`
-      insertParams = [
-        body.date,
-        body.supplierId ? parseInt(body.supplierId) : null,
-        body.supplierName,
-        body.customPoNumber || null,
-        body.invoiceImage || null,
-        subtotal,
-        gstAmount,
-        grandTotal,
-        gstType,
-        gstPercentage || null,
-        gstAmountRupees || null,
-        body.notes || null,
-        transportCharges,
-        Object.keys(transportDetails).length > 0 ? JSON.stringify(transportDetails) : null,
+        poStatus, // New Status
         // Legacy fields - use first item or empty
         items.length > 0 ? items[0].productName : '',
         items.length > 0 && items[0].productImages?.length > 0 ? items[0].productImages[0] : null,
@@ -344,7 +378,7 @@ export async function POST(request: NextRequest) {
         grandTotal,
       ]
     }
-    
+
     const result = await query(insertQuery, insertParams)
 
     const order = result.rows[0]
@@ -370,141 +404,166 @@ export async function POST(request: NextRequest) {
         ]
       )
 
-      // Auto-add to inventory
-      // Normalize product name: trim, remove extra spaces, standardize
-      const normalizedProductName = item.productName.trim().replace(/\s+/g, ' ')
-      const dressCode = `${normalizedProductName}_${item.fabricType || 'standard'}`.replace(/\s+/g, '_').toUpperCase()
+      // Only update inventory if status is 'open' (or 'approved')
+      if (poStatus === 'open') {
+        // Auto-add to inventory
+        // Normalize product name: trim, remove extra spaces, standardize
+        const normalizedProductName = item.productName.trim().replace(/\s+/g, ' ')
+        const dressCode = `${normalizedProductName}_${item.fabricType || 'standard'}`.replace(/\s+/g, '_').toUpperCase()
 
-      // Try exact match first (by dress_code) - with tenant filtering
-      let existingInventoryQuery = 'SELECT * FROM inventory WHERE dress_code = $1'
-      const inventoryParams: any[] = [dressCode]
-      
-      // Add tenant filter
-      if (tenantId) {
-        existingInventoryQuery += ' AND tenant_id = $2'
-        inventoryParams.push(tenantId)
-      } else {
-        existingInventoryQuery += ' AND tenant_id IS NULL'
-      }
-      
-      let existingInventory = await query(existingInventoryQuery, inventoryParams)
+        // Try exact match first (by dress_code) - with tenant filtering
+        let existingInventoryQuery = 'SELECT * FROM inventory WHERE dress_code = $1'
+        const inventoryParams: any[] = [dressCode]
 
-      // If no exact match, try normalized name match (normalize spaces in database too) - with tenant filtering
-      if (existingInventory.rows.length === 0) {
-        const normalizedNameLower = normalizedProductName.toLowerCase()
-        let nameMatchQuery = `SELECT * FROM inventory 
-           WHERE LOWER(TRIM(REPLACE(dress_name, '  ', ' '))) = $1
-           AND (fabric_type = $2 OR (fabric_type IS NULL AND $2 = 'standard'))`
-        const nameParams: any[] = [normalizedNameLower, item.fabricType || 'standard']
-        
+        // Add tenant filter
         if (tenantId) {
-          nameMatchQuery += ' AND tenant_id = $3'
-          nameParams.push(tenantId)
+          existingInventoryQuery += ' AND tenant_id = $2'
+          inventoryParams.push(tenantId)
         } else {
-          nameMatchQuery += ' AND tenant_id IS NULL'
+          existingInventoryQuery += ' AND tenant_id IS NULL'
         }
-        nameMatchQuery += ' LIMIT 1'
-        
-        existingInventory = await query(nameMatchQuery, nameParams)
-      }
 
-      // If still no match, try partial match on dress_code - with tenant filtering
-      if (existingInventory.rows.length === 0) {
-        const searchPattern = `%${normalizedProductName.replace(/\s+/g, '_').toUpperCase()}%`
-        let partialMatchQuery = `SELECT * FROM inventory 
-           WHERE LOWER(dress_code) LIKE LOWER($1)`
-        const partialParams: any[] = [searchPattern]
-        
-        if (tenantId) {
-          partialMatchQuery += ' AND tenant_id = $2'
-          partialParams.push(tenantId)
+        let existingInventory = await query(existingInventoryQuery, inventoryParams)
+
+        // If no exact match, try normalized name match (normalize spaces in database too) - with tenant filtering
+        if (existingInventory.rows.length === 0) {
+          const normalizedNameLower = normalizedProductName.toLowerCase()
+          let nameMatchQuery = `SELECT * FROM inventory 
+             WHERE LOWER(TRIM(REPLACE(dress_name, '  ', ' '))) = $1
+             AND (fabric_type = $2 OR (fabric_type IS NULL AND $2 = 'standard'))`
+          const nameParams: any[] = [normalizedNameLower, item.fabricType || 'standard']
+
+          if (tenantId) {
+            nameMatchQuery += ' AND tenant_id = $3'
+            nameParams.push(tenantId)
+          } else {
+            nameMatchQuery += ' AND tenant_id IS NULL'
+          }
+          nameMatchQuery += ' LIMIT 1'
+
+          existingInventory = await query(nameMatchQuery, nameParams)
+        }
+
+        // If still no match, try partial match on dress_code - with tenant filtering
+        if (existingInventory.rows.length === 0) {
+          const searchPattern = `%${normalizedProductName.replace(/\s+/g, '_').toUpperCase()}%`
+          let partialMatchQuery = `SELECT * FROM inventory 
+             WHERE LOWER(dress_code) LIKE LOWER($1)`
+          const partialParams: any[] = [searchPattern]
+
+          if (tenantId) {
+            partialMatchQuery += ' AND tenant_id = $2'
+            partialParams.push(tenantId)
+          } else {
+            partialMatchQuery += ' AND tenant_id IS NULL'
+          }
+          partialMatchQuery += ' LIMIT 1'
+
+          existingInventory = await query(partialMatchQuery, partialParams)
+        }
+
+        if (existingInventory.rows.length > 0) {
+          const existing = existingInventory.rows[0]
+          const existingSizes = existing.sizes || []
+          const newSizes = item.sizes || []
+          const mergedSizes = Array.from(new Set([...existingSizes, ...newSizes]))
+
+          // Update stock: increase quantity_in and current_stock by the exact purchase order quantity
+          const purchaseQuantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : (item.quantity || 0)
+          const currentQuantityIn = parseInt(existing.quantity_in) || 0
+          const currentQuantityOut = parseInt(existing.quantity_out) || 0
+          const currentStock = parseInt(existing.current_stock) || 0
+          const newQuantityIn = currentQuantityIn + purchaseQuantity
+          // Maintain relationship: current_stock = quantity_in - quantity_out
+          const newCurrentStock = newQuantityIn - currentQuantityOut
+
+          // Validate: quantity_in should never be negative
+          if (newQuantityIn < 0) {
+            console.error(`❌ Invalid stock update for ${item.productName}: quantity_in would be negative (${newQuantityIn}). Skipping.`)
+            continue
+          }
+
+          console.log(`📦 Updating stock for ${item.productName}: Adding ${purchaseQuantity} units (Current: ${currentStock} → New: ${newCurrentStock})`)
+
+          // Update dress_code if it doesn't match (normalize it)
+          const updateDressCode = existing.dress_code !== dressCode ? dressCode : existing.dress_code
+
+          await query(
+            `UPDATE inventory 
+             SET sizes = $1, 
+                 dress_code = $2,
+                 dress_type = COALESCE($3, dress_type),
+                 wholesale_price = $4, selling_price = $5,
+                 fabric_type = COALESCE($6, fabric_type),
+                 supplier_name = COALESCE($7, supplier_name),
+                 quantity_in = $8,
+                 current_stock = $9,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $10`,
+            [
+              mergedSizes,
+              updateDressCode,
+              item.category || existing.dress_type, // Sync category to dress_type
+              item.pricePerPiece,
+              (parseFloat(item.pricePerPiece) * 2).toFixed(2),
+              item.fabricType,
+              body.supplierName,
+              newQuantityIn,
+              newCurrentStock,
+              existing.id,
+            ]
+          )
         } else {
-          partialMatchQuery += ' AND tenant_id IS NULL'
+          // New inventory item - set initial stock to the exact purchase order quantity
+          const purchaseQuantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : (item.quantity || 0)
+          // For new items, quantity_out starts at 0, so current_stock = quantity_in
+          console.log(`📦 Creating new inventory item ${item.productName} with initial stock: ${purchaseQuantity}`)
+
+          await query(
+            `INSERT INTO inventory 
+             (dress_name, dress_type, dress_code, sizes, wholesale_price, selling_price,
+              image_url, fabric_type, supplier_name, quantity_in, quantity_out, current_stock, tenant_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [
+              normalizedProductName, // Use normalized name
+              item.category || 'Custom',
+              dressCode,
+              item.sizes || [],
+              item.pricePerPiece,
+              (parseFloat(item.pricePerPiece) * 2).toFixed(2),
+              item.productImages && item.productImages.length > 0 ? item.productImages[0] : null,
+              item.fabricType,
+              body.supplierName,
+              purchaseQuantity, // quantity_in = purchase order quantity
+              0, // quantity_out starts at 0
+              purchaseQuantity, // current_stock = quantity_in - quantity_out = purchaseQuantity - 0
+              tenantId // Add tenant_id for tenant isolation
+            ]
+          )
         }
-        partialMatchQuery += ' LIMIT 1'
-        
-        existingInventory = await query(partialMatchQuery, partialParams)
-      }
+      } // End if status === 'open'
+    }
 
-      if (existingInventory.rows.length > 0) {
-        const existing = existingInventory.rows[0]
-        const existingSizes = existing.sizes || []
-        const newSizes = item.sizes || []
-        const mergedSizes = Array.from(new Set([...existingSizes, ...newSizes]))
-
-        // Update stock: increase quantity_in and current_stock by the exact purchase order quantity
-        const purchaseQuantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : (item.quantity || 0)
-        const currentQuantityIn = parseInt(existing.quantity_in) || 0
-        const currentQuantityOut = parseInt(existing.quantity_out) || 0
-        const currentStock = parseInt(existing.current_stock) || 0
-        const newQuantityIn = currentQuantityIn + purchaseQuantity
-        // Maintain relationship: current_stock = quantity_in - quantity_out
-        const newCurrentStock = newQuantityIn - currentQuantityOut
-
-        // Validate: quantity_in should never be negative
-        if (newQuantityIn < 0) {
-          console.error(`❌ Invalid stock update for ${item.productName}: quantity_in would be negative (${newQuantityIn}). Skipping.`)
-          continue
+    // Capture approval request if needed
+    if (poStatus === 'pending_approval' && workflowRule) {
+      // Need requesterId
+      let requesterId = 0
+      try {
+        const session = request.cookies.get('admin_session')
+        if (session) {
+          const decoded = decodeBase64(session.value)
+          requesterId = parseInt(decoded.split(':')[1])
         }
+      } catch (e) { }
 
-        console.log(`📦 Updating stock for ${item.productName}: Adding ${purchaseQuantity} units (Current: ${currentStock} → New: ${newCurrentStock})`)
-
-        // Update dress_code if it doesn't match (normalize it)
-        const updateDressCode = existing.dress_code !== dressCode ? dressCode : existing.dress_code
-
-        await query(
-          `UPDATE inventory 
-           SET sizes = $1, 
-               dress_code = $2,
-               dress_type = COALESCE($3, dress_type),
-               wholesale_price = $4, selling_price = $5,
-               fabric_type = COALESCE($6, fabric_type),
-               supplier_name = COALESCE($7, supplier_name),
-               quantity_in = $8,
-               current_stock = $9,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $10`,
-          [
-            mergedSizes,
-            updateDressCode,
-            item.category || existing.dress_type, // Sync category to dress_type
-            item.pricePerPiece,
-            (parseFloat(item.pricePerPiece) * 2).toFixed(2),
-            item.fabricType,
-            body.supplierName,
-            newQuantityIn,
-            newCurrentStock,
-            existing.id,
-          ]
-        )
-      } else {
-        // New inventory item - set initial stock to the exact purchase order quantity
-        const purchaseQuantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : (item.quantity || 0)
-        // For new items, quantity_out starts at 0, so current_stock = quantity_in
-        console.log(`📦 Creating new inventory item ${item.productName} with initial stock: ${purchaseQuantity}`)
-
-        await query(
-          `INSERT INTO inventory 
-           (dress_name, dress_type, dress_code, sizes, wholesale_price, selling_price,
-            image_url, fabric_type, supplier_name, quantity_in, quantity_out, current_stock, tenant_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [
-            normalizedProductName, // Use normalized name
-            item.category || 'Custom',
-            dressCode,
-            item.sizes || [],
-            item.pricePerPiece,
-            (parseFloat(item.pricePerPiece) * 2).toFixed(2),
-            item.productImages && item.productImages.length > 0 ? item.productImages[0] : null,
-            item.fabricType,
-            body.supplierName,
-            purchaseQuantity, // quantity_in = purchase order quantity
-            0, // quantity_out starts at 0
-            purchaseQuantity, // current_stock = quantity_in - quantity_out = purchaseQuantity - 0
-            tenantId // Add tenant_id for tenant isolation
-          ]
-        )
-      }
+      await createApprovalRequest(
+        workflowRule.id,
+        'purchase_order',
+        orderId,
+        requesterId, // Will be 0 if extraction failed
+        workflowRule.approver_role_id,
+        tenantId || undefined
+      )
     }
 
     // Fetch the complete order with items
@@ -572,8 +631,13 @@ export async function POST(request: NextRequest) {
         invoiceDate: newOrder.transport_details?.invoiceDate || '',
         contactPersons: newOrder.transport_details?.contactPersons || [],
         notes: newOrder.notes || '',
+        status: newOrder.status || 'open',
         createdAt: newOrder.created_at.toISOString(),
-      }
+      },
+      approval: poStatus === 'pending_approval' ? {
+        required: true,
+        message: 'This Purchase Order requires approval'
+      } : undefined
     })
   } catch (error) {
     console.error('Purchase order add error:', error)

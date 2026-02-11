@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get tenant context
     const context = getTenantContext(request)
-    
+
     // Check if tenant_id column exists, if not, use old behavior (no tenant filtering)
     let tenantFilter
     try {
@@ -66,12 +66,21 @@ export async function PUT(request: NextRequest) {
 
     // Get tenant context
     const context = getTenantContext(request)
-    
+
+    // Safety Check: Only Superadmin and Tenant Owners can update business profile
+    // Regular "users" (employees) should not update global business settings
+    if (context.isUser) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized: Only admins can update business settings' },
+        { status: 403 }
+      )
+    }
+
     // Check if tenant_id column exists
     let hasTenantIdColumn = false
     let tenantFilter
     let tenantId = null
-    
+
     try {
       // Try to check if column exists
       await query('SELECT tenant_id FROM business_profile LIMIT 1')
@@ -131,7 +140,7 @@ export async function PUT(request: NextRequest) {
       // Insert new profile with tenant_id (if column exists)
       let insertQuery: string
       let insertParams: any[]
-      
+
       if (hasTenantIdColumn) {
         insertQuery = `INSERT INTO business_profile 
          (business_name, owner_name, email, phone, address, gst_number, whatsapp_number, tenant_id)
@@ -163,7 +172,7 @@ export async function PUT(request: NextRequest) {
           body.whatsappNumber
         ]
       }
-      
+
       const result = await query(insertQuery, insertParams)
 
       const profile = result.rows[0]

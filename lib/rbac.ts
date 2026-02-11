@@ -1,61 +1,26 @@
 import { getAdminById } from './db-auth'
+import { hasPermission as dbHasPermission, Role as DBRole, Permission } from './rbac-db'
 
-export type Role = 'superadmin' | 'admin' | 'user'
+// Re-export types for compatibility
+export type Role = DBRole
+export type { Permission }
 
-export interface Permission {
-  resource: string
-  action: 'read' | 'write' | 'delete' | 'manage'
-}
+// Deprecated hardcoded permissions map, keeping for reference if needed but logic is now DB driven
+const rolePermissions = {}
 
-// Define role-based permissions
-const rolePermissions: Record<Role, Permission[]> = {
-  superadmin: [
-    { resource: '*', action: 'manage' }, // Full access to everything
-  ],
-  admin: [
-    { resource: 'dashboard', action: 'read' },
-    { resource: 'suppliers', action: 'write' },
-    { resource: 'purchases', action: 'write' },
-    { resource: 'inventory', action: 'write' },
-    { resource: 'customers', action: 'write' },
-    { resource: 'catalogues', action: 'write' },
-    { resource: 'sales', action: 'write' },
-    { resource: 'invoices', action: 'write' },
-    { resource: 'business', action: 'write' },
-    { resource: 'admins', action: 'read' }, // Can view but not manage
-    { resource: 'users', action: 'read' }, // Can view but not manage
-  ],
-  user: [
-    { resource: 'catalogues', action: 'read' }, // Can only view catalogues
-    { resource: 'products', action: 'read' }, // Can view products in catalogues
-  ],
-}
-
+/**
+ * Check if a role has the required permission
+ * @param role The full Role object from the database
+ * @param resource The resource to access (e.g. 'inventory')
+ * @param action The action to perform ('read', 'write', 'delete', 'manage')
+ */
 export function hasPermission(role: Role, resource: string, action: Permission['action']): boolean {
-  const permissions = rolePermissions[role] || []
-  
-  // Check for wildcard permission (superadmin)
-  if (permissions.some(p => p.resource === '*' && p.action === 'manage')) {
-    return true
-  }
-  
-  // Check for specific resource permission
-  const resourcePermission = permissions.find(p => p.resource === resource)
-  if (!resourcePermission) {
-    return false
-  }
-  
-  // Check action level
-  const actionHierarchy: Record<Permission['action'], number> = {
-    read: 1,
-    write: 2,
-    delete: 3,
-    manage: 4,
-  }
-  
-  return actionHierarchy[resourcePermission.action] >= actionHierarchy[action]
+  return dbHasPermission(role, resource, action)
 }
 
+/**
+ * Check if a role can access a specific frontend route
+ */
 export function canAccessRoute(role: Role, route: string): boolean {
   // Map routes to resources
   const routeMap: Record<string, string> = {
@@ -70,19 +35,34 @@ export function canAccessRoute(role: Role, route: string): boolean {
     '/admin/business': 'business',
     '/admin/admins': 'admins',
     '/admin/users': 'users',
+    '/admin/roles': 'roles',
     '/admin/setup': 'dashboard', // Setup wizard requires dashboard access
   }
-  
+
   const resource = routeMap[route] || route
   return hasPermission(role, resource, 'read')
 }
 
+/**
+ * Get the current user's role from the database
+ * Returns the full Role object instead of just a string
+ */
 export async function getCurrentUserRole(adminId: number): Promise<Role | null> {
   try {
-    const admin = await getAdminById(adminId)
-    return admin?.role || null
+    const admin = await getAdminById(adminId) as any
+    // getAdminById now returns joined role details (name, permissions)
+    // We construct the Role object from that
+    if (!admin || !admin.role_id) return null
+
+    return {
+      id: admin.role_id,
+      name: admin.role_name,
+      tenant_id: admin.tenant_id,
+      permissions: admin.role_permissions,
+    }
   } catch (error) {
     console.error('Error getting user role:', error)
     return null
   }
 }
+

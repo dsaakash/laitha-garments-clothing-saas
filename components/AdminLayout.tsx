@@ -48,6 +48,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return false
   })
   const [userRole, setUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
+  const [userPermissions, setUserPermissions] = useState<Record<string, string[]>>({})
   const [userName, setUserName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [businessName, setBusinessName] = useState<string>('Lalitha Garments')
@@ -94,12 +95,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               console.log('✅ Setting user role to:', role)
               setUserRole(role as 'superadmin' | 'admin' | 'user')
 
-              // Set user name and email
+              // Set user name, email, and permissions
               if (data.admin.name) {
                 setUserName(data.admin.name)
               }
               if (data.admin.email) {
                 setUserEmail(data.admin.email)
+              }
+              if (data.admin.permissions) {
+                console.log('✅ Setting user permissions:', Object.keys(data.admin.permissions))
+                setUserPermissions(data.admin.permissions)
               }
 
               // Fetch tenant business name and workflow settings if this is a tenant user
@@ -284,37 +289,77 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return null
   }
 
+  // Helper function to check permission
+  const hasPermission = (resource: string, action: string = 'read') => {
+    // Superadmin wildcard check
+    if (userPermissions['*'] && userPermissions['*'].includes('manage')) return true
+
+    // Resource check
+    const actions = userPermissions[resource] || []
+    if (actions.includes('manage')) return true
+
+    // Action hierarchy check
+    const hierarchy: Record<string, number> = { read: 1, write: 2, delete: 3, manage: 4 }
+    return (hierarchy[actions.find(a => hierarchy[a] >= hierarchy[action]) || ''] || 0) > 0
+  }
+
   // Updated navItems with Lucide icons
+  // Now includes required permissions
   const navItems = [
-    { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['superadmin', 'admin'] },
-    { href: '/admin/tenants', label: 'Tenants', icon: Building2, roles: ['superadmin'] },
-    { href: '/admin/research', label: 'Raw Research', icon: Search, roles: ['superadmin'] }, // Only superadmin
-    { href: '/admin/setup', label: 'Setup Wizard', icon: Rocket, roles: ['superadmin', 'admin'] },
-    { href: '/admin/business', label: 'Business Setup', icon: Settings, roles: ['superadmin', 'admin'] },
-    { href: '/admin/workflow', label: 'Workflow', icon: Sliders, roles: ['superadmin', 'admin'] }, // Conditional for tenants
-    { href: '/admin/suppliers', label: 'Suppliers', icon: Factory, roles: ['superadmin', 'admin'] },
-    { href: '/admin/categories', label: 'Categories', icon: Tags, roles: ['superadmin', 'admin'] },
-    { href: '/admin/purchases', label: 'Purchase Orders', icon: ShoppingCart, roles: ['superadmin', 'admin'] },
-    { href: '/admin/inventory', label: 'Inventory', icon: Package, roles: ['superadmin', 'admin'] },
-    { href: '/admin/customers', label: 'Customers', icon: Users, roles: ['superadmin', 'admin'] },
-    { href: '/admin/products', label: 'Products', icon: Shirt, roles: ['user'] },
-    { href: '/admin/catalogues', label: 'Catalogues', icon: BookOpen, roles: ['superadmin', 'admin'] },
-    { href: '/admin/sales', label: 'Sales', icon: Banknote, roles: ['superadmin', 'admin'] },
-    { href: '/admin/invoices', label: 'Invoices', icon: FileText, roles: ['superadmin', 'admin', 'user'] },
-    { href: '/admin/enquiries', label: 'Customer Enquiries', icon: MessageSquare, roles: ['superadmin'] }, // Only superadmin
-    { href: '/admin/admins', label: 'Admin Management', icon: ShieldCheck, roles: ['superadmin'] },
-    { href: '/admin/users', label: 'User Management', icon: UserCog, roles: ['superadmin'] }, // Only superadmin
+    { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, resource: 'dashboard' },
+    { href: '/admin/tenants', label: 'Tenants', icon: Building2, resource: 'tenants', action: 'manage' }, // Usually superadmin only
+    { href: '/admin/research', label: 'Raw Research', icon: Search, resource: 'research', action: 'read' },
+    { href: '/admin/setup', label: 'Setup Wizard', icon: Rocket, resource: 'dashboard' },
+    { href: '/admin/business', label: 'Business Setup', icon: Settings, resource: 'business' },
+    {
+      href: '/admin/workflow',
+      label: 'Workflow',
+      icon: Sliders,
+      resource: 'workflow',
+      subItems: [
+        { href: '/admin/workflow/visualize', label: 'Overview' },
+        { href: '/admin/workflow/rules', label: 'Configuration' }
+      ]
+    },
+    { href: '/admin/suppliers', label: 'Suppliers', icon: Factory, resource: 'suppliers' },
+    { href: '/admin/categories', label: 'Categories', icon: Tags, resource: 'categories' },
+    { href: '/admin/purchases', label: 'Purchase Orders', icon: ShoppingCart, resource: 'purchases' },
+    { href: '/admin/inventory', label: 'Inventory', icon: Package, resource: 'inventory' },
+    { href: '/admin/customers', label: 'Customers', icon: Users, resource: 'customers' },
+    { href: '/admin/products', label: 'Products', icon: Shirt, resource: 'products' },
+    { href: '/admin/catalogues', label: 'Catalogues', icon: BookOpen, resource: 'catalogues' },
+    { href: '/admin/sales', label: 'Sales', icon: Banknote, resource: 'sales' },
+    { href: '/admin/invoices', label: 'Invoices', icon: FileText, resource: 'invoices' },
+    { href: '/admin/enquiries', label: 'Customer Enquiries', icon: MessageSquare, resource: 'enquiries' },
+    { href: '/admin/admins', label: 'Admin Management', icon: ShieldCheck, resource: 'admins' },
+    { href: '/admin/users', label: 'User Management', icon: UserCog, resource: 'users' },
+    { href: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, resource: 'roles' }, // New Item
   ]
 
-  // Filter nav items based on user role and tenant settings
+  // Filter nav items based on user role and permissions
   const filteredNavItems = (() => {
     if (!userRole) {
       // While loading, show minimal items
-      return navItems.filter(item => item.roles.includes('user'))
+      return []
     }
 
-    // Filter based on role
-    let items = navItems.filter(item => item.roles.includes(userRole))
+    // Superadmin bypass (legacy check fallback)
+    if (userRole === 'superadmin') return navItems
+
+    // Filter based on permissions
+    let items = navItems.filter(item => {
+      // If resource is specified, check permission
+      if (item.resource) {
+        return hasPermission(item.resource, item.action || 'read')
+      }
+      return true // No resource specific requirement? (Should be rare)
+    })
+
+    // Special handling for legacy 'user' role if permissions are empty
+    // This provides backward compatibility if permissions migration failed or delayed
+    if (Object.keys(userPermissions).length === 0 && userRole === 'user') {
+      return navItems.filter(item => ['/admin/products', '/admin/catalogues'].includes(item.href))
+    }
 
     // For tenants, conditionally show workflow based on workflowEnabled flag
     if (userRole === 'admin') {
@@ -384,38 +429,77 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           {/* Navigation */}
           <nav className={`flex-1 overflow-y-auto custom-scrollbar ${sidebarCollapsed ? 'px-2 py-4' : 'px-4 py-6'} space-y-1.5`}>
             {filteredNavItems.map((item) => {
-              const isActive = pathname === item.href
+              const isActive = pathname === item.href || (item.subItems && item.subItems.some(sub => pathname === sub.href))
               const Icon = item.icon
+              const hasSubItems = item.subItems && item.subItems.length > 0
+              // State to track if submenu is expanded - defaulting to true if active
+              const isExpanded = isActive || (hasSubItems && pathname.startsWith(item.href))
 
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`relative flex items-center rounded-xl transition-all duration-200 group ${sidebarCollapsed ? 'justify-center p-3' : 'px-4 py-3 gap-3'
-                    } ${isActive
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-purple-100'
-                    }`}
-                  title={sidebarCollapsed ? item.label : ''}
-                >
-                  <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} strokeWidth={2} />
+                <div key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`relative flex items-center rounded-xl transition-all duration-200 group ${sidebarCollapsed ? 'justify-center p-3' : 'px-4 py-3 gap-3'
+                      } ${isActive && !hasSubItems
+                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                        : isActive && hasSubItems
+                          ? 'text-white bg-slate-800'
+                          : 'text-slate-400 hover:bg-slate-800 hover:text-purple-100'
+                      }`}
+                    title={sidebarCollapsed ? item.label : ''}
+                  >
+                    <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} strokeWidth={2} />
 
-                  {!sidebarCollapsed && (
-                    <span className="font-medium text-sm flex-1">{item.label}</span>
-                  )}
+                    {!sidebarCollapsed && (
+                      <span className="font-medium text-sm flex-1">{item.label}</span>
+                    )}
 
-                  {!sidebarCollapsed && isActive && (
-                    <span className="w-1.5 h-1.5 bg-white rounded-full shadow-glow"></span>
-                  )}
+                    {!sidebarCollapsed && hasSubItems && (
+                      <div className="text-slate-500">
+                        {isExpanded ? <ChevronLeft className="w-4 h-4 -rotate-90" /> : <ChevronLeft className="w-4 h-4" />}
+                      </div>
+                    )}
 
-                  {/* Tooltip for collapsed mode */}
-                  {sidebarCollapsed && (
-                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-xl border border-slate-700 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">
-                      {item.label}
-                      <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45 border-l border-b border-slate-700"></div>
+                    {!sidebarCollapsed && isActive && !hasSubItems && (
+                      <span className="w-1.5 h-1.5 bg-white rounded-full shadow-glow"></span>
+                    )}
+
+                    {/* Tooltip for collapsed mode */}
+                    {sidebarCollapsed && (
+                      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-xl border border-slate-700 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">
+                        {item.label}
+                        {hasSubItems && item.subItems?.map(sub => (
+                          <div key={sub.href} className="mt-1 text-slate-400 font-normal pl-2 border-l border-slate-700">
+                            {sub.label}
+                          </div>
+                        ))}
+                        <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45 border-l border-b border-slate-700"></div>
+                      </div>
+                    )}
+                  </Link>
+
+                  {/* Submenu Items */}
+                  {!sidebarCollapsed && hasSubItems && (
+                    <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                      {item.subItems?.map((sub) => {
+                        const isSubActive = pathname === sub.href
+                        return (
+                          <Link
+                            key={sub.href}
+                            href={sub.href}
+                            className={`flex items-center pl-12 pr-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${isSubActive
+                              ? 'text-purple-400 bg-slate-800/50'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                              }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full mr-3 ${isSubActive ? 'bg-purple-500' : 'bg-slate-600'}`}></span>
+                            {sub.label}
+                          </Link>
+                        )
+                      })}
                     </div>
                   )}
-                </Link>
+                </div>
               )
             })}
           </nav>

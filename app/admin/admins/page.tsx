@@ -8,29 +8,25 @@ export default function AdminsPage() {
   const [admins, setAdmins] = useState<Admin[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null)
+  const [roles, setRoles] = useState<any[]>([])
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     name: '',
     role: 'admin' as 'superadmin' | 'admin' | 'user',
+    roleId: '' as string | number
   })
 
   useEffect(() => {
     loadAdmins()
+    loadRoles()
   }, [])
 
   // Handle ESC key to close modals
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && showModal) {
-        setShowModal(false)
-        setEditingAdmin(null)
-        setFormData({
-          email: '',
-          password: '',
-          name: '',
-          role: 'admin',
-        })
+        handleCloseModal()
       }
     }
 
@@ -39,6 +35,23 @@ export default function AdminsPage() {
       return () => window.removeEventListener('keydown', handleEsc)
     }
   }, [showModal])
+
+  // Update role fallback when roleId changes
+  useEffect(() => {
+    if (formData.roleId) {
+      const selectedRole = roles.find(r => r.id === parseInt(formData.roleId.toString()))
+      if (selectedRole) {
+        // Map dynamic roles to legacy roles for backward compatibility
+        if (selectedRole.name.toLowerCase().includes('super')) {
+          setFormData(prev => ({ ...prev, role: 'superadmin' }))
+        } else if (selectedRole.name.toLowerCase() === 'user') {
+          setFormData(prev => ({ ...prev, role: 'user' }))
+        } else {
+          setFormData(prev => ({ ...prev, role: 'admin' }))
+        }
+      }
+    }
+  }, [formData.roleId, roles])
 
   const loadAdmins = async () => {
     try {
@@ -52,19 +65,34 @@ export default function AdminsPage() {
     }
   }
 
+  const loadRoles = async () => {
+    try {
+      const response = await fetch('/api/roles')
+      const result = await response.json()
+      if (result.success) {
+        setRoles(result.roles)
+      }
+    } catch (error) {
+      console.error('Failed to load roles:', error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
+      const payload: any = {
+        role: formData.role,
+        roleId: formData.roleId ? parseInt(formData.roleId.toString()) : undefined
+      }
+
       if (editingAdmin) {
         // Update role only (password updates would need separate endpoint)
+        payload.id = editingAdmin.id
         const response = await fetch('/api/admin', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: editingAdmin.id,
-            role: formData.role,
-          }),
+          body: JSON.stringify(payload),
         })
         const result = await response.json()
         if (!result.success) {
@@ -72,15 +100,14 @@ export default function AdminsPage() {
           return
         }
       } else {
+        payload.email = formData.email
+        payload.password = formData.password
+        payload.name = formData.name
+
         const response = await fetch('/api/admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-            name: formData.name,
-            role: formData.role,
-          }),
+          body: JSON.stringify(payload),
         })
         const result = await response.json()
         if (!result.success) {
@@ -88,7 +115,7 @@ export default function AdminsPage() {
           return
         }
       }
-      
+
       resetForm()
       await loadAdmins()
       setShowModal(false)
@@ -105,6 +132,7 @@ export default function AdminsPage() {
       password: '', // Don't pre-fill password
       name: admin.name || '',
       role: admin.role,
+      roleId: admin.role_id || ''
     })
     setShowModal(true)
   }
@@ -134,8 +162,14 @@ export default function AdminsPage() {
       password: '',
       name: '',
       role: 'admin',
+      roleId: ''
     })
     setEditingAdmin(null)
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    resetForm()
   }
 
   const getRoleBadgeColor = (role: string) => {
@@ -149,6 +183,14 @@ export default function AdminsPage() {
       default:
         return 'bg-gray-100 text-gray-800'
     }
+  }
+
+  const getRoleName = (admin: Admin) => {
+    if (admin.role_id) {
+      const dynamicRole = roles.find(r => r.id === admin.role_id)
+      if (dynamicRole) return dynamicRole.name
+    }
+    return admin.role
   }
 
   return (
@@ -204,7 +246,7 @@ export default function AdminsPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleBadgeColor(admin.role)}`}>
-                      {admin.role}
+                      {getRoleName(admin)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -275,27 +317,31 @@ export default function AdminsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Role *
+                    System Role (Auto-derived or Manual)
                   </label>
                   <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'superadmin' | 'admin' | 'user' })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    value={formData.roleId}
+                    onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-2"
                   >
-                    <option value="admin">Admin</option>
-                    <option value="superadmin">Super Admin</option>
-                    <option value="user">User</option>
+                    <option value="">Select a Role...</option>
+                    {roles.map(role => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
                   </select>
+
+                  <div className="text-xs text-gray-500">
+                    Legacy Access Level: <span className="font-semibold">{formData.role}</span>
+                  </div>
                 </div>
+
                 <div className="flex space-x-4 pt-4">
                   <button
                     type="button"
-                    onClick={() => {
-                      resetForm()
-                      setShowModal(false)
-                    }}
+                    onClick={handleCloseModal}
                     className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                   >
                     Cancel

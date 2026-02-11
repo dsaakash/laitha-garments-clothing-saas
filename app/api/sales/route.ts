@@ -138,6 +138,36 @@ export async function POST(request: NextRequest) {
     }
 
     // Start transaction - insert sale first (with tenant_id)
+    // If billNumber was provided, we need to ensure the sequence catches up
+    // This handles the case where frontend fetches "next number" (preview) and sends it
+    if (body.billNumber && body.billNumber.trim() !== '') {
+      try {
+        // Parse bill number to see if it follows our pattern: BILL-YYYY-XXXX
+        const parts = body.billNumber.split('-')
+        if (parts.length === 3 && parts[0] === 'BILL') {
+          const year = parseInt(parts[1])
+          const number = parseInt(parts[2])
+
+          if (!isNaN(year) && !isNaN(number)) {
+            // Update sequence to be at least this number
+            // We use GREATEST to ensure we don't accidentally decrease it
+            // CAST tenantId to appropriate type for the text column in sequence table
+            await query(
+              `INSERT INTO bill_number_sequence (year, tenant_id, last_number)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (year, COALESCE(tenant_id, ''::VARCHAR)) 
+               DO UPDATE SET last_number = GREATEST(bill_number_sequence.last_number, EXCLUDED.last_number),
+                             updated_at = CURRENT_TIMESTAMP`,
+              [year, tenantId, number]
+            )
+          }
+        }
+      } catch (seqError) {
+        console.error('Failed to sync bill number sequence:', seqError)
+        // Don't fail the sale creation just because sequence sync failed
+      }
+    }
+
     const saleResult = await query(
       `INSERT INTO sales 
        (date, party_name, customer_id, bill_number, subtotal, discount_type, discount_percentage, discount_amount,

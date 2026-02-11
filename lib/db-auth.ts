@@ -6,6 +6,7 @@ export interface Admin {
   email: string
   name?: string
   role: 'superadmin' | 'admin' | 'user'
+  role_id?: number
   created_at: Date
   updated_at: Date
 }
@@ -15,6 +16,7 @@ export interface User {
   email: string
   name?: string
   role: 'user'
+  role_id?: number
   created_at: Date
   updated_at: Date
 }
@@ -35,12 +37,12 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
   }
 }
 
-export async function createAdmin(email: string, password: string, name?: string, role: 'superadmin' | 'admin' | 'user' = 'admin'): Promise<Admin> {
+export async function createAdmin(email: string, password: string, name?: string, role: 'superadmin' | 'admin' | 'user' = 'admin', roleId?: number): Promise<Admin> {
   const passwordHash = await hashPassword(password)
 
   const result = await query(
-    'INSERT INTO admins (email, password_hash, name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role, created_at, updated_at',
-    [email, passwordHash, name || null, role]
+    'INSERT INTO admins (email, password_hash, name, role, role_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, role_id, created_at, updated_at',
+    [email, passwordHash, name || null, role, roleId || null]
   )
 
   return result.rows[0]
@@ -57,18 +59,26 @@ export async function createUser(email: string, password: string, name?: string)
   return result.rows[0]
 }
 
-export async function getAdminByEmail(email: string): Promise<(Admin & { password_hash: string }) | null> {
+export async function getAdminByEmail(email: string): Promise<(Admin & { password_hash: string, role_details?: any }) | null> {
   const result = await query(
-    'SELECT id, email, password_hash, name, role, created_at, updated_at FROM admins WHERE email = $1',
+    `SELECT a.id, a.email, a.password_hash, a.name, a.role, a.role_id, a.tenant_id, a.created_at, a.updated_at,
+            r.name as role_name, r.permissions as role_permissions
+     FROM admins a
+     LEFT JOIN roles r ON a.role_id = r.id
+     WHERE a.email = $1`,
     [email]
   )
 
   return result.rows[0] || null
 }
 
-export async function getUserByEmail(email: string): Promise<(User & { password_hash: string }) | null> {
+export async function getUserByEmail(email: string): Promise<(User & { password_hash: string, role_details?: any }) | null> {
   const result = await query(
-    'SELECT id, email, password_hash, name, role, created_at, updated_at FROM users WHERE email = $1',
+    `SELECT u.id, u.email, u.password_hash, u.name, u.role, u.role_id, u.tenant_id, u.created_at, u.updated_at,
+            r.name as role_name, r.permissions as role_permissions
+     FROM users u
+     LEFT JOIN roles r ON u.role_id = r.id
+     WHERE u.email = $1`,
     [email]
   )
 
@@ -77,7 +87,11 @@ export async function getUserByEmail(email: string): Promise<(User & { password_
 
 export async function getAdminById(id: number): Promise<Admin | null> {
   const result = await query(
-    'SELECT id, email, name, role, created_at, updated_at FROM admins WHERE id = $1',
+    `SELECT a.id, a.email, a.name, a.role, a.role_id, a.created_at, a.updated_at,
+            r.name as role_name, r.permissions as role_permissions
+     FROM admins a
+     LEFT JOIN roles r ON a.role_id = r.id
+     WHERE a.id = $1`,
     [id]
   )
 
@@ -86,7 +100,11 @@ export async function getAdminById(id: number): Promise<Admin | null> {
 
 export async function getUserById(id: number): Promise<User | null> {
   const result = await query(
-    'SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1',
+    `SELECT u.id, u.email, u.name, u.role, u.role_id, u.created_at, u.updated_at,
+            r.name as role_name, r.permissions as role_permissions
+     FROM users u
+     LEFT JOIN roles r ON u.role_id = r.id
+     WHERE u.id = $1`,
     [id]
   )
 
@@ -146,10 +164,10 @@ export async function verifyUser(email: string, password: string): Promise<User 
   return userWithoutPassword
 }
 
-export async function updateAdminRole(id: number, role: 'superadmin' | 'admin' | 'user'): Promise<Admin | null> {
+export async function updateAdminRole(id: number, role: 'superadmin' | 'admin' | 'user', roleId?: number): Promise<Admin | null> {
   const result = await query(
-    'UPDATE admins SET role = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, email, name, role, created_at, updated_at',
-    [role, id]
+    'UPDATE admins SET role = $1, role_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING id, email, name, role, role_id, created_at, updated_at',
+    [role, roleId || null, id]
   )
 
   return result.rows[0] || null

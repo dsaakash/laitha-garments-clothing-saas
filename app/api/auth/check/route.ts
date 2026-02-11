@@ -57,6 +57,11 @@ export async function GET(request: NextRequest) {
         if (admin) {
           admin.type = 'superadmin'
           admin.tenant_id = null
+          admin.permissions = admin.role_permissions || {}
+          // Use dynamic role name if available, else fallback to legacy
+          if (admin.role_name) {
+            admin.role = admin.role_name.toLowerCase().replace(' ', '')
+          }
         }
       }
     } else if (userType === 'user') {
@@ -67,6 +72,10 @@ export async function GET(request: NextRequest) {
         if (admin) {
           admin.type = 'user'
           admin.tenant_id = null
+          admin.permissions = admin.role_permissions || {}
+          if (admin.role_name) {
+            admin.role = admin.role_name.toLowerCase().replace(' ', '')
+          }
         }
       }
     }
