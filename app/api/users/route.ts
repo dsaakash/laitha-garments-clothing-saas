@@ -19,9 +19,10 @@ export async function GET(request: NextRequest) {
     // Check if user has permission to view users (admin and superadmin)
     try {
       const decoded = decodeBase64(session.value)
-      const adminId = parseInt(decoded.split(':')[0])
+      const parts = decoded.split(':')
+      const adminId = parseInt(parts[1])
       const role = await getCurrentUserRole(adminId)
-      
+
       if (!role || !hasPermission(role, 'users', 'read')) {
         return NextResponse.json(
           { success: false, message: 'Insufficient permissions' },
@@ -61,9 +62,10 @@ export async function POST(request: NextRequest) {
     // Check if user has permission to create users (admin and superadmin)
     try {
       const decoded = decodeBase64(session.value)
-      const adminId = parseInt(decoded.split(':')[0])
+      const parts = decoded.split(':')
+      const adminId = parseInt(parts[1])
       const role = await getCurrentUserRole(adminId)
-      
+
       if (!role || !hasPermission(role, 'users', 'write')) {
         return NextResponse.json(
           { success: false, message: 'Insufficient permissions to create users' },
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await createUser(email, password, name)
-    
+
     return NextResponse.json({
       success: true,
       message: 'User created successfully',
@@ -115,24 +117,24 @@ export async function POST(request: NextRequest) {
       detail: error?.detail,
       stack: error?.stack
     })
-    
+
     if (error.code === '23505') { // Unique constraint violation
       return NextResponse.json(
         { success: false, message: 'User with this email already exists' },
         { status: 400 }
       )
     }
-    
+
     if (error.code === '42P01') { // Table does not exist
       return NextResponse.json(
         { success: false, message: 'Users table does not exist. Please run the migration: npm run migrate-roles' },
         { status: 500 }
       )
     }
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         message: error?.message || 'Server error',
         error: process.env.NODE_ENV === 'development' ? error?.message : undefined
       },
@@ -156,9 +158,10 @@ export async function DELETE(request: NextRequest) {
     // Check if user has permission to delete users (admin and superadmin)
     try {
       const decoded = decodeBase64(session.value)
-      const adminId = parseInt(decoded.split(':')[0])
+      const parts = decoded.split(':')
+      const adminId = parseInt(parts[1])
       const role = await getCurrentUserRole(adminId)
-      
+
       if (!role || !hasPermission(role, 'users', 'delete')) {
         return NextResponse.json(
           { success: false, message: 'Insufficient permissions to delete users' },
@@ -183,7 +186,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleted = await deleteUser(parseInt(id))
-    
+
     if (deleted) {
       return NextResponse.json({
         success: true,

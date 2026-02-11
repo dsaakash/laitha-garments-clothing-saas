@@ -120,7 +120,7 @@ export default function CataloguesPage() {
     setFormData({
       name: catalogue.name,
       description: catalogue.description || '',
-      items: catalogue.items,
+      items: catalogue.items || [],
     })
     setShowModal(true)
   }
@@ -183,7 +183,7 @@ export default function CataloguesPage() {
   }
 
   const getCatalogueItems = (catalogue: Catalogue) => {
-    return catalogue.items
+    return (catalogue.items || [])
       .map(id => inventory.find(item => item.id === id))
       .filter(Boolean) as InventoryItem[]
   }

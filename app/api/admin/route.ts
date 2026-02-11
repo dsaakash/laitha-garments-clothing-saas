@@ -19,9 +19,15 @@ export async function GET(request: NextRequest) {
     // Check if user has permission to view admins
     try {
       const decoded = decodeBase64(session.value)
-      const adminId = parseInt(decoded.split(':')[0])
+      const parts = decoded.split(':')
+      const adminId = parseInt(parts[1])
+
+      if (isNaN(adminId)) {
+        throw new Error('Invalid admin ID')
+      }
+
       const role = await getCurrentUserRole(adminId)
-      
+
       if (!role || !hasPermission(role, 'admins', 'read')) {
         return NextResponse.json(
           { success: false, message: 'Insufficient permissions' },
@@ -36,6 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     const admins = await getAllAdmins()
+
     return NextResponse.json({ success: true, admins })
   } catch (error) {
     console.error('Get admins error:', error)
@@ -61,9 +68,10 @@ export async function POST(request: NextRequest) {
     // Check if user has permission to create admins (only superadmin)
     try {
       const decoded = decodeBase64(session.value)
-      const adminId = parseInt(decoded.split(':')[0])
+      const parts = decoded.split(':')
+      const adminId = parseInt(parts[1])
       const role = await getCurrentUserRole(adminId)
-      
+
       if (!role || !hasPermission(role, 'admins', 'write')) {
         return NextResponse.json(
           { success: false, message: 'Only superadmin can create admins' },
@@ -99,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = await createAdmin(email, password, name, validRole as 'superadmin' | 'admin' | 'user')
-    
+
     return NextResponse.json({
       success: true,
       message: 'Admin created successfully',
@@ -112,14 +120,14 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Create admin error:', error)
-    
+
     if (error.code === '23505') { // Unique constraint violation
       return NextResponse.json(
         { success: false, message: 'Admin with this email already exists' },
         { status: 400 }
       )
     }
-    
+
     return NextResponse.json(
       { success: false, message: 'Server error' },
       { status: 500 }
@@ -142,9 +150,10 @@ export async function DELETE(request: NextRequest) {
     // Check if user has permission to delete admins (only superadmin)
     try {
       const decoded = decodeBase64(session.value)
-      const adminId = parseInt(decoded.split(':')[0])
+      const parts = decoded.split(':')
+      const adminId = parseInt(parts[1])
       const role = await getCurrentUserRole(adminId)
-      
+
       if (!role || !hasPermission(role, 'admins', 'delete')) {
         return NextResponse.json(
           { success: false, message: 'Only superadmin can delete admins' },
@@ -169,11 +178,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     const adminIdToDelete = parseInt(id)
-    
+
     // Prevent deleting yourself
     try {
       const decoded = decodeBase64(session.value)
-      const currentAdminId = parseInt(decoded.split(':')[0])
+      const parts = decoded.split(':')
+      const currentAdminId = parseInt(parts[1])
       if (currentAdminId === adminIdToDelete) {
         return NextResponse.json(
           { success: false, message: 'Cannot delete your own account' },
@@ -185,7 +195,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleted = await deleteAdmin(adminIdToDelete)
-    
+
     if (deleted) {
       return NextResponse.json({
         success: true,
@@ -221,9 +231,10 @@ export async function PUT(request: NextRequest) {
     // Check if user has permission to update admins (only superadmin)
     try {
       const decoded = decodeBase64(session.value)
-      const adminId = parseInt(decoded.split(':')[0])
+      const parts = decoded.split(':')
+      const adminId = parseInt(parts[1])
       const role = await getCurrentUserRole(adminId)
-      
+
       if (!role || !hasPermission(role, 'admins', 'write')) {
         return NextResponse.json(
           { success: false, message: 'Only superadmin can update admin roles' },
@@ -254,7 +265,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updated = await updateAdminRole(parseInt(id), role as 'superadmin' | 'admin' | 'user')
-    
+
     if (updated) {
       return NextResponse.json({
         success: true,
