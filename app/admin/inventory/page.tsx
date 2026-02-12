@@ -609,6 +609,14 @@ export default function InventoryPage() {
     }
   }
 
+  const calculateStockValue = (items: InventoryItem[]) => {
+    return items.reduce((total, item) => {
+      const stock = Math.max(0, item.currentStock || 0)
+      const price = item.sellingPrice || 0
+      return total + (stock * price)
+    }, 0)
+  }
+
   return (
     <AdminLayout>
       <div>
@@ -668,6 +676,31 @@ export default function InventoryPage() {
           </label>
         </PageHeader>
 
+        {/* Supplier Summary Card */}
+        {supplierFilter !== 'All' && !groupBySupplier && items.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-purple-100">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">{supplierFilter} - Stock Overview</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                <p className="text-purple-600 text-sm font-medium mb-1">Total Items</p>
+                <p className="text-2xl font-bold text-purple-900">{items.length}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                <p className="text-green-600 text-sm font-medium mb-1">Total Stock Quantity</p>
+                <p className="text-2xl font-bold text-green-900">
+                  {items.reduce((sum, item) => sum + Math.max(0, item.currentStock || 0), 0)}
+                </p>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <p className="text-blue-600 text-sm font-medium mb-1">Total Stock Value</p>
+                <p className="text-2xl font-bold text-blue-900">
+                  ₹{calculateStockValue(items).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {items.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <p className="text-gray-500 text-lg">No inventory items yet. Add your first item!</p>
@@ -688,10 +721,18 @@ export default function InventoryPage() {
               <div className="space-y-4">
                 {Object.entries(groupedItems).map(([supplier, supplierItems]) => (
                   <div key={supplier} className="bg-white rounded-lg shadow-md">
-                    <div className="bg-purple-50 px-6 py-3 border-b border-purple-200">
+                    <div className="bg-purple-50 px-6 py-3 border-b border-purple-200 flex justify-between items-center">
                       <h3 className="text-lg font-semibold text-purple-900">
                         {supplier} ({supplierItems.length} {supplierItems.length === 1 ? 'item' : 'items'})
                       </h3>
+                      <div className="flex gap-4 text-sm">
+                        <span className="text-purple-700 font-medium">
+                          Qty: {supplierItems.reduce((sum, item) => sum + Math.max(0, item.currentStock || 0), 0)}
+                        </span>
+                        <span className="text-purple-900 font-bold bg-white px-3 py-1 rounded-lg border border-purple-100">
+                          Value: ₹{calculateStockValue(supplierItems).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
                     {/* Top Scrollbar for Grouped View */}
                     <div
