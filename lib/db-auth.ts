@@ -131,11 +131,13 @@ export async function verifyAdmin(email: string, password: string): Promise<Admi
   return adminWithoutPassword
 }
 
-export async function getAllAdmins(tenantId?: string): Promise<Admin[]> {
+export async function getAllAdmins(tenantId?: string | null): Promise<Admin[]> {
   let queryText = 'SELECT id, email, name, role, role_id, tenant_id, created_at, updated_at FROM admins'
   const params: any[] = []
 
-  if (tenantId) {
+  if (tenantId === null) {
+    queryText += ' WHERE tenant_id IS NULL'
+  } else if (tenantId) {
     queryText += ' WHERE tenant_id = $1'
     params.push(tenantId)
   }
@@ -145,6 +147,22 @@ export async function getAllAdmins(tenantId?: string): Promise<Admin[]> {
   const result = await query(queryText, params)
 
   return result.rows
+}
+
+export async function getAdminCount(tenantId: string): Promise<number> {
+  const result = await query(
+    'SELECT COUNT(*) FROM admins WHERE tenant_id = $1',
+    [tenantId]
+  )
+  return parseInt(result.rows[0].count)
+}
+
+export async function getTenantAdminLimit(tenantId: string): Promise<number> {
+  const result = await query(
+    'SELECT admin_limit FROM tenants WHERE id = $1',
+    [tenantId]
+  )
+  return result.rows[0]?.admin_limit || 5 // Default to 5 if not found or null
 }
 
 export async function getAllUsers(): Promise<User[]> {

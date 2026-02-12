@@ -6,7 +6,7 @@ import AdminLayout from '@/components/AdminLayout'
 import PageHeader from '@/components/PageHeader'
 import ActionButton from '@/components/ActionButton'
 import StatusBadge from '@/components/StatusBadge'
-import { ArrowLeft, Copy, RefreshCw, Key, Mail, Phone, MapPin, Building2, Calendar, TrendingUp, Settings, Check, LayoutGrid, CreditCard } from 'lucide-react'
+import { ArrowLeft, Copy, RefreshCw, Key, Mail, Phone, MapPin, Building2, Calendar, TrendingUp, Settings, Check, LayoutGrid, CreditCard, ShoppingBag, ShoppingCart, Users, Truck, Package } from 'lucide-react'
 import { getPlanPricing } from '@/lib/tenantStorage'
 
 interface Tenant {
@@ -28,6 +28,7 @@ interface Tenant {
     monthlyRevenue: number
     modules: string[]
     createdAt: string
+    adminLimit?: number
 }
 
 interface Credentials {
@@ -59,6 +60,7 @@ export default function TenantDetailsPage() {
     const router = useRouter()
     const params = useParams()
     const [tenant, setTenant] = useState<Tenant | null>(null)
+    const [stats, setStats] = useState<any>(null)
     const [credentials, setCredentials] = useState<Credentials | null>(null)
     const [loading, setLoading] = useState(true)
     const [resetting, setResetting] = useState(false)
@@ -70,6 +72,7 @@ export default function TenantDetailsPage() {
     const [selectedPlan, setSelectedPlan] = useState<string>('free')
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
     const [customPrice, setCustomPrice] = useState<number>(0)
+    const [customAdminLimit, setCustomAdminLimit] = useState<number>(5)
     const [selectedModules, setSelectedModules] = useState<string[]>([])
 
     // Edit Profile Form State
@@ -92,10 +95,22 @@ export default function TenantDetailsPage() {
                 setTenant(result.data)
                 setCredentials(result.credentials)
 
+                // Fetch stats
+                try {
+                    const statsRes = await fetch(`/api/tenants/${params.id}/stats`)
+                    const statsData = await statsRes.json()
+                    if (statsData.success) {
+                        setStats(statsData.stats)
+                    }
+                } catch (e) {
+                    console.error('Failed to load stats', e)
+                }
+
                 // Init subscription form state
                 setSelectedPlan(result.data.plan)
                 setBillingCycle(result.data.billingCycle || 'monthly')
                 setCustomPrice(result.data.monthlyRevenue || 0)
+                setCustomAdminLimit(result.data.adminLimit || 5)
                 setSelectedModules(result.data.modules || [])
 
                 // Init edit form state
@@ -245,6 +260,7 @@ export default function TenantDetailsPage() {
                 modules: selectedModules,
                 workflowEnabled: selectedModules.includes('workflow'),
                 websiteBuilderEnabled: selectedModules.includes('website'),
+                adminLimit: customAdminLimit,
             }
 
             // If upgrading to a paid plan from trial, set status to active
@@ -449,16 +465,127 @@ export default function TenantDetailsPage() {
                             </div>
                         </div>
 
+
+
                         {/* Features / Modules */}
                         <div className="bg-white rounded-xl shadow-sm p-6">
                             <div className="flex items-center gap-2 mb-4">
                                 <LayoutGrid className="w-5 h-5 text-gray-500" />
-                                <h3 className="text-lg font-bold">Active Modules</h3>
+                                <h3 className="text-lg font-bold">Active Modules & Data</h3>
                             </div>
+
+                            {/* Module Cards Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                                {/* Inventory */}
+                                {tenant.modules.includes('inventory') && (
+                                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 relative overflow-hidden group hover:shadow-md transition-all">
+                                        <div className="flex items-center gap-2 mb-2 relative z-10">
+                                            <Package className="w-5 h-5 text-blue-600" />
+                                            <h4 className="font-bold text-blue-900">Inventory</h4>
+                                        </div>
+                                        <div className="flex justify-between items-end relative z-10">
+                                            <div>
+                                                <p className="text-sm text-blue-700">Total Items</p>
+                                                <p className="text-xl font-bold text-blue-900">{stats?.inventory?.count || 0}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm text-blue-700">Stock Value</p>
+                                                <p className="font-bold text-blue-900">₹{(stats?.inventory?.total_value || stats?.inventory?.value || 0).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="absolute -right-4 -bottom-4 opacity-10 transform rotate-12 group-hover:scale-110 transition-transform">
+                                            <Package className="w-24 h-24 text-blue-600" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Sales */}
+                                {tenant.modules.includes('sales') && (
+                                    <div className="bg-green-50 p-4 rounded-xl border border-green-100 relative overflow-hidden group hover:shadow-md transition-all">
+                                        <div className="flex items-center gap-2 mb-2 relative z-10">
+                                            <TrendingUp className="w-5 h-5 text-green-600" />
+                                            <h4 className="font-bold text-green-900">Sales</h4>
+                                        </div>
+                                        <div className="flex justify-between items-end relative z-10">
+                                            <div>
+                                                <p className="text-sm text-green-700">Orders</p>
+                                                <p className="text-xl font-bold text-green-900">{stats?.sales?.count || 0}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm text-green-700">Revenue</p>
+                                                <p className="font-bold text-green-900">₹{(stats?.sales?.revenue || 0).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="absolute -right-4 -bottom-4 opacity-10 transform rotate-12 group-hover:scale-110 transition-transform">
+                                            <TrendingUp className="w-24 h-24 text-green-600" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Purchases */}
+                                {tenant.modules.includes('purchases') && (
+                                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 relative overflow-hidden group hover:shadow-md transition-all">
+                                        <div className="flex items-center gap-2 mb-2 relative z-10">
+                                            <ShoppingBag className="w-5 h-5 text-amber-600" />
+                                            <h4 className="font-bold text-amber-900">Purchase Orders</h4>
+                                        </div>
+                                        <div className="flex justify-between items-end relative z-10">
+                                            <div>
+                                                <p className="text-sm text-amber-700">POs</p>
+                                                <p className="text-xl font-bold text-amber-900">{stats?.purchases?.count || 0}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm text-amber-700">Total Spent</p>
+                                                <p className="font-bold text-amber-900">₹{(stats?.purchases?.totalSpent || 0).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="absolute -right-4 -bottom-4 opacity-10 transform rotate-12 group-hover:scale-110 transition-transform">
+                                            <ShoppingBag className="w-24 h-24 text-amber-600" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Customers */}
+                                {(tenant.modules.includes('customers') || tenant.modules.includes('crm')) && (
+                                    <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 relative overflow-hidden group hover:shadow-md transition-all">
+                                        <div className="flex items-center gap-2 mb-2 relative z-10">
+                                            <Users className="w-5 h-5 text-purple-600" />
+                                            <h4 className="font-bold text-purple-900">Customers</h4>
+                                        </div>
+                                        <div className="relative z-10">
+                                            <p className="text-sm text-purple-700">Total Database</p>
+                                            <p className="text-xl font-bold text-purple-900">{stats?.customers?.count || 0}</p>
+                                        </div>
+                                        <div className="absolute -right-4 -bottom-4 opacity-10 transform rotate-12 group-hover:scale-110 transition-transform">
+                                            <Users className="w-24 h-24 text-purple-600" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Suppliers */}
+                                {tenant.modules.includes('suppliers') && (
+                                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 relative overflow-hidden group hover:shadow-md transition-all">
+                                        <div className="flex items-center gap-2 mb-2 relative z-10">
+                                            <Truck className="w-5 h-5 text-orange-600" />
+                                            <h4 className="font-bold text-orange-900">Suppliers</h4>
+                                        </div>
+                                        <div className="relative z-10">
+                                            <p className="text-sm text-orange-700">Active Suppliers</p>
+                                            <p className="text-xl font-bold text-orange-900">{stats?.suppliers?.count || 0}</p>
+                                        </div>
+                                        <div className="absolute -right-4 -bottom-4 opacity-10 transform rotate-12 group-hover:scale-110 transition-transform">
+                                            <Truck className="w-24 h-24 text-orange-600" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">All Enabled Modules</h4>
                             <div className="flex flex-wrap gap-2">
                                 {tenant.modules && tenant.modules.length > 0 ? (
                                     tenant.modules.map(module => (
-                                        <span key={module} className="bg-purple-50 text-purple-700 border border-purple-100 px-3 py-1 rounded-lg text-sm font-medium capitalize">
+                                        <span key={module} className="bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1 rounded-lg text-sm font-medium capitalize flex items-center gap-2">
+                                            <Check className="w-3 h-3 text-green-500" />
                                             {AVAILABLE_MODULES.find(m => m.id === module)?.label || module}
                                         </span>
                                     ))
@@ -555,236 +682,266 @@ export default function TenantDetailsPage() {
                 </div>
 
                 {/* Manage Subscription Modal */}
-                {showSubscriptionModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]">
-                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                                <h3 className="text-xl font-bold text-gray-900">Manage Subscription</h3>
-                                <button
-                                    onClick={() => setShowSubscriptionModal(false)}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-
-                            <div className="p-6 overflow-y-auto flex-1 space-y-8">
-
-                                {/* Plan Selection */}
-                                <div>
-                                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Select Plan</h4>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        {['free', 'basic', 'premium', 'enterprise'].map((plan) => (
-                                            <div
-                                                key={plan}
-                                                onClick={() => handlePlanChange(plan)}
-                                                className={`p-3 border-2 rounded-xl cursor-pointer transition-all text-center ${selectedPlan === plan
-                                                    ? 'border-purple-600 bg-purple-50'
-                                                    : 'border-gray-200 hover:border-purple-300'
-                                                    }`}
-                                            >
-                                                <p className="font-bold capitalize">{plan}</p>
-                                            </div>
-                                        ))}
-                                    </div>
+                {
+                    showSubscriptionModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+                                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                                    <h3 className="text-xl font-bold text-gray-900">Manage Subscription</h3>
+                                    <button
+                                        onClick={() => setShowSubscriptionModal(false)}
+                                        className="text-gray-400 hover:text-gray-600"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
 
-                                {/* Pricing & Billing */}
-                                <div>
-                                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Billing Configuration</h4>
-                                    <div className="grid grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Billing Cycle</label>
-                                            <div className="flex bg-white rounded-lg p-1 border border-gray-200">
-                                                <button
-                                                    onClick={() => setBillingCycle('monthly')}
-                                                    className={`flex-1 py-1 text-sm font-medium rounded ${billingCycle === 'monthly' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}
+                                <div className="p-6 overflow-y-auto flex-1 space-y-8">
+
+                                    {/* Plan Selection */}
+                                    <div>
+                                        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Select Plan</h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            {['free', 'basic', 'premium', 'enterprise'].map((plan) => (
+                                                <div
+                                                    key={plan}
+                                                    onClick={() => handlePlanChange(plan)}
+                                                    className={`p-3 border-2 rounded-xl cursor-pointer transition-all text-center ${selectedPlan === plan
+                                                        ? 'border-purple-600 bg-purple-50'
+                                                        : 'border-gray-200 hover:border-purple-300'
+                                                        }`}
                                                 >
-                                                    Monthly
-                                                </button>
-                                                <button
-                                                    onClick={() => setBillingCycle('yearly')}
-                                                    className={`flex-1 py-1 text-sm font-medium rounded ${billingCycle === 'yearly' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}
-                                                >
-                                                    Yearly
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Monthly Price (₹) <span className="text-xs text-gray-400 font-normal">(Override)</span>
-                                            </label>
-                                            <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                    <span className="text-gray-500 sm:text-sm">₹</span>
+                                                    <p className="font-bold capitalize">{plan}</p>
                                                 </div>
-                                                <input
-                                                    type="number"
-                                                    value={customPrice}
-                                                    onChange={(e) => setCustomPrice(Number(e.target.value))}
-                                                    className="pl-7 block w-full rounded-lg border-gray-300 bg-white border focus:ring-purple-500 focus:border-purple-500 sm:text-sm py-2"
-                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Pricing & Billing */}
+                                    <div>
+                                        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Billing Configuration</h4>
+                                        <div className="grid grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Billing Cycle</label>
+                                                <div className="flex bg-white rounded-lg p-1 border border-gray-200">
+                                                    <button
+                                                        onClick={() => setBillingCycle('monthly')}
+                                                        className={`flex-1 py-1 text-sm font-medium rounded ${billingCycle === 'monthly' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}
+                                                    >
+                                                        Monthly
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setBillingCycle('yearly')}
+                                                        className={`flex-1 py-1 text-sm font-medium rounded ${billingCycle === 'yearly' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}
+                                                    >
+                                                        Yearly
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                    Monthly Price (₹) <span className="text-xs text-gray-400 font-normal">(Override)</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                        <span className="text-gray-500 sm:text-sm">₹</span>
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        value={customPrice}
+                                                        onChange={(e) => setCustomPrice(Number(e.target.value))}
+                                                        className="pl-7 block w-full rounded-lg border-gray-300 bg-white border focus:ring-purple-500 focus:border-purple-500 sm:text-sm py-2"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Module Selection */}
-                                <div>
-                                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Feature Modules</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        {AVAILABLE_MODULES.map((module) => (
-                                            <div
-                                                key={module.id}
-                                                onClick={() => handleModuleToggle(module.id)}
-                                                className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all ${selectedModules.includes(module.id)
-                                                    ? 'border-purple-500 bg-purple-50'
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                                    }`}
-                                            >
-                                                <span className={`font-medium ${selectedModules.includes(module.id) ? 'text-purple-900' : 'text-gray-700'}`}>
-                                                    {module.label}
-                                                </span>
-                                                {selectedModules.includes(module.id) && (
-                                                    <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white">
-                                                        <Check className="w-3 h-3" />
+                                    {/* Admin Limit Configuration */}
+                                    <div className="mt-6 pt-6 border-t border-gray-100">
+                                        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">System Limits</h4>
+                                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                    Max Admin Users
+                                                </label>
+                                                <div className="relative">
+                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                        <Users className="h-4 w-4 text-gray-400" />
                                                     </div>
-                                                )}
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={customAdminLimit}
+                                                        onChange={(e) => setCustomAdminLimit(Number(e.target.value))}
+                                                        className="pl-9 block w-full rounded-lg border-gray-300 bg-white border focus:ring-purple-500 focus:border-purple-500 sm:text-sm py-2"
+                                                    />
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">Default is 5 users. Increase for larger teams.</p>
                                             </div>
-                                        ))}
+                                        </div>
                                     </div>
+
+
+                                    {/* Module Selection */}
+                                    <div>
+                                        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Feature Modules</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {AVAILABLE_MODULES.map((module) => (
+                                                <div
+                                                    key={module.id}
+                                                    onClick={() => handleModuleToggle(module.id)}
+                                                    className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all ${selectedModules.includes(module.id)
+                                                        ? 'border-purple-500 bg-purple-50'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                        }`}
+                                                >
+                                                    <span className={`font-medium ${selectedModules.includes(module.id) ? 'text-purple-900' : 'text-gray-700'}`}>
+                                                        {module.label}
+                                                    </span>
+                                                    {selectedModules.includes(module.id) && (
+                                                        <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white">
+                                                            <Check className="w-3 h-3" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                 </div>
 
-                            </div>
-
-                            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-                                <ActionButton
-                                    variant="secondary"
-                                    onClick={() => setShowSubscriptionModal(false)}
-                                    disabled={upgrading}
-                                >
-                                    Cancel
-                                </ActionButton>
-                                <ActionButton
-                                    variant="primary"
-                                    onClick={handleUpdateSubscription}
-                                    disabled={upgrading}
-                                >
-                                    {upgrading ? 'Saving...' : 'Save Subscription'}
-                                </ActionButton>
+                                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                                    <ActionButton
+                                        variant="secondary"
+                                        onClick={() => setShowSubscriptionModal(false)}
+                                        disabled={upgrading}
+                                    >
+                                        Cancel
+                                    </ActionButton>
+                                    <ActionButton
+                                        variant="primary"
+                                        onClick={handleUpdateSubscription}
+                                        disabled={upgrading}
+                                    >
+                                        {upgrading ? 'Saving...' : 'Save Subscription'}
+                                    </ActionButton>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Edit Profile Modal */}
-                {showEditModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]">
-                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                                <h3 className="text-xl font-bold text-gray-900">Edit Business Profile</h3>
-                                <button
-                                    onClick={() => setShowEditModal(false)}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-
-                            <div className="p-6 overflow-y-auto flex-1 space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
-                                    <input
-                                        type="text"
-                                        value={editData.businessName}
-                                        onChange={(e) => setEditData({ ...editData, businessName: e.target.value })}
-                                        className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
-                                    />
+                {
+                    showEditModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+                                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                                    <h3 className="text-xl font-bold text-gray-900">Edit Business Profile</h3>
+                                    <button
+                                        onClick={() => setShowEditModal(false)}
+                                        className="text-gray-400 hover:text-gray-600"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="p-6 overflow-y-auto flex-1 space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
                                         <input
                                             type="text"
-                                            value={editData.ownerName}
-                                            onChange={(e) => setEditData({ ...editData, ownerName: e.target.value })}
+                                            value={editData.businessName}
+                                            onChange={(e) => setEditData({ ...editData, businessName: e.target.value })}
                                             className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
                                         />
                                     </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
+                                            <input
+                                                type="text"
+                                                value={editData.ownerName}
+                                                onChange={(e) => setEditData({ ...editData, ownerName: e.target.value })}
+                                                className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Subdomain</label>
+                                            <input
+                                                type="text"
+                                                value={editData.subdomain}
+                                                onChange={(e) => setEditData({ ...editData, subdomain: e.target.value })}
+                                                className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                                            <input
+                                                type="text"
+                                                value={editData.phone}
+                                                onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                                                className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
+                                            <input
+                                                type="text"
+                                                value={editData.whatsapp}
+                                                onChange={(e) => setEditData({ ...editData, whatsapp: e.target.value })}
+                                                className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Subdomain</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">GST Number (Optional)</label>
                                         <input
                                             type="text"
-                                            value={editData.subdomain}
-                                            onChange={(e) => setEditData({ ...editData, subdomain: e.target.value })}
+                                            value={editData.gstNumber}
+                                            onChange={(e) => setEditData({ ...editData, gstNumber: e.target.value })}
+                                            className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Business Address</label>
+                                        <textarea
+                                            rows={3}
+                                            value={editData.address}
+                                            onChange={(e) => setEditData({ ...editData, address: e.target.value })}
                                             className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                                        <input
-                                            type="text"
-                                            value={editData.phone}
-                                            onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                                            className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
-                                        <input
-                                            type="text"
-                                            value={editData.whatsapp}
-                                            onChange={(e) => setEditData({ ...editData, whatsapp: e.target.value })}
-                                            className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
-                                        />
-                                    </div>
+                                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                                    <ActionButton
+                                        variant="secondary"
+                                        onClick={() => setShowEditModal(false)}
+                                        disabled={upgrading}
+                                    >
+                                        Cancel
+                                    </ActionButton>
+                                    <ActionButton
+                                        variant="primary"
+                                        onClick={handleUpdateProfile}
+                                        disabled={upgrading}
+                                    >
+                                        {upgrading ? 'Saving...' : 'Save Changes'}
+                                    </ActionButton>
                                 </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">GST Number (Optional)</label>
-                                    <input
-                                        type="text"
-                                        value={editData.gstNumber}
-                                        onChange={(e) => setEditData({ ...editData, gstNumber: e.target.value })}
-                                        className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Business Address</label>
-                                    <textarea
-                                        rows={3}
-                                        value={editData.address}
-                                        onChange={(e) => setEditData({ ...editData, address: e.target.value })}
-                                        className="w-full rounded-lg border-gray-300 border focus:ring-purple-500 focus:border-purple-500 py-2 px-3"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-                                <ActionButton
-                                    variant="secondary"
-                                    onClick={() => setShowEditModal(false)}
-                                    disabled={upgrading}
-                                >
-                                    Cancel
-                                </ActionButton>
-                                <ActionButton
-                                    variant="primary"
-                                    onClick={handleUpdateProfile}
-                                    disabled={upgrading}
-                                >
-                                    {upgrading ? 'Saving...' : 'Save Changes'}
-                                </ActionButton>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
-        </AdminLayout>
+                    )
+                }
+            </div >
+        </AdminLayout >
     )
 }

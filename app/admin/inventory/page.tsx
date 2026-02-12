@@ -11,6 +11,7 @@ import { InventoryItem } from '@/lib/storage'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { Plus, Download, Package2, Edit, Trash2, Eye } from 'lucide-react'
+import RestockModal from '@/components/inventory/RestockModal'
 
 export default function InventoryPage() {
   const tableWrapperRef = useRef<HTMLDivElement>(null)
@@ -46,12 +47,8 @@ export default function InventoryPage() {
   const [groupBySupplier, setGroupBySupplier] = useState(false)
   const [showStockModal, setShowStockModal] = useState(false)
   const [showBulkStockModal, setShowBulkStockModal] = useState(false)
-  const [stockFormData, setStockFormData] = useState({
-    itemId: '',
-    type: 'in' as 'in' | 'out' | 'remove-out',
-    quantity: '',
-    notes: '',
-  })
+  // stockFormData replaced by RestockModal internal state
+  const [stockItem, setStockItem] = useState<InventoryItem | null>(null)
   const [bulkStockData, setBulkStockData] = useState<{
     itemId: string
     quantity: string
@@ -75,7 +72,7 @@ export default function InventoryPage() {
           setSelectedItem(null)
         } else if (showStockModal) {
           setShowStockModal(false)
-          setStockFormData({ itemId: '', type: 'in', quantity: '', notes: '' })
+          setStockItem(null)
         } else if (showBulkStockModal) {
           setShowBulkStockModal(false)
           setBulkStockData([])
@@ -407,59 +404,9 @@ export default function InventoryPage() {
     setPreviewImages([])
   }
 
-  const handleStockUpdate = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const quantity = parseInt(stockFormData.quantity)
-    if (isNaN(quantity) || quantity <= 0) {
-      alert('Please enter a valid quantity')
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/inventory/${stockFormData.itemId}/stock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: stockFormData.type,
-          quantity,
-          notes: stockFormData.notes || undefined,
-        }),
-      })
-
-      const result = await response.json()
-      if (!result.success) {
-        alert('Failed to update stock')
-        return
-      }
-
-      const successMessages: Record<string, string> = {
-        'in': 'Stock added successfully!',
-        'out': 'Stock removed successfully!',
-        'remove-out': 'Quantity Out reversed successfully!'
-      }
-      alert(successMessages[stockFormData.type] || 'Stock updated successfully!')
-      setShowStockModal(false)
-      setStockFormData({
-        itemId: '',
-        type: 'in',
-        quantity: '',
-        notes: '',
-      })
-      await loadItems()
-    } catch (error) {
-      console.error('Failed to update stock:', error)
-      alert('Failed to update stock')
-    }
-  }
-
-  const openStockModal = (item: InventoryItem, type: 'in' | 'out' | 'remove-out') => {
-    setStockFormData({
-      itemId: item.id,
-      type,
-      quantity: '',
-      notes: '',
-    })
+  const openStockModal = (item: InventoryItem, initialType?: 'in' | 'out' | 'remove-out') => {
+    setStockItem(item)
+    // We can pass initialType to modal if needed, but for now modal defaults to 'in' or we can add prop
     setShowStockModal(true)
   }
 
@@ -869,11 +816,16 @@ export default function InventoryPage() {
                                       >
                                         +
                                       </button>
-                                      <span className={`font-bold text-sm min-w-[60px] text-center ${(item.currentStock || 0) > 10 ? 'text-green-600' :
+                                      <div className="flex flex-col items-center">
+                                        <span className={`font-bold text-sm min-w-[60px] text-center ${(item.currentStock || 0) > 10 ? 'text-green-600' :
                                           (item.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
-                                        }`}>
-                                        Stock: {item.currentStock || 0}
-                                      </span>
+                                          }`}>
+                                          Stock: {item.currentStock || 0}
+                                        </span>
+                                        <span className="text-[10px] text-gray-500 font-medium">
+                                          Value: ₹{((item.currentStock || 0) * item.sellingPrice).toLocaleString()}
+                                        </span>
+                                      </div>
                                       <button
                                         onClick={() => quickStockUpdate(item.id, 'remove-stock', 1)}
                                         className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded text-xs font-bold border border-red-200"
@@ -1055,11 +1007,16 @@ export default function InventoryPage() {
                               >
                                 +
                               </button>
-                              <span className={`font-bold text-sm min-w-[60px] text-center ${(item.currentStock || 0) > 10 ? 'text-green-600' :
+                              <div className="flex flex-col items-center">
+                                <span className={`font-bold text-sm min-w-[60px] text-center ${(item.currentStock || 0) > 10 ? 'text-green-600' :
                                   (item.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
-                                }`}>
-                                Stock: {item.currentStock || 0}
-                              </span>
+                                  }`}>
+                                  Stock: {item.currentStock || 0}
+                                </span>
+                                <span className="text-[10px] text-gray-500 font-medium">
+                                  Value: ₹{((item.currentStock || 0) * item.sellingPrice).toLocaleString()}
+                                </span>
+                              </div>
                               <button
                                 onClick={() => quickStockUpdate(item.id, 'remove-stock', 1)}
                                 className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded text-xs font-bold border border-red-200"
@@ -1540,7 +1497,7 @@ export default function InventoryPage() {
                       <div>
                         <label className="text-xs font-medium text-gray-400">Available Stock</label>
                         <p className={`text-xl font-bold ${(selectedItem.currentStock || 0) > 10 ? 'text-green-600' :
-                            (selectedItem.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
+                          (selectedItem.currentStock || 0) > 0 ? 'text-yellow-600' : 'text-red-600'
                           }`}>
                           {selectedItem.currentStock || 0}
                         </p>
@@ -1655,82 +1612,15 @@ export default function InventoryPage() {
         )}
 
         {/* Stock Update Modal */}
-        {showStockModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-              <h2 className="text-2xl font-bold mb-6">
-                {stockFormData.type === 'in' ? 'Add Stock' :
-                  stockFormData.type === 'out' ? 'Remove Stock' :
-                    'Reverse Quantity Out'}
-              </h2>
-              <form onSubmit={handleStockUpdate} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {stockFormData.type === 'in' ? 'Quantity In' :
-                      stockFormData.type === 'out' ? 'Quantity Out' :
-                        'Quantity to Reverse'} *
-                  </label>
-                  {stockFormData.type === 'remove-out' && (
-                    <p className="text-xs text-gray-500 mb-2">
-                      This will decrease quantity_out and increase current stock. Use this to reverse a sale or incorrect stock removal.
-                    </p>
-                  )}
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={stockFormData.quantity}
-                    onChange={(e) => setStockFormData({ ...stockFormData, quantity: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="Enter quantity"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
-                  <textarea
-                    value={stockFormData.notes}
-                    onChange={(e) => setStockFormData({ ...stockFormData, notes: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    rows={3}
-                    placeholder="Add any notes about this stock transaction..."
-                  />
-                </div>
-                <div className="flex space-x-4 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowStockModal(false)
-                      setStockFormData({
-                        itemId: '',
-                        type: 'in',
-                        quantity: '',
-                        notes: '',
-                      })
-                    }}
-                    className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className={`flex-1 text-white px-4 py-2 rounded-lg transition-colors ${stockFormData.type === 'in'
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : stockFormData.type === 'out'
-                          ? 'bg-red-600 hover:bg-red-700'
-                          : stockFormData.type === 'remove-out'
-                            ? 'bg-purple-600 hover:bg-purple-700'
-                            : 'bg-blue-600 hover:bg-blue-700'
-                      }`}
-                  >
-                    {stockFormData.type === 'in' ? 'Add Stock' :
-                      stockFormData.type === 'out' ? 'Remove Stock' :
-                        stockFormData.type === 'remove-out' ? 'Reverse Out' : 'Set Stock'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        <RestockModal
+          isOpen={showStockModal}
+          onClose={() => {
+            setShowStockModal(false)
+            setStockItem(null)
+          }}
+          item={stockItem}
+          onSuccess={loadItems}
+        />
 
         {/* Bulk Stock Update Modal */}
         {showBulkStockModal && (

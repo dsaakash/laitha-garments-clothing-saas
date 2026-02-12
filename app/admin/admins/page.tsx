@@ -18,6 +18,7 @@ export default function AdminsPage() {
   })
 
   const [currentUserRole, setCurrentUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
+  const [adminLimit, setAdminLimit] = useState<number>(0)
 
   useEffect(() => {
     fetch('/api/auth/check')
@@ -72,8 +73,12 @@ export default function AdminsPage() {
     try {
       const response = await fetch('/api/admin')
       const result = await response.json()
+      console.log('AdminsPage: loadAdmins result', result)
       if (result.success) {
         setAdmins(result.admins)
+        if (result.limit) setAdminLimit(result.limit)
+      } else {
+        console.error('AdminsPage: API returned success=false', result)
       }
     } catch (error) {
       console.error('Failed to load admins:', error)
@@ -228,6 +233,14 @@ export default function AdminsPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {currentUserRole !== 'superadmin' && adminLimit > 0 && (
+            <div className={`px-6 py-3 border-b ${admins.length >= adminLimit ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-800'}`}>
+              <p className="text-sm font-medium">
+                Admin Seats Used: {admins.length} / {adminLimit}
+                {admins.length >= adminLimit && <span className="ml-2 font-bold">(Limit Reached)</span>}
+              </p>
+            </div>
+          )}
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>

@@ -29,6 +29,7 @@ function transformTenant(dbTenant: any): any {
         createdAt: dbTenant.created_at,
         updatedAt: dbTenant.updated_at,
         createdBy: dbTenant.created_by,
+        adminLimit: dbTenant.admin_limit || 5, // Default to 5
     }
 }
 
@@ -89,7 +90,8 @@ export async function PUT(
             subdomain,
             workflowEnabled,
             websiteBuilderEnabled,
-            modules
+            modules,
+            adminLimit
         } = body
 
         // Get current tenant to check plan changes
@@ -118,7 +120,10 @@ export async function PUT(
         if (subdomain) updateData.subdomain = subdomain
         if (workflowEnabled !== undefined) updateData.workflow_enabled = workflowEnabled
         if (websiteBuilderEnabled !== undefined) updateData.website_builder_enabled = websiteBuilderEnabled
+        if (workflowEnabled !== undefined) updateData.workflow_enabled = workflowEnabled
+        if (websiteBuilderEnabled !== undefined) updateData.website_builder_enabled = websiteBuilderEnabled
         if (modules) updateData.modules = modules
+        if (adminLimit !== undefined) updateData.admin_limit = adminLimit
 
         // Handle plan upgrade logic
         if (plan && plan !== currentTenant.plan) {

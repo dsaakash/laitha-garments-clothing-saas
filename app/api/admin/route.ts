@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdmin, getAllAdmins, deleteAdmin, getAdminById, updateAdminRole } from '@/lib/db-auth'
+import { createAdmin, getAllAdmins, deleteAdmin, getAdminById, updateAdminRole, getAdminCount, getTenantAdminLimit } from '@/lib/db-auth'
 import { verifyAdmin, getAdminByEmail } from '@/lib/db-auth'
 import { getCurrentUserRole, hasPermission } from '@/lib/rbac'
 import { decodeBase64 } from '@/lib/utils'
@@ -10,25 +10,38 @@ export async function GET(request: NextRequest) {
     // Verify authentication
     const session = request.cookies.get('admin_session')
     if (!session) {
+      console.log('Admin API: No session found')
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    let tenantId: string | undefined
+    let tenantId: string | null | undefined
+    let userType: string | undefined
+    let adminId: number | undefined
 
     // Check if user has permission to view admins
     try {
       const decoded = decodeBase64(session.value)
+      console.log('Admin API: Decoded session', decoded)
+
       const parts = decoded.split(':')
-      const userType = parts[0]
-      const adminId = parseInt(parts[1])
+      userType = parts[0]
+      adminId = parseInt(parts[1])
 
       // Extract tenantId if present (index 3)
       if (parts.length > 3 && parts[3] && parts[3] !== 'null') {
         tenantId = parts[3]
       }
+
+      // Superadmins should see only System Admins (Lalitha Garments staff) by default
+      // This prevents mixing Tenant Admins with System Admins
+      if (userType === 'superadmin') {
+        tenantId = null
+      }
+
+      console.log('Admin API: Parsed', { userType, adminId, tenantId })
 
       // Tenant owners have implicit permission for their own tenant
       if (userType === 'tenant') {
@@ -39,8 +52,10 @@ export async function GET(request: NextRequest) {
         }
 
         const role = await getCurrentUserRole(adminId)
+        console.log('Admin API: User role', role)
 
         if (!role || !hasPermission(role, 'admins', 'read')) {
+          console.log('Admin API: Insufficient permissions', { role })
           return NextResponse.json(
             { success: false, message: 'Insufficient permissions' },
             { status: 403 }
@@ -48,6 +63,7 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (error) {
+      console.error('Admin API: Session decode error', error)
       return NextResponse.json(
         { success: false, message: 'Invalid session' },
         { status: 401 }
@@ -55,8 +71,17 @@ export async function GET(request: NextRequest) {
     }
 
     const admins = await getAllAdmins(tenantId)
+    let limit = 0
 
-    return NextResponse.json({ success: true, admins })
+    if (userType === 'tenant' && tenantId) {
+      limit = await getTenantAdminLimit(tenantId)
+    }
+
+    return NextResponse.json({
+      success: true,
+      admins,
+      limit
+    })
   } catch (error) {
     console.error('Get admins error:', error)
     return NextResponse.json(
@@ -91,6 +116,19 @@ export async function POST(request: NextRequest) {
       // Extract tenantId if present
       if (parts.length > 3 && parts[3] && parts[3] !== 'null') {
         tenantId = parts[3]
+      }
+
+      // Check Admin Limit for Tenants
+      if (tenantId) {
+        const currentCount = await getAdminCount(tenantId)
+        const limit = await getTenantAdminLimit(tenantId)
+
+        if (currentCount >= limit) {
+          return NextResponse.json(
+            { success: false, message: `Admin limit reached (${currentCount}/${limit}). Upgrade your plan to add more.` },
+            { status: 403 }
+          )
+        }
       }
 
       if (userType === 'tenant') {

@@ -8,6 +8,8 @@ import { format } from 'date-fns'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import StockValueCards from '@/components/dashboard/StockValueCards'
+import SupplierStockTable from '@/components/dashboard/SupplierStockTable'
 
 interface SoldItem {
   dressName: string
@@ -34,6 +36,7 @@ export default function Dashboard() {
   })
   const [recentSales, setRecentSales] = useState<Sale[]>([])
   const [soldItems, setSoldItems] = useState<SoldItem[]>([])
+  const [stockValueData, setStockValueData] = useState<any>(null)
   const [trialInfo, setTrialInfo] = useState<{
     isTrial: boolean
     daysRemaining: number
@@ -111,15 +114,21 @@ export default function Dashboard() {
 
     const loadData = async () => {
       try {
-        const [inventoryRes, salesRes] = await Promise.all([
+        const [inventoryRes, salesRes, stockValueRes] = await Promise.all([
           fetch('/api/inventory', { credentials: 'include' }),
           fetch('/api/sales', { credentials: 'include' }),
+          fetch('/api/inventory/value', { credentials: 'include' }),
         ])
         const inventoryResult = await inventoryRes.json()
         const salesResult = await salesRes.json()
+        const stockValueResult = await stockValueRes.json()
 
         const inventory = inventoryResult.success ? inventoryResult.data : []
         const sales = salesResult.success ? salesResult.data : []
+
+        if (stockValueResult.success) {
+          setStockValueData(stockValueResult.data)
+        }
 
         const totalRevenue = sales.reduce((sum: number, sale: Sale) => sum + sale.totalAmount, 0)
         const totalProfit = sales.reduce((sum: number, sale: Sale) => {
@@ -297,38 +306,38 @@ export default function Dashboard() {
         {/* Trial Warning Banner */}
         {trialInfo && trialInfo.isTrial && (
           <div className={`rounded-xl p-6 border-2 ${trialInfo.daysRemaining <= 3
-              ? 'bg-red-50 border-red-200'
-              : trialInfo.daysRemaining <= 7
-                ? 'bg-orange-50 border-orange-200'
-                : 'bg-yellow-50 border-yellow-200'
+            ? 'bg-red-50 border-red-200'
+            : trialInfo.daysRemaining <= 7
+              ? 'bg-orange-50 border-orange-200'
+              : 'bg-yellow-50 border-yellow-200'
             }`}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${trialInfo.daysRemaining <= 3
-                      ? 'bg-red-100'
-                      : trialInfo.daysRemaining <= 7
-                        ? 'bg-orange-100'
-                        : 'bg-yellow-100'
+                    ? 'bg-red-100'
+                    : trialInfo.daysRemaining <= 7
+                      ? 'bg-orange-100'
+                      : 'bg-yellow-100'
                     }`}>
                     <span className="text-2xl">⏰</span>
                   </div>
                   <div>
                     <h3 className={`text-lg font-bold ${trialInfo.daysRemaining <= 3
-                        ? 'text-red-900'
-                        : trialInfo.daysRemaining <= 7
-                          ? 'text-orange-900'
-                          : 'text-yellow-900'
+                      ? 'text-red-900'
+                      : trialInfo.daysRemaining <= 7
+                        ? 'text-orange-900'
+                        : 'text-yellow-900'
                       }`}>
                       {trialInfo.daysRemaining === 0
                         ? '🚨 Trial Ends Today!'
                         : `Trial Period: ${trialInfo.daysRemaining} Days Remaining`}
                     </h3>
                     <p className={`text-sm ${trialInfo.daysRemaining <= 3
-                        ? 'text-red-700'
-                        : trialInfo.daysRemaining <= 7
-                          ? 'text-orange-700'
-                          : 'text-yellow-700'
+                      ? 'text-red-700'
+                      : trialInfo.daysRemaining <= 7
+                        ? 'text-orange-700'
+                        : 'text-yellow-700'
                       }`}>
                       Your trial expires on {format(new Date(trialInfo.trialEndDate), 'MMMM dd, yyyy')}
                     </p>
@@ -360,6 +369,9 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Stock Value - Retail & Wholesale */}
+        <StockValueCards data={stockValueData} loading={!stockValueData} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {statCards.map((card, index) => (
@@ -439,6 +451,14 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Supplier Stock Value Table */}
+        {stockValueData?.supplierBreakdown && stockValueData.supplierBreakdown.length > 0 && (
+          <SupplierStockTable
+            data={stockValueData.supplierBreakdown}
+            loading={!stockValueData}
+          />
+        )}
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>

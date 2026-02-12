@@ -505,7 +505,7 @@ export async function POST(request: NextRequest) {
               updateDressCode,
               item.category || existing.dress_type, // Sync category to dress_type
               item.pricePerPiece,
-              (parseFloat(item.pricePerPiece) * 2).toFixed(2),
+              item.sellingPrice ? parseFloat(item.sellingPrice).toFixed(2) : (parseFloat(item.pricePerPiece) * 2).toFixed(2),
               item.fabricType,
               body.supplierName,
               newQuantityIn,
@@ -530,7 +530,7 @@ export async function POST(request: NextRequest) {
               dressCode,
               item.sizes || [],
               item.pricePerPiece,
-              (parseFloat(item.pricePerPiece) * 2).toFixed(2),
+              item.sellingPrice ? parseFloat(item.sellingPrice).toFixed(2) : (parseFloat(item.pricePerPiece) * 2).toFixed(2),
               item.productImages && item.productImages.length > 0 ? item.productImages[0] : null,
               item.fabricType,
               body.supplierName,
