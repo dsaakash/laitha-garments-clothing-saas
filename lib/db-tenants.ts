@@ -28,6 +28,7 @@ export interface TenantDB {
     workflow_enabled: boolean
     website_builder_enabled: boolean
     modules: string[]
+    admin_limit: number
     created_at: string
     updated_at: string
     created_by: string
@@ -52,6 +53,7 @@ export async function createTenant(data: {
     subdomain: string
     workflowEnabled: boolean
     modules?: string[]
+    adminLimit?: number
     createdBy: string
 }): Promise<TenantDB> {
     // Hash password
@@ -63,9 +65,9 @@ export async function createTenant(data: {
       password_hash, phone, whatsapp, address, gst_number,
       status, plan, trial_start_date, trial_end_date,
       subscription_status, billing_cycle, monthly_revenue,
-      subdomain, workflow_enabled, website_builder_enabled, modules,
+      subdomain, workflow_enabled, website_builder_enabled, modules, admin_limit,
       created_at, updated_at, created_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $22)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $23)
     RETURNING *`,
         [
             data.id,
@@ -89,6 +91,7 @@ export async function createTenant(data: {
             data.workflowEnabled,
             false, // website_builder_enabled
             data.modules || [], // Default to empty array if not provided
+            data.adminLimit || 5, // Default to 5 if not provided
             data.createdBy
         ]
     )

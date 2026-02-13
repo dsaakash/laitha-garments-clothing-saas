@@ -32,6 +32,8 @@ function transformTenant(dbTenant: any): any {
         subdomain: dbTenant.subdomain,
         workflowEnabled: dbTenant.workflow_enabled,
         websiteBuilderEnabled: dbTenant.website_builder_enabled,
+        modules: dbTenant.modules || [],
+        adminLimit: dbTenant.admin_limit || 5,
         createdAt: dbTenant.created_at,
         updatedAt: dbTenant.updated_at,
         createdBy: dbTenant.created_by,
@@ -126,6 +128,8 @@ export async function POST(request: NextRequest) {
             trialEndDate,
             subdomain: `${slug}.yoursaas.com`,
             workflowEnabled: body.workflowEnabled !== false,
+            modules: body.modules || [],
+            adminLimit: body.adminLimit || 2, // Default to 2 for trial as requested
             createdBy: body.createdBy || 'system'
         })
 

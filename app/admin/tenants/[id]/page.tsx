@@ -40,6 +40,8 @@ interface Credentials {
 const AVAILABLE_MODULES = [
     { id: 'pos', label: 'POS System' },
     { id: 'inventory', label: 'Inventory Management' },
+    { id: 'products', label: 'Products' },
+    { id: 'catalogues', label: 'Catalogues' },
     { id: 'purchases', label: 'Purchase Orders' },
     { id: 'sales', label: 'Sales & Billing' },
     { id: 'invoices', label: 'Invoicing' },

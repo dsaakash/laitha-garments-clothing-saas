@@ -8,6 +8,27 @@ import ActionButton from '@/components/ActionButton'
 import { ArrowLeft, Save } from 'lucide-react'
 import { generateSlug, getPlanPricing } from '@/lib/tenantStorage'
 
+const AVAILABLE_MODULES = [
+    { id: 'pos', label: 'POS System' },
+    { id: 'inventory', label: 'Inventory Management' },
+    { id: 'products', label: 'Products' },
+    { id: 'catalogues', label: 'Catalogues' },
+    { id: 'purchases', label: 'Purchase Orders' },
+    { id: 'sales', label: 'Sales & Billing' },
+    { id: 'invoices', label: 'Invoicing' },
+    { id: 'customers', label: 'CRM / Customers' },
+    { id: 'enquiries', label: 'Customer Enquiries' },
+    { id: 'suppliers', label: 'Supplier Management' },
+    { id: 'workflow', label: 'Workflow Engine' },
+    { id: 'website', label: 'Website Builder' },
+    { id: 'accounting', label: 'Accounting' },
+    { id: 'research', label: 'Raw Research' },
+    { id: 'setup', label: 'Setup Wizard' },
+    { id: 'business', label: 'Business Profile' },
+    { id: 'admins', label: 'Admin Management' },
+    { id: 'roles', label: 'Roles & Permissions' },
+]
+
 export default function NewTenantPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
@@ -23,6 +44,8 @@ export default function NewTenantPage() {
         plan: 'free' as 'free' | 'basic' | 'premium' | 'enterprise',
         workflowEnabled: true,
     })
+    const [selectedModules, setSelectedModules] = useState<string[]>(['inventory', 'products', 'catalogues', 'sales', 'customers', 'business', 'setup'])
+    const [adminLimit, setAdminLimit] = useState<number>(2)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -35,6 +58,8 @@ export default function NewTenantPage() {
                 body: JSON.stringify({
                     ...formData,
                     whatsapp: formData.whatsapp || formData.phone,
+                    modules: selectedModules,
+                    adminLimit: adminLimit,
                     createdBy: 'superadmin', // TODO: Get from session
                 }),
             })
@@ -52,6 +77,14 @@ export default function NewTenantPage() {
             alert('Failed to create tenant')
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleModuleToggle = (moduleId: string) => {
+        if (selectedModules.includes(moduleId)) {
+            setSelectedModules(prev => prev.filter(id => id !== moduleId))
+        } else {
+            setSelectedModules(prev => [...prev, moduleId])
         }
     }
 
@@ -234,23 +267,56 @@ export default function NewTenantPage() {
                             </div>
                         </div>
 
-                        {/* Features */}
+                        {/* Module Selection */}
                         <div className="mb-8">
-                            <h3 className="text-lg font-bold text-gray-900 mb-4">Features</h3>
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">Module Access for Free Trial</h3>
+                            <p className="text-sm text-gray-500 mb-6">Select which modules will be available during the 14-day trial period.</p>
 
-                            <div className="space-y-3">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.workflowEnabled}
-                                        onChange={(e) => setFormData({ ...formData, workflowEnabled: e.target.checked })}
-                                        className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                                    />
-                                    <div>
-                                        <span className="text-sm font-semibold text-gray-700">Workflow Canvas</span>
-                                        <p className="text-xs text-gray-500">Allow tenant to visualize and automate business processes</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {AVAILABLE_MODULES.map((module) => (
+                                    <div
+                                        key={module.id}
+                                        onClick={() => handleModuleToggle(module.id)}
+                                        className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all ${selectedModules.includes(module.id)
+                                            ? 'border-purple-500 bg-purple-50'
+                                            : 'border-gray-200 hover:border-gray-300 shadow-sm'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedModules.includes(module.id)
+                                                ? 'bg-purple-600 border-purple-600'
+                                                : 'border-gray-300 bg-white'
+                                                }`}>
+                                                {selectedModules.includes(module.id) && (
+                                                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <span className={`font-medium ${selectedModules.includes(module.id) ? 'text-purple-900' : 'text-gray-700'}`}>
+                                                {module.label}
+                                            </span>
+                                        </div>
                                     </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Admin Limit Configuration */}
+                        <div className="mb-8">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">Trial Limits</h3>
+                            <div className="max-w-xs">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Max Admin Users
                                 </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={adminLimit}
+                                    onChange={(e) => setAdminLimit(parseInt(e.target.value))}
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Default is 2 for trial. Adjust manually if needed.</p>
                             </div>
                         </div>
 
@@ -273,6 +339,14 @@ export default function NewTenantPage() {
                                 <div>
                                     <p className="text-gray-600">Plan</p>
                                     <p className="font-semibold capitalize">{formData.plan}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-600">Admin Limit</p>
+                                    <p className="font-semibold">{adminLimit} admins</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-600">Selected Modules</p>
+                                    <p className="font-semibold text-purple-700">{selectedModules.length} modules enabled</p>
                                 </div>
                             </div>
                         </div>
