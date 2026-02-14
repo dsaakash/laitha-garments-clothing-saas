@@ -4,6 +4,8 @@ import { verifyAdmin, getAdminByEmail } from '@/lib/db-auth'
 import { getCurrentUserRole, hasPermission } from '@/lib/rbac'
 import { decodeBase64 } from '@/lib/utils'
 
+export const dynamic = 'force-dynamic'
+
 // Get all admins
 export async function GET(request: NextRequest) {
   try {
@@ -29,33 +31,48 @@ export async function GET(request: NextRequest) {
       const parts = decoded.split(':')
       userType = parts[0]
       adminId = parseInt(parts[1])
+      const email = parts[2]
 
-      // Extract tenantId if present (index 3)
-      if (parts.length > 3 && parts[3] && parts[3] !== 'null') {
+      // Extract tenantId correctly based on session format
+      // Format 1 (length 5): userType:userId:email:tenantId:timestamp
+      // Format 2 (length 4): userType:userId:email:timestamp
+      if (parts.length > 4) {
         tenantId = parts[3]
-      }
-
-      // Superadmins should see only System Admins (Lalitha Garments staff) by default
-      // This prevents mixing Tenant Admins with System Admins
-      if (userType === 'superadmin') {
+      } else {
         tenantId = null
       }
 
-      console.log('Admin API: Parsed', { userType, adminId, tenantId })
+      // If superadmin, allow overriding tenantId via query param
+      // This allows them to switch between viewing system admins (Lalitha staff) and tenant admins
+      if (userType === 'superadmin') {
+        const { searchParams } = new URL(request.url)
+        const queryTenantId = searchParams.get('tenantId')
+
+        if (queryTenantId === 'all') {
+          tenantId = undefined // Fetch all admins
+        } else if (queryTenantId) {
+          tenantId = queryTenantId
+        } else {
+          tenantId = null // Default to system admins
+        }
+      }
+
+      console.log('Admin API: Parsed Info:', { userType, adminId, email, tenantId, sessionLength: parts.length })
 
       // Tenant owners have implicit permission for their own tenant
       if (userType === 'tenant') {
         // Proceed
       } else {
         if (isNaN(adminId)) {
+          console.error('Admin API: Invalid admin ID in session')
           throw new Error('Invalid admin ID')
         }
 
         const role = await getCurrentUserRole(adminId)
-        console.log('Admin API: User role', role)
+        console.log('Admin API: User role for adminId', adminId, ':', role?.name)
 
         if (!role || !hasPermission(role, 'admins', 'read')) {
-          console.log('Admin API: Insufficient permissions', { role })
+          console.log('Admin API: Insufficient permissions for role:', role?.name)
           return NextResponse.json(
             { success: false, message: 'Insufficient permissions' },
             { status: 403 }

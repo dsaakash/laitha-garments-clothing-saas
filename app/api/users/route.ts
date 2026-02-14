@@ -1,103 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createUser, getAllUsers, deleteUser } from '@/lib/db-auth'
+import { createUser, getAllUsers, deleteUser, getUserById } from '@/lib/db-auth'
 import { getUserByEmail } from '@/lib/db-auth'
 import { getCurrentUserRole, hasPermission } from '@/lib/rbac'
-import { decodeBase64 } from '@/lib/utils'
+import { getTenantContext } from '@/lib/tenant-context'
 
 // Get all users
 export async function GET(request: NextRequest) {
   try {
-    // Verify authentication
+    const context = getTenantContext(request)
+
+    // Verify permission
     const session = request.cookies.get('admin_session')
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user has permission to view users (admin and superadmin)
-    try {
-      const decoded = decodeBase64(session.value)
-      const parts = decoded.split(':')
-      const adminId = parseInt(parts[1])
-      const role = await getCurrentUserRole(adminId)
-
-      if (!role || !hasPermission(role, 'users', 'read')) {
-        return NextResponse.json(
-          { success: false, message: 'Insufficient permissions' },
-          { status: 403 }
-        )
-      }
-    } catch (error) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid session' },
-        { status: 401 }
-      )
-    }
-
-    const users = await getAllUsers()
+    const users = await getAllUsers(context.isSuperAdmin ? null : context.tenantId)
     return NextResponse.json({ success: true, users })
   } catch (error) {
     console.error('Get users error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 })
   }
 }
 
 // Create new user
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
-    const session = request.cookies.get('admin_session')
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user has permission to create users (admin and superadmin)
-    try {
-      const decoded = decodeBase64(session.value)
-      const parts = decoded.split(':')
-      const adminId = parseInt(parts[1])
-      const role = await getCurrentUserRole(adminId)
-
-      if (!role || !hasPermission(role, 'users', 'write')) {
-        return NextResponse.json(
-          { success: false, message: 'Insufficient permissions to create users' },
-          { status: 403 }
-        )
-      }
-    } catch (error) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid session' },
-        { status: 401 }
-      )
-    }
-
+    const context = getTenantContext(request)
     const { email, password, name } = await request.json()
 
     if (!email || !password) {
-      return NextResponse.json(
-        { success: false, message: 'Email and password are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'Email and password are required' }, { status: 400 })
     }
 
     // Check if user already exists
     const existing = await getUserByEmail(email)
     if (existing) {
-      return NextResponse.json(
-        { success: false, message: 'User with this email already exists' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'User with this email already exists' }, { status: 400 })
     }
 
-    const user = await createUser(email, password, name)
+    const user = await createUser(email, password, name, context.isTenant ? context.tenantId! : undefined)
 
     return NextResponse.json({
       success: true,
@@ -111,98 +53,41 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Create user error:', error)
-    console.error('Error details:', {
-      message: error?.message,
-      code: error?.code,
-      detail: error?.detail,
-      stack: error?.stack
-    })
-
-    if (error.code === '23505') { // Unique constraint violation
-      return NextResponse.json(
-        { success: false, message: 'User with this email already exists' },
-        { status: 400 }
-      )
-    }
-
-    if (error.code === '42P01') { // Table does not exist
-      return NextResponse.json(
-        { success: false, message: 'Users table does not exist. Please run the migration: npm run migrate-roles' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: error?.message || 'Server error',
-        error: process.env.NODE_ENV === 'development' ? error?.message : undefined
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, message: error?.message || 'Server error' }, { status: 500 })
   }
 }
 
 // Delete user
 export async function DELETE(request: NextRequest) {
   try {
-    // Verify authentication
-    const session = request.cookies.get('admin_session')
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user has permission to delete users (admin and superadmin)
-    try {
-      const decoded = decodeBase64(session.value)
-      const parts = decoded.split(':')
-      const adminId = parseInt(parts[1])
-      const role = await getCurrentUserRole(adminId)
-
-      if (!role || !hasPermission(role, 'users', 'delete')) {
-        return NextResponse.json(
-          { success: false, message: 'Insufficient permissions to delete users' },
-          { status: 403 }
-        )
-      }
-    } catch (error) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid session' },
-        { status: 401 }
-      )
-    }
-
+    const context = getTenantContext(request)
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, message: 'User ID is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'User ID is required' }, { status: 400 })
     }
 
-    const deleted = await deleteUser(parseInt(id))
+    const userId = parseInt(id)
+    const user = await getUserById(userId)
 
-    if (deleted) {
-      return NextResponse.json({
-        success: true,
-        message: 'User deleted successfully'
-      })
-    } else {
-      return NextResponse.json(
-        { success: false, message: 'User not found' },
-        { status: 404 }
-      )
+    if (!user) {
+      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
+
+    // Isolate deletion: can only delete users from your own tenant
+    if (!context.isSuperAdmin && user.tenant_id !== context.tenantId) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
+    }
+
+    if (context.isSuperAdmin && user.tenant_id !== null) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
+    }
+
+    const deleted = await deleteUser(userId)
+    return NextResponse.json({ success: true, message: 'User deleted successfully' })
   } catch (error) {
     console.error('Delete user error:', error)
-    return NextResponse.json(
-      { success: false, message: 'Server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 })
   }
 }

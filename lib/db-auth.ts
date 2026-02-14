@@ -49,12 +49,12 @@ export async function createAdmin(email: string, password: string, name?: string
   return result.rows[0]
 }
 
-export async function createUser(email: string, password: string, name?: string): Promise<User> {
+export async function createUser(email: string, password: string, name?: string, tenantId?: string): Promise<User> {
   const passwordHash = await hashPassword(password)
 
   const result = await query(
-    'INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role, created_at, updated_at',
-    [email, passwordHash, name || null, 'user']
+    'INSERT INTO users (email, password_hash, name, role, tenant_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, tenant_id, created_at, updated_at',
+    [email, passwordHash, name || null, 'user', tenantId || null]
   )
 
   return result.rows[0]
@@ -165,10 +165,20 @@ export async function getTenantAdminLimit(tenantId: string): Promise<number> {
   return result.rows[0]?.admin_limit || 5 // Default to 5 if not found or null
 }
 
-export async function getAllUsers(): Promise<User[]> {
-  const result = await query(
-    'SELECT id, email, name, role, created_at, updated_at FROM users ORDER BY created_at DESC'
-  )
+export async function getAllUsers(tenantId?: string | null): Promise<User[]> {
+  let queryText = 'SELECT id, email, name, role, tenant_id, created_at, updated_at FROM users'
+  const params: any[] = []
+
+  if (tenantId === null) {
+    queryText += ' WHERE tenant_id IS NULL'
+  } else if (tenantId) {
+    queryText += ' WHERE tenant_id = $1'
+    params.push(tenantId)
+  }
+
+  queryText += ' ORDER BY created_at DESC'
+
+  const result = await query(queryText, params)
 
   return result.rows
 }
