@@ -18,6 +18,7 @@ export interface User {
   name?: string
   role: 'user'
   role_id?: number
+  tenant_id?: string | null
   created_at: Date
   updated_at: Date
 }
