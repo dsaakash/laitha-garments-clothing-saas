@@ -27,8 +27,11 @@ import {
   Menu,
   Building2,
   Sliders,
-  Search
+  Search,
+  Palette,
+  Paintbrush
 } from 'lucide-react'
+import { useTheme } from '@/components/ThemeProvider'
 
 interface AdminLayoutProps {
   children: React.ReactNode
@@ -352,7 +355,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       { href: '/admin/enquiries', label: 'Customer Enquiries', icon: MessageSquare, resource: 'enquiries', module: 'enquiries' },
       { href: '/admin/admins', label: 'Admin Management', icon: ShieldCheck, resource: 'admins', module: 'admins' },
       { href: '/admin/users', label: 'User Management', icon: UserCog, resource: 'users', module: 'users' },
-      { href: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, resource: 'roles', module: 'roles' }, // New Item
+      { href: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, resource: 'roles', module: 'roles' },
+      { href: '/admin/theme', label: 'Platform Theme', icon: Palette, resource: 'theme', action: 'manage' },
+      { href: '/admin/appearance', label: 'Appearance', icon: Paintbrush, resource: 'appearance' },
     ]
 
   // Filter nav items based on user role and permissions
@@ -383,8 +388,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // For tenants, conditionally show items based on enabled modules and subscription
     if (userRole === 'admin') {
       items = items.filter(item => {
-        // Explicitly hide Tenants list from non-superadmins
-        if (item.href === '/admin/tenants') {
+        // Explicitly hide Tenants list and Platform Theme from non-superadmins
+        if (item.href === '/admin/tenants' || item.href === '/admin/theme') {
           return false
         }
 
@@ -417,27 +422,28 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-slate-900 text-white shadow-2xl transform transition-all duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-50 text-white shadow-2xl transform transition-all duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-72'} w-72 flex flex-col`}
+        style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)' }}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className={`flex-shrink-0 bg-slate-950/50 backdrop-blur border-b border-slate-800 ${sidebarCollapsed ? 'p-4 items-center justify-center' : 'p-6'}`}>
+          <div className={`flex-shrink-0 backdrop-blur border-b ${sidebarCollapsed ? 'p-4 items-center justify-center' : 'p-6'}`} style={{ backgroundColor: 'rgba(0,0,0,0.15)', borderColor: 'rgba(255,255,255,0.1)' }}>
             <div className="flex items-start justify-between gap-3">
               {!sidebarCollapsed && (
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <Building2 className="w-5 h-5 text-purple-400" />
+                    <Building2 className="w-5 h-5" style={{ color: 'var(--accent, #9333ea)' }} />
                     <h1 className="text-lg font-bold tracking-tight truncate">{businessName}</h1>
                   </div>
-                  <div className="flex items-center gap-2 text-slate-400 text-xs font-medium bg-slate-800/50 py-1 px-2 rounded-md w-fit">
-                    <div className={`w-2 h-2 rounded-full ${userRole === 'superadmin' ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
+                  <div className="flex items-center gap-2 text-xs font-medium py-1 px-2 rounded-md w-fit" style={{ color: 'var(--sidebar-text, #e2e8f0)', backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent, #9333ea)' }}></div>
                     {userRole === 'user' ? 'User Portal' : 'Admin Portal'}
                   </div>
                 </div>
               )}
               {sidebarCollapsed && (
-                <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-purple-900/50">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg" style={{ backgroundColor: 'var(--accent, #9333ea)' }}>
                   <span className="font-bold text-lg">
                     {businessName.slice(0, 1).toUpperCase()}
                   </span>
@@ -448,7 +454,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 {/* Mobile Close Button */}
                 <button
                   onClick={() => setSidebarOpen(false)}
-                  className="lg:hidden text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors"
+                  className="lg:hidden hover:text-white p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--sidebar-text, #94a3b8)' }}
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -457,7 +464,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
 
           {/* Navigation */}
-          <nav className={`flex-1 overflow-y-auto custom-scrollbar ${sidebarCollapsed ? 'px-2 py-4' : 'px-4 py-6'} space-y-1.5`}>
+          <nav className={`flex-1 overflow-y-auto scrollbar-thin ${sidebarCollapsed ? 'px-2 py-4' : 'px-4 py-6'} space-y-1.5`}>
             {filteredNavItems.map((item) => {
               const isActive = pathname === item.href || (item.subItems && item.subItems.some(sub => pathname === sub.href))
               const Icon = item.icon
@@ -471,11 +478,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     href={item.href}
                     className={`relative flex items-center rounded-xl transition-all duration-200 group ${sidebarCollapsed ? 'justify-center p-3' : 'px-4 py-3 gap-3'
                       } ${isActive && !hasSubItems
-                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                        ? 'text-white shadow-lg'
                         : isActive && hasSubItems
-                          ? 'text-white bg-slate-800'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-purple-100'
+                          ? 'text-white'
+                          : ''
                       }`}
+                    style={{
+                      backgroundColor: isActive && !hasSubItems
+                        ? 'var(--accent, #9333ea)'
+                        : isActive && hasSubItems
+                          ? 'var(--sidebar-hover, #334155)'
+                          : undefined,
+                      color: isActive
+                        ? '#ffffff'
+                        : 'var(--sidebar-text, #94a3b8)',
+                    }}
                     title={sidebarCollapsed ? item.label : ''}
                   >
                     <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} strokeWidth={2} />
@@ -485,7 +502,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     )}
 
                     {!sidebarCollapsed && hasSubItems && (
-                      <div className="text-slate-500">
+                      <div style={{ color: 'var(--sidebar-text, #64748b)', opacity: 0.6 }}>
                         {isExpanded ? <ChevronLeft className="w-4 h-4 -rotate-90" /> : <ChevronLeft className="w-4 h-4" />}
                       </div>
                     )}
@@ -496,14 +513,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
                     {/* Tooltip for collapsed mode */}
                     {sidebarCollapsed && (
-                      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-xl border border-slate-700 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">
+                      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 text-white text-xs font-medium rounded-md shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap" style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)', border: '1px solid rgba(255,255,255,0.15)' }}>
                         {item.label}
                         {hasSubItems && item.subItems?.map(sub => (
-                          <div key={sub.href} className="mt-1 text-slate-400 font-normal pl-2 border-l border-slate-700">
+                          <div key={sub.href} className="mt-1 font-normal pl-2" style={{ color: 'var(--sidebar-text, #94a3b8)', opacity: 0.7, borderLeft: '1px solid rgba(255,255,255,0.15)' }}>
                             {sub.label}
                           </div>
                         ))}
-                        <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45 border-l border-b border-slate-700"></div>
+                        <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rotate-45" style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)', borderLeft: '1px solid rgba(255,255,255,0.15)', borderBottom: '1px solid rgba(255,255,255,0.15)' }}></div>
                       </div>
                     )}
                   </Link>
@@ -517,12 +534,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                           <Link
                             key={sub.href}
                             href={sub.href}
-                            className={`flex items-center pl-12 pr-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${isSubActive
-                              ? 'text-purple-400 bg-slate-800/50'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                              }`}
+                            className="flex items-center pl-12 pr-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200"
+                            style={{
+                              color: isSubActive ? 'var(--accent, #9333ea)' : 'var(--sidebar-text, #94a3b8)',
+                              backgroundColor: isSubActive ? 'rgba(255,255,255,0.05)' : undefined,
+                            }}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full mr-3 ${isSubActive ? 'bg-purple-500' : 'bg-slate-600'}`}></span>
+                            <span className="w-1.5 h-1.5 rounded-full mr-3" style={{ backgroundColor: isSubActive ? 'var(--accent, #9333ea)' : 'rgba(255,255,255,0.2)' }}></span>
                             {sub.label}
                           </Link>
                         )
@@ -535,14 +553,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </nav>
 
           {/* Footer */}
-          <div className={`flex-shrink-0 border-t border-slate-800 bg-slate-950/30 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`}>
+          <div className={`flex-shrink-0 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`} style={{ borderTop: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.1)' }}>
             {/* Collapse/Expand Toggle Button - Bottom */}
             <button
               onClick={toggleSidebar}
-              className={`hidden lg:flex w-full items-center text-slate-400 hover:text-white hover:bg-slate-800 p-2.5 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-700 ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'}`}
+              className={`hidden lg:flex w-full items-center hover:text-white p-2.5 rounded-xl transition-all duration-200 border border-transparent ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'}`}
+              style={{ color: 'var(--sidebar-text, #94a3b8)' }}
               title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
-              <div className="bg-slate-800 rounded-lg p-1 group-hover:bg-slate-700">
+              <div className="rounded-lg p-1" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
                 {sidebarCollapsed ? (
                   <ChevronRight className="w-4 h-4" />
                 ) : (
