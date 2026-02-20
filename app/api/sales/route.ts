@@ -347,7 +347,7 @@ export async function POST(request: NextRequest) {
             const currentQuantityOut = parseInt(inventory.quantity_out) || 0
             const currentStock = parseInt(inventory.current_stock) || 0
             // Use meters if per meter pricing, otherwise use quantity
-            const quantityToDeduct = item.usePerMeter && item.meters ? item.meters : item.quantity
+            const quantityToDeduct = item.usePerMeter && item.meters ? parseFloat(item.meters) : (parseInt(item.quantity) || 0)
             const newQuantityOut = currentQuantityOut + quantityToDeduct
             // Maintain relationship: current_stock = quantity_in - quantity_out
             const newCurrentStock = Math.max(0, currentQuantityIn - newQuantityOut) // Prevent negative stock
@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
             const currentQuantityIn = parseInt(inventory.quantity_in) || 0
             const currentQuantityOut = parseInt(inventory.quantity_out) || 0
             const currentStock = parseInt(inventory.current_stock) || 0
-            const newQuantityOut = currentQuantityOut + item.quantity
+            const newQuantityOut = currentQuantityOut + (parseInt(item.quantity) || 0)
             // Maintain relationship: current_stock = quantity_in - quantity_out
             const newCurrentStock = Math.max(0, currentQuantityIn - newQuantityOut) // Prevent negative stock
 

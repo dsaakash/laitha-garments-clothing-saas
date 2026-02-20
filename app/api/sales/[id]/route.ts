@@ -11,7 +11,7 @@ export async function PUT(
     const id = parseInt(params.id)
     const body = await request.json()
     console.log('Updating sale:', id, 'with body:', JSON.stringify(body, null, 2))
-    
+
     if (isNaN(id)) {
       client.release()
       return NextResponse.json(
@@ -38,15 +38,15 @@ export async function PUT(
             'SELECT quantity_out, current_stock, quantity_in FROM inventory WHERE id = $1',
             [oldItem.inventory_id]
           )
-          
+
           if (inventoryResult.rows.length > 0) {
             const inventory = inventoryResult.rows[0]
             const currentQuantityIn = parseInt(inventory.quantity_in) || 0
             const currentQuantityOut = parseInt(inventory.quantity_out) || 0
-            const quantityToRestore = oldItem.use_per_meter && oldItem.meters ? oldItem.meters : oldItem.quantity
+            const quantityToRestore = oldItem.use_per_meter && oldItem.meters ? parseFloat(oldItem.meters) : (parseInt(oldItem.quantity) || 0)
             const newQuantityOut = Math.max(0, currentQuantityOut - quantityToRestore)
             const newCurrentStock = currentQuantityIn - newQuantityOut
-            
+
             await client.query(
               `UPDATE inventory 
                SET quantity_out = $1, 
@@ -110,17 +110,17 @@ export async function PUT(
               // For updates, we need to account for items that were already in the sale
               // Find if this item was in the old sale and restore that quantity
               const oldItem = oldItems.find((oi: any) => oi.inventory_id === inventoryId)
-              const restoredQuantity = oldItem ? (oldItem.use_per_meter && oldItem.meters ? oldItem.meters : oldItem.quantity) : 0
+              const restoredQuantity = oldItem ? (oldItem.use_per_meter && oldItem.meters ? parseFloat(oldItem.meters) : (parseInt(oldItem.quantity) || 0)) : 0
               const effectiveStock = availableStock + restoredQuantity
               const requestedQuantity = item.quantity || 0
-              
+
               if (effectiveStock < requestedQuantity) {
                 await client.query('ROLLBACK')
                 client.release()
                 return NextResponse.json(
-                  { 
-                    success: false, 
-                    message: `Insufficient stock for ${inventoryItem.dress_name} (${inventoryItem.dress_code}). Available: ${effectiveStock}, Requested: ${requestedQuantity}` 
+                  {
+                    success: false,
+                    message: `Insufficient stock for ${inventoryItem.dress_name} (${inventoryItem.dress_code}). Available: ${effectiveStock}, Requested: ${requestedQuantity}`
                   },
                   { status: 400 }
                 )
@@ -135,20 +135,20 @@ export async function PUT(
             }
           }
         }
-        
+
         // Now process items if all validations pass
         for (const item of body.items) {
           // Validate required fields
           if (!item.dressName || !item.dressType || item.quantity === undefined || item.quantity === null) {
             throw new Error(`Missing required fields for item: ${JSON.stringify(item)}`)
           }
-          
+
           // ALWAYS ensure dress_code is present - fetch from inventory if missing
           let dressCode = item.dressCode || ''
           let inventoryId = item.inventoryId ? parseInt(item.inventoryId) : null
           let finalDressName = item.dressName || ''
           let finalDressType = item.dressType || ''
-          
+
           // If inventoryId is provided, always fetch the latest dress_code from inventory
           if (inventoryId) {
             const inventoryResult = await client.query(
@@ -167,7 +167,7 @@ export async function PUT(
               finalDressType = finalDressType || inventory.dress_type || ''
             }
           }
-          
+
           await client.query(
             `INSERT INTO sale_items 
              (sale_id, inventory_id, dress_name, dress_type, dress_code, size, 
@@ -189,22 +189,22 @@ export async function PUT(
               item.profit || 0,
             ]
           )
-          
+
           // Update inventory stock
           if (item.inventoryId) {
             const inventoryResult = await client.query(
               'SELECT quantity_out, current_stock, quantity_in FROM inventory WHERE id = $1',
               [parseInt(item.inventoryId)]
             )
-            
+
             if (inventoryResult.rows.length > 0) {
               const inventory = inventoryResult.rows[0]
               const currentQuantityIn = parseInt(inventory.quantity_in) || 0
               const currentQuantityOut = parseInt(inventory.quantity_out) || 0
-              const quantityToDeduct = item.usePerMeter && item.meters ? item.meters : item.quantity
+              const quantityToDeduct = item.usePerMeter && item.meters ? parseFloat(item.meters) : (parseInt(item.quantity) || 0)
               const newQuantityOut = currentQuantityOut + quantityToDeduct
               const newCurrentStock = Math.max(0, currentQuantityIn - newQuantityOut)
-              
+
               await client.query(
                 `UPDATE inventory 
                  SET quantity_out = $1, 
@@ -303,9 +303,9 @@ export async function PUT(
       }
     }
     return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Failed to update sale', 
+      {
+        success: false,
+        message: 'Failed to update sale',
         error: error?.message || String(error),
         details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
       },
@@ -322,7 +322,7 @@ export async function DELETE(
   try {
     client = await getPool().connect()
     const id = parseInt(params.id)
-    
+
     if (isNaN(id)) {
       client.release()
       return NextResponse.json(
@@ -349,15 +349,15 @@ export async function DELETE(
             'SELECT quantity_out, current_stock, quantity_in FROM inventory WHERE id = $1',
             [item.inventory_id]
           )
-          
+
           if (inventoryResult.rows.length > 0) {
             const inventory = inventoryResult.rows[0]
             const currentQuantityIn = parseInt(inventory.quantity_in) || 0
             const currentQuantityOut = parseInt(inventory.quantity_out) || 0
-            const quantityToRestore = item.use_per_meter && item.meters ? item.meters : item.quantity
+            const quantityToRestore = item.use_per_meter && item.meters ? parseFloat(item.meters) : (parseInt(item.quantity) || 0)
             const newQuantityOut = Math.max(0, currentQuantityOut - quantityToRestore)
             const newCurrentStock = currentQuantityIn - newQuantityOut
-            
+
             await client.query(
               `UPDATE inventory 
                SET quantity_out = $1, 
@@ -372,7 +372,7 @@ export async function DELETE(
 
       // Delete sale items (cascade should handle this, but being explicit)
       await client.query('DELETE FROM sale_items WHERE sale_id = $1', [id])
-      
+
       // Delete sale
       await client.query('DELETE FROM sales WHERE id = $1', [id])
 
