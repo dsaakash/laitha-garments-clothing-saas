@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month')
     const year = searchParams.get('year')
+    const date = searchParams.get('date')
     const customerId = searchParams.get('customer_id')
     const partyName = searchParams.get('partyName')
 
@@ -69,6 +70,12 @@ export async function GET(request: NextRequest) {
     if (month) {
       conditions.push(`EXTRACT(MONTH FROM s.date) = $${paramCount}`)
       params.push(month)
+      paramCount++
+    }
+
+    if (date) {
+      conditions.push(`s.date = $${paramCount}`)
+      params.push(date)
       paramCount++
     }
 
@@ -330,7 +337,7 @@ export async function POST(request: NextRequest) {
         // Update inventory stock: decrease quantity_out and current_stock
         if (item.inventoryId) {
           const inventoryResult = await query(
-            'SELECT quantity_out, current_stock FROM inventory WHERE id = $1',
+            'SELECT quantity_out, current_stock, quantity_in FROM inventory WHERE id = $1',
             [parseInt(item.inventoryId)]
           )
 
@@ -357,7 +364,7 @@ export async function POST(request: NextRequest) {
         } else if (item.dressCode) {
           // Try to find inventory by dress_code if inventory_id is not provided
           const inventoryResult = await query(
-            'SELECT id, quantity_out, current_stock FROM inventory WHERE dress_code = $1',
+            'SELECT id, quantity_out, current_stock, quantity_in FROM inventory WHERE dress_code = $1',
             [item.dressCode]
           )
 
