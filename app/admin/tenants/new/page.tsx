@@ -9,6 +9,7 @@ import { ArrowLeft, Save } from 'lucide-react'
 import { generateSlug, getPlanPricing } from '@/lib/tenantStorage'
 
 const AVAILABLE_MODULES = [
+    { id: 'ai_setup_assistant', label: 'AI Setup Assistant (Groq)' },
     { id: 'pos', label: 'POS System' },
     { id: 'inventory', label: 'Inventory Management' },
     { id: 'products', label: 'Products' },

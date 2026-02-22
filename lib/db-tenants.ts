@@ -23,6 +23,9 @@ export interface TenantDB {
     billing_cycle: 'monthly' | 'yearly'
     next_billing_date?: string
     monthly_revenue: number
+    subscription_start_date?: string
+    subscription_end_date?: string
+    subscription_expired_notified_at?: string
     custom_domain?: string
     subdomain: string
     workflow_enabled: boolean

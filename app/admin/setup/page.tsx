@@ -24,7 +24,7 @@ export default function SetupPage() {
         fetch('/api/catalogues', { credentials: 'include' }),
         fetch('/api/sales', { credentials: 'include' }),
       ])
-      
+
       const profile = profileRes.ok ? (await profileRes.json()).data : null
       const suppliers = suppliersRes.ok ? (await suppliersRes.json()).data : []
       const purchaseOrders = purchasesRes.ok ? (await purchasesRes.json()).data : []
@@ -43,7 +43,7 @@ export default function SetupPage() {
       if (sales.length > 0) steps.push(7)
 
       setCompletedSteps(steps)
-      
+
       // Auto-advance to first incomplete step
       if (!profile) setCurrentStep(1)
       else if (suppliers.length === 0) setCurrentStep(2)
@@ -64,6 +64,7 @@ export default function SetupPage() {
       title: 'Business Setup',
       description: 'Configure your business profile',
       route: '/admin/business',
+      aiRoute: '/admin/business-ai',
       icon: '⚙️',
     },
     {
@@ -149,28 +150,26 @@ export default function SetupPage() {
             {steps.map((step) => {
               const isCompleted = completedSteps.includes(step.number)
               const isCurrent = currentStep === step.number
-              
+
               return (
                 <div
                   key={step.number}
-                  className={`border-2 rounded-lg p-6 transition-all ${
-                    isCurrent
+                  className={`border-2 rounded-lg p-6 transition-all ${isCurrent
                       ? 'border-purple-500 bg-purple-50'
                       : isCompleted
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-gray-200 bg-gray-50'
-                  }`}
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-4 flex-1">
                       <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold ${
-                          isCompleted
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold ${isCompleted
                             ? 'bg-green-500 text-white'
                             : isCurrent
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-gray-300 text-gray-600'
-                        }`}
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-gray-300 text-gray-600'
+                          }`}
                       >
                         {isCompleted ? '✓' : step.number}
                       </div>
@@ -183,18 +182,30 @@ export default function SetupPage() {
                           )}
                         </div>
                         <p className="text-gray-600 mb-4">{step.description}</p>
-                        <button
-                          onClick={() => handleStepClick(step.number)}
-                          className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                            isCompleted
-                              ? 'bg-green-600 text-white hover:bg-green-700'
-                              : isCurrent
-                              ? 'bg-purple-600 text-white hover:bg-purple-700'
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
-                        >
-                          {isCompleted ? 'Review' : isCurrent ? 'Continue' : 'Start'}
-                        </button>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleStepClick(step.number)}
+                            className={`px-6 py-2 rounded-lg font-medium transition-colors ${isCompleted
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : isCurrent
+                                  ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                              }`}
+                          >
+                            {isCompleted ? 'Review' : isCurrent ? 'Continue' : 'Start'}
+                          </button>
+                          {'aiRoute' in step && (step as any).aiRoute && (
+                            <button
+                              onClick={() => router.push((step as any).aiRoute)}
+                              className="px-4 py-2 rounded-lg font-medium transition-all
+                                         bg-gradient-to-r from-purple-500 to-indigo-500 text-white
+                                         hover:from-purple-600 hover:to-indigo-600 shadow-sm hover:shadow-md
+                                         text-sm flex items-center gap-1"
+                            >
+                              ✨ Try AI Setup
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

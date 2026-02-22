@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { checkAuth, logout } from '@/lib/auth'
 import { useTrialCheck } from '@/lib/useTrialCheck'
+import SubscriptionRenewalBanner from '@/components/SubscriptionRenewalBanner'
 import {
   LayoutDashboard,
   Rocket,
@@ -600,6 +601,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
           <div className="w-10"></div> {/* Spacer for centering */}
         </div>
+
+        {/* Subscription renewal warning banner — only shown to tenants near expiry */}
+        {(userRole === 'admin') && <SubscriptionRenewalBanner />}
 
         <div className="p-4 lg:p-8 max-w-[1600px] mx-auto">
           {children}

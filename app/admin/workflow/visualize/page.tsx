@@ -32,7 +32,9 @@ import {
     X,
     ArrowRight,
     ArrowLeft,
-    Loader2
+    Loader2,
+    MessageSquare,
+    CheckSquare
 } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 
@@ -75,6 +77,12 @@ const nodeTypes = {
 // Initial Data
 const initialNodes = [
     {
+        id: 'enquiries',
+        type: 'process',
+        data: { label: 'Enquiries', icon: MessageSquare, stats: 'Customer Queries', colorClass: 'bg-pink-50 text-pink-600', href: '/admin/enquiries', apiPath: '/api/enquiries' },
+        position: { x: 0, y: 0 },
+    },
+    {
         id: 'suppliers',
         type: 'process',
         data: { label: 'Suppliers', icon: Factory, stats: 'Manage Suppliers', colorClass: 'bg-orange-50 text-orange-600', href: '/admin/suppliers', apiPath: '/api/suppliers' },
@@ -90,6 +98,12 @@ const initialNodes = [
         id: 'purchases',
         type: 'process',
         data: { label: 'Purchase Orders', icon: ShoppingCart, stats: 'Procurement', colorClass: 'bg-blue-50 text-blue-600', href: '/admin/purchases', apiPath: '/api/purchases' },
+        position: { x: 0, y: 0 },
+    },
+    {
+        id: 'approvals',
+        type: 'process',
+        data: { label: 'Approvals', icon: CheckSquare, stats: 'Workflow Auth', colorClass: 'bg-red-50 text-red-600', href: '/admin/approvals', apiPath: '/api/approvals' },
         position: { x: 0, y: 0 },
     },
     {
@@ -125,9 +139,11 @@ const initialNodes = [
 ];
 
 const initialEdges = [
+    { id: 'enq1', source: 'enquiries', target: 'customers', animated: true, label: 'Convert' },
     { id: 'e1', source: 'suppliers', target: 'purchases', animated: true, label: 'Create PO' },
     { id: 'e2', source: 'categories', target: 'purchases', type: 'smoothstep', style: { strokeDasharray: '5,5' }, label: 'Categorize' },
-    { id: 'e3', source: 'purchases', target: 'inventory', animated: true, label: 'Add to Stock' },
+    { id: 'app1', source: 'purchases', target: 'approvals', animated: true, label: 'Requires Auth' },
+    { id: 'app2', source: 'approvals', target: 'inventory', animated: true, label: 'Release to Stock' },
     { id: 'e4', source: 'inventory', target: 'customers', type: 'smoothstep', style: { strokeDasharray: '5,5' } },
     { id: 'e5', source: 'inventory', target: 'catalogues', label: 'Organize' },
     { id: 'e6', source: 'customers', target: 'sales', animated: true, label: 'Place Order' },

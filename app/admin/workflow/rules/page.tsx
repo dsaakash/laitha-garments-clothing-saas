@@ -199,8 +199,10 @@ export default function WorkflowConfigPage() {
                                         onChange={(e) => setNewRule({ ...newRule, module: e.target.value })}
                                     >
                                         <option value="purchases">Purchases</option>
-                                        <option value="sales">Sales (Coming Soon)</option>
-                                        <option value="inventory">Inventory (Coming Soon)</option>
+                                        <option value="sales">Sales</option>
+                                        <option value="inventory">Inventory</option>
+                                        <option value="enquiries">Enquiries</option>
+                                        <option value="catalogues">Catalogues</option>
                                     </select>
                                 </div>
 

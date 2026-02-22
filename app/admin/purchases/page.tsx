@@ -11,8 +11,9 @@ import * as XLSX from 'xlsx'
 export default function PurchasesPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [inventoryItems, setInventoryItems] = useState<any[]>([])
   const [categories, setCategories] = useState<string[]>(['All'])
-  const [availableCategories, setAvailableCategories] = useState<Array<{id: string, name: string, parentId: string | null}>>([])
+  const [availableCategories, setAvailableCategories] = useState<Array<{ id: string, name: string, parentId: string | null }>>([])
   const [showModal, setShowModal] = useState(false)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -50,7 +51,7 @@ export default function PurchasesPage() {
     invoiceDate: '',
     transportCharges: 0,
   })
-  const [contactPersons, setContactPersons] = useState<Array<{name: string, mobile: string}>>([])
+  const [contactPersons, setContactPersons] = useState<Array<{ name: string, mobile: string }>>([])
   const [uploadingTransportImage, setUploadingTransportImage] = useState(false)
   const transportImageFileInputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<PurchaseOrderItem[]>([
@@ -107,17 +108,18 @@ export default function PurchasesPage() {
 
   const loadData = async () => {
     try {
-      const [suppliersRes, ordersRes, categoriesRes] = await Promise.all([
+      const [suppliersRes, ordersRes, categoriesRes, inventoryRes] = await Promise.all([
         fetch('/api/suppliers'),
         fetch('/api/purchases'),
-        fetch('/api/categories')
+        fetch('/api/categories'),
+        fetch('/api/inventory')
       ])
-      
+
       const suppliersResult = await suppliersRes.json()
       if (suppliersResult.success) {
         setSuppliers(suppliersResult.data)
       }
-      
+
       const ordersResult = await ordersRes.json()
       if (ordersResult.success) {
         setCategories(ordersResult.categories || ['All'])
@@ -127,6 +129,11 @@ export default function PurchasesPage() {
       const categoriesResult = await categoriesRes.json()
       if (categoriesResult.success) {
         setAvailableCategories(categoriesResult.data)
+      }
+
+      const inventoryResult = await inventoryRes.json()
+      if (inventoryResult.success) {
+        setInventoryItems(inventoryResult.data)
       }
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -147,12 +154,12 @@ export default function PurchasesPage() {
 
   const handleQuickSupplierCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!quickSupplierForm.name.trim() || !quickSupplierForm.phone.trim()) {
       alert('Name and Phone are required')
       return
     }
-    
+
     try {
       const response = await fetch('/api/suppliers', {
         method: 'POST',
@@ -164,9 +171,9 @@ export default function PurchasesPage() {
           address: quickSupplierForm.address.trim() || undefined,
         }),
       })
-      
+
       const result = await response.json()
-      
+
       if (result.success) {
         // Refresh suppliers list
         await loadSuppliers()
@@ -187,15 +194,15 @@ export default function PurchasesPage() {
   }
 
   // Build category tree for hierarchical display
-  const buildCategoryTree = (categories: Array<{id: string, name: string, parentId: string | null}>) => {
-    const map = new Map<string, {id: string, name: string, parentId: string | null, children: any[]}>()
+  const buildCategoryTree = (categories: Array<{ id: string, name: string, parentId: string | null }>) => {
+    const map = new Map<string, { id: string, name: string, parentId: string | null, children: any[] }>()
     const roots: any[] = []
-    
+
     // Create nodes
     categories.forEach(cat => {
       map.set(cat.id, { ...cat, children: [] })
     })
-    
+
     // Build tree
     categories.forEach(cat => {
       const node = map.get(cat.id)!
@@ -206,14 +213,14 @@ export default function PurchasesPage() {
         roots.push(node)
       }
     })
-    
+
     return { roots, map }
   }
 
   const getCategoryOptions = () => {
     const { roots } = buildCategoryTree(availableCategories)
     const options: JSX.Element[] = []
-    
+
     const renderCategory = (category: any, level: number = 0) => {
       const indent = '  '.repeat(level)
       options.push(
@@ -223,7 +230,7 @@ export default function PurchasesPage() {
       )
       category.children.forEach((child: any) => renderCategory(child, level + 1))
     }
-    
+
     roots.forEach(root => renderCategory(root))
     return options
   }
@@ -234,48 +241,48 @@ export default function PurchasesPage() {
       if (filterCategory && filterCategory !== 'All') {
         url.searchParams.set('category', filterCategory)
       }
-      
+
       const response = await fetch(url.toString())
       const result = await response.json()
-      
+
       if (!result.success) {
         console.error('API error:', result.message || result.error)
         alert(`Failed to load purchase orders: ${result.message || 'Unknown error'}`)
         return
       }
-      
+
       if (result.data && Array.isArray(result.data)) {
         let allOrders = result.data
-        
+
         if (filterSupplier) {
           allOrders = allOrders.filter((order: PurchaseOrder) => order.supplierId === filterSupplier)
         }
-        
+
         if (filterYear) {
           allOrders = allOrders.filter((order: PurchaseOrder) => {
             const orderYear = new Date(order.date).getFullYear().toString()
             return orderYear === filterYear
           })
         }
-        
+
         if (filterMonth) {
           allOrders = allOrders.filter((order: PurchaseOrder) => {
             const orderMonth = (new Date(order.date).getMonth() + 1).toString().padStart(2, '0')
             return orderMonth === filterMonth
           })
         }
-        
+
         // Search by supplier name
         if (searchQuery.trim()) {
           const query = searchQuery.toLowerCase().trim()
-          allOrders = allOrders.filter((order: PurchaseOrder) => 
+          allOrders = allOrders.filter((order: PurchaseOrder) =>
             order.supplierName.toLowerCase().includes(query) ||
             (order.customPoNumber && order.customPoNumber.toLowerCase().includes(query)) ||
             (order.items && order.items.some(item => item.productName.toLowerCase().includes(query))) ||
             (order.productName && order.productName.toLowerCase().includes(query))
           )
         }
-        
+
         allOrders.sort((a: PurchaseOrder, b: PurchaseOrder) => new Date(b.date).getTime() - new Date(a.date).getTime())
         setOrders(allOrders)
         console.log(`Loaded ${allOrders.length} purchase orders`)
@@ -296,7 +303,7 @@ export default function PurchasesPage() {
     setUploadingIndex(itemIndex)
     try {
       const uploadedUrls: string[] = []
-      
+
       for (const file of Array.from(files)) {
         if (!file.type.startsWith('image/')) {
           alert('Please select image files only')
@@ -321,7 +328,7 @@ export default function PurchasesPage() {
           uploadedUrls.push(data.url)
         }
       }
-      
+
       if (uploadedUrls.length > 0) {
         setItems(prev => {
           const newItems = [...prev]
@@ -450,20 +457,20 @@ export default function PurchasesPage() {
     setItems(prev => {
       const newItems = [...prev]
       const item = { ...newItems[index] }
-      
+
       if (field === 'sizes') {
-        item.sizes = typeof value === 'string' 
+        item.sizes = typeof value === 'string'
           ? value.split(',').map(s => s.trim()).filter(Boolean)
           : value
       } else {
         (item as any)[field] = value
       }
-      
+
       // Recalculate total
       if (field === 'quantity' || field === 'pricePerPiece') {
         item.totalAmount = item.quantity * item.pricePerPiece
       }
-      
+
       newItems[index] = item
       return newItems
     })
@@ -482,7 +489,7 @@ export default function PurchasesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     const supplier = suppliers.find(s => s.id === formData.supplierId)
     if (!supplier) {
       alert('Please select a supplier')
@@ -490,7 +497,7 @@ export default function PurchasesPage() {
     }
 
     // Validate items
-    const validItems = items.filter(item => 
+    const validItems = items.filter(item =>
       item.productName && item.quantity > 0 && item.pricePerPiece > 0
     )
 
@@ -507,7 +514,7 @@ export default function PurchasesPage() {
 
     try {
       const totals = calculateTotals()
-      
+
       const payload = {
         date: formData.date,
         supplierId: formData.supplierId,
@@ -536,7 +543,7 @@ export default function PurchasesPage() {
         invoiceNumber: formData.invoiceNumber || undefined,
         invoiceDate: formData.invoiceDate || undefined,
         transportCharges: formData.transportCharges || undefined,
-        contactPersons: contactPersons.filter(cp => cp.name.trim() || cp.mobile.trim()).length > 0 
+        contactPersons: contactPersons.filter(cp => cp.name.trim() || cp.mobile.trim()).length > 0
           ? contactPersons.filter(cp => cp.name.trim() || cp.mobile.trim())
           : undefined,
       }
@@ -555,15 +562,15 @@ export default function PurchasesPage() {
           body: JSON.stringify(payload),
         })
       }
-      
+
       const result = await response.json()
       if (!result.success) {
         alert(`Failed to ${editingOrder ? 'update' : 'add'} purchase order: ${result.message || 'Unknown error'}`)
         return
       }
-      
+
       alert(`Purchase order ${editingOrder ? 'updated' : 'added'}! Inventory updated automatically.`)
-      
+
       resetForm()
       await loadOrders()
       setShowModal(false)
@@ -594,7 +601,7 @@ export default function PurchasesPage() {
       transportCharges: (order as any).transportCharges || 0,
     })
     setContactPersons((order as any).contactPersons || [])
-    
+
     // Convert order to items format
     if (order.items && order.items.length > 0) {
       setItems(order.items.map(item => ({
@@ -620,7 +627,7 @@ export default function PurchasesPage() {
         productImages: order.productImage ? [order.productImage] : [],
       }])
     }
-    
+
     setShowModal(true)
   }
 
@@ -684,12 +691,12 @@ export default function PurchasesPage() {
   const calculateTotals = () => {
     const subtotal = items.reduce((sum, item) => sum + item.totalAmount, 0)
     const selectedSupplier = suppliers.find(s => s.id === formData.supplierId)
-    
+
     let gstAmount = 0
     let gstPercentage = 0
     let gstAmountRupees = 0
     let gstType: 'percentage' | 'rupees' = 'percentage'
-    
+
     // Check if manual GST override is set
     if (formData.gstType === 'rupees' && formData.gstAmountRupees > 0) {
       gstType = 'rupees'
@@ -711,10 +718,10 @@ export default function PurchasesPage() {
         gstAmount = (subtotal * gstPercentage) / 100
       }
     }
-    
+
     const transportCharges = formData.transportCharges || 0
     const grandTotal = subtotal + gstAmount + transportCharges
-    
+
     return { subtotal, gstAmount, grandTotal, gstPercentage, gstAmountRupees, gstType, transportCharges }
   }
 
@@ -728,14 +735,14 @@ export default function PurchasesPage() {
       alert('Please enter a category name')
       return
     }
-    
+
     // Check if category already exists (case-insensitive) in the same parent
     const existingCat = availableCategories.find(cat => {
       const nameMatch = cat.name.toLowerCase() === newCategoryName.trim().toLowerCase()
       const parentMatch = (cat.parentId || null) === (newCategoryParentId || null)
       return nameMatch && parentMatch
     })
-    
+
     if (existingCat) {
       alert(`Category "${existingCat.name}" already exists${newCategoryParentId ? ' under this parent' : ''}`)
       // Auto-select the existing category for the item that opened the modal
@@ -750,7 +757,7 @@ export default function PurchasesPage() {
       setShowCategoryModal(false)
       return
     }
-    
+
     try {
       const response = await fetch('/api/categories', {
         method: 'POST',
@@ -767,21 +774,21 @@ export default function PurchasesPage() {
         alert(result.message || 'Failed to create category')
         return
       }
-      
+
       // Refresh categories list
       const categoriesRes = await fetch('/api/categories')
       const categoriesResult = await categoriesRes.json()
       if (categoriesResult.success) {
         setAvailableCategories(categoriesResult.data)
       }
-      
+
       // Auto-select the newly created category for the item that opened the modal
       if (categoryModalItemIndex !== null) {
         const newItems = [...items]
         newItems[categoryModalItemIndex].category = result.data.name
         setItems(newItems)
       }
-      
+
       setNewCategoryName('')
       setNewCategoryParentId('')
       setCategoryModalItemIndex(null)
@@ -802,7 +809,7 @@ export default function PurchasesPage() {
     const category = availableCategories.find(c => c.id === categoryId)
     if (!category) return ''
     if (!category.parentId) return category.name
-    
+
     const parent = availableCategories.find(c => c.id === category.parentId)
     if (parent) {
       return `${getCategoryPath(parent.id)} > ${category.name}`
@@ -814,7 +821,7 @@ export default function PurchasesPage() {
     try {
       // Prepare data for export - flatten purchase orders with their items
       const exportData: any[] = []
-      
+
       orders.forEach(order => {
         if (order.items && order.items.length > 0) {
           // If order has multiple items, create a row for each item
@@ -948,7 +955,7 @@ export default function PurchasesPage() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
-          
+
           <div className="flex gap-4 items-end flex-wrap">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Category</label>
@@ -1041,31 +1048,21 @@ export default function PurchasesPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
             {orders.map((order) => (
-              <div 
-                key={order.id} 
+              <div
+                key={order.id}
                 className="bg-white rounded-lg shadow-md p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all duration-200 border border-gray-100 hover:border-purple-200 relative"
                 onClick={() => handleViewDetails(order)}
               >
                 <div className="flex justify-between items-start mb-4 relative">
                   <div className="flex-1 min-w-0 pr-2">
-                    <h3 className="text-lg font-bold text-gray-900 truncate">
-                      {order.customPoNumber || `PO-${order.id}`}
-                      {(() => {
-                        // Get product name(s)
-                        let productName = ''
-                        if (order.items && order.items.length > 0) {
-                          const names = order.items.map(item => item.productName).filter(Boolean)
-                          if (names.length === 1) {
-                            productName = names[0]
-                          } else if (names.length > 1) {
-                            productName = `${names[0]}${names.length > 1 ? ` +${names.length - 1} more` : ''}`
-                          }
-                        } else if (order.productName) {
-                          productName = order.productName
-                        }
-                        return productName ? ` - ${productName}` : ''
-                      })()}
-                    </h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-bold text-gray-900 truncate">
+                        {order.customPoNumber || `PO-${order.id}`}
+                      </h3>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                        Pending
+                      </span>
+                    </div>
                     <p className="text-sm text-gray-500 truncate">{order.supplierName}</p>
                     {order.items && order.items.length > 0 && (
                       <p className="text-xs text-gray-400 mt-1">
@@ -1096,7 +1093,7 @@ export default function PurchasesPage() {
                     </button>
                   </div>
                 </div>
-                
+
                 {(() => {
                   let images: string[] = []
                   if (order.items && order.items.length > 0 && order.items[0].productImages && order.items[0].productImages.length > 0) {
@@ -1104,15 +1101,15 @@ export default function PurchasesPage() {
                   } else if (order.productImage) {
                     images = [order.productImage]
                   }
-                  
+
                   if (images.length === 0) return null
-                  
+
                   return (
                     <div className="mb-4">
                       <div className="flex gap-2 flex-wrap">
                         {images.slice(0, 3).map((img, idx) => (
-                          <div 
-                            key={idx} 
+                          <div
+                            key={idx}
                             className="relative w-full h-32 sm:h-40 flex-1 min-w-[100px] cursor-pointer hover:opacity-80 transition-opacity rounded-lg border border-gray-200 overflow-hidden"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1122,17 +1119,17 @@ export default function PurchasesPage() {
                             }}
                             title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
                           >
-                    <Image
+                            <Image
                               src={img}
                               alt={`Product Image ${idx + 1}`}
-                      fill
+                              fill
                               className="object-cover"
                               sizes="(max-width: 768px) 50vw, 33vw"
-                    />
-                  </div>
+                            />
+                          </div>
                         ))}
                         {images.length > 3 && (
-                          <div 
+                          <div
                             className="relative w-full h-32 sm:h-40 flex-1 min-w-[100px] cursor-pointer hover:opacity-80 transition-opacity rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center text-sm text-gray-600"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1143,13 +1140,13 @@ export default function PurchasesPage() {
                             title={`+${images.length - 3} more images - Click to view all`}
                           >
                             +{images.length - 3} more
-                  </div>
+                          </div>
                         )}
                       </div>
                     </div>
                   )
                 })()}
-                
+
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Date:</span>
@@ -1282,24 +1279,43 @@ export default function PurchasesPage() {
                           <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
                           <input
                             type="text"
+                            list={`products-list-${index}`}
                             required
                             value={item.productName}
-                            onChange={(e) => updateItem(index, 'productName', e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              updateItem(index, 'productName', val)
+                              // Auto-fill category and fabricType if selected from existing inventory
+                              const selectedProduct = inventoryItems.find((inv) =>
+                                inv.dressName.toLowerCase() === val.toLowerCase() &&
+                                (!formData.supplierId || inv.supplierName === suppliers.find(s => s.id === formData.supplierId)?.name)
+                              )
+                              if (selectedProduct) {
+                                if (!item.category) updateItem(index, 'category', selectedProduct.category)
+                                if (!item.fabricType) updateItem(index, 'fabricType', selectedProduct.fabricType)
+                              }
+                            }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                           />
+                          <datalist id={`products-list-${index}`}>
+                            {inventoryItems
+                              .filter(inv => !formData.supplierId || inv.supplierName === suppliers.find(s => s.id === formData.supplierId)?.name)
+                              .map(inv => <option key={inv.id} value={inv.dressName} />)
+                            }
+                          </datalist>
                         </div>
 
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                           <div className="flex gap-2">
-                          <select
-                            value={item.category}
-                            onChange={(e) => updateItem(index, 'category', e.target.value)}
+                            <select
+                              value={item.category}
+                              onChange={(e) => updateItem(index, 'category', e.target.value)}
                               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          >
+                            >
                               <option value="">Select a category...</option>
-                            {getCategoryOptions()}
-                          </select>
+                              {getCategoryOptions()}
+                            </select>
                             <button
                               type="button"
                               onClick={() => {
@@ -1318,9 +1334,9 @@ export default function PurchasesPage() {
                             <p className="text-xs text-gray-500">
                               Select from dropdown or click + to add new
                             </p>
-                            <a 
-                              href="/admin/categories" 
-                              target="_blank" 
+                            <a
+                              href="/admin/categories"
+                              target="_blank"
                               className="text-xs text-purple-600 hover:underline"
                             >
                               Manage categories
@@ -1391,9 +1407,9 @@ export default function PurchasesPage() {
                           {item.productImages && item.productImages.length > 0 && (
                             <div className="mt-2">
                               <div className="flex flex-wrap gap-2 mb-2">
-                              {item.productImages.map((img, imgIndex) => (
-                                  <div 
-                                    key={imgIndex} 
+                                {item.productImages.map((img, imgIndex) => (
+                                  <div
+                                    key={imgIndex}
                                     className="relative w-20 h-20 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden group"
                                     onClick={() => {
                                       setLightboxImages(item.productImages || [])
@@ -1402,26 +1418,26 @@ export default function PurchasesPage() {
                                     }}
                                     title="Click to view full size"
                                   >
-                                  <Image
-                                    src={img}
-                                    alt={`Product ${index + 1} - Image ${imgIndex + 1}`}
-                                    fill
+                                    <Image
+                                      src={img}
+                                      alt={`Product ${index + 1} - Image ${imgIndex + 1}`}
+                                      fill
                                       className="object-cover"
-                                    sizes="80px"
-                                  />
-                                  <button
-                                    type="button"
+                                      sizes="80px"
+                                    />
+                                    <button
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         removeImage(index, imgIndex)
                                       }}
                                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                                       title="Remove image"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
                               <p className="text-xs text-gray-500">Click any image to view full size</p>
                             </div>
@@ -1482,7 +1498,7 @@ export default function PurchasesPage() {
                               min="0"
                               max="100"
                               step="0.01"
-                              value={editingOrder 
+                              value={editingOrder
                                 ? (formData.gstPercentage !== undefined && formData.gstPercentage !== null ? formData.gstPercentage : '')
                                 : (formData.gstPercentage || selectedSupplier?.gstPercentage || '')}
                               onChange={(e) => setFormData({ ...formData, gstPercentage: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })}
@@ -1500,7 +1516,7 @@ export default function PurchasesPage() {
                               type="number"
                               min="0"
                               step="0.01"
-                              value={editingOrder 
+                              value={editingOrder
                                 ? (formData.gstAmountRupees !== undefined && formData.gstAmountRupees !== null ? formData.gstAmountRupees : '')
                                 : (formData.gstAmountRupees || selectedSupplier?.gstAmountRupees || '')}
                               onChange={(e) => setFormData({ ...formData, gstAmountRupees: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })}
@@ -1541,7 +1557,7 @@ export default function PurchasesPage() {
                         />
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Transport Address</label>
                       <textarea
@@ -1569,7 +1585,7 @@ export default function PurchasesPage() {
                       {formData.transportImage && (
                         <div className="mt-2">
                           <div className="relative inline-block max-w-xs">
-                            <div 
+                            <div
                               className="relative w-full h-32 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden group"
                               onClick={() => {
                                 setLightboxImages([formData.transportImage])
@@ -1714,7 +1730,7 @@ export default function PurchasesPage() {
                   {formData.invoiceImage && (
                     <div className="mt-2">
                       <div className="relative inline-block max-w-xs">
-                        <div 
+                        <div
                           className="relative w-full h-32 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden group"
                           onClick={() => {
                             setLightboxImages([formData.invoiceImage])
@@ -1797,7 +1813,7 @@ export default function PurchasesPage() {
                     className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
                   >
                     <span>+</span>
-                    <span>Add Product</span>
+                    <span>Add Product / Material</span>
                   </button>
                   <div className="flex space-x-4">
                     <button
@@ -1882,9 +1898,9 @@ export default function PurchasesPage() {
                         {item.productImages && item.productImages.length > 0 && (
                           <div className="mb-2">
                             <div className="flex gap-2 flex-wrap mb-2">
-                            {item.productImages.map((img, imgIndex) => (
-                                <div 
-                                  key={imgIndex} 
+                              {item.productImages.map((img, imgIndex) => (
+                                <div
+                                  key={imgIndex}
                                   className="relative w-24 h-24 cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-200 overflow-hidden"
                                   onClick={() => {
                                     setLightboxImages(item.productImages || [])
@@ -1893,15 +1909,15 @@ export default function PurchasesPage() {
                                   }}
                                   title="Click to view full size"
                                 >
-                                <Image
-                                  src={img}
-                                  alt={`${item.productName} - Image ${imgIndex + 1}`}
-                                  fill
+                                  <Image
+                                    src={img}
+                                    alt={`${item.productName} - Image ${imgIndex + 1}`}
+                                    fill
                                     className="object-cover"
-                                  sizes="96px"
-                                />
-                              </div>
-                            ))}
+                                    sizes="96px"
+                                  />
+                                </div>
+                              ))}
                             </div>
                             <p className="text-xs text-gray-500">Click any image to view full size</p>
                           </div>
@@ -1935,7 +1951,7 @@ export default function PurchasesPage() {
                   <div className="border rounded-lg p-4">
                     <h4 className="font-bold text-gray-900">{selectedOrder.productName || 'Product'}</h4>
                     {selectedOrder.productImage && (
-                      <div 
+                      <div
                         className="relative w-full h-64 my-4 cursor-pointer hover:opacity-80 transition-opacity rounded-lg border-2 border-gray-200 overflow-hidden"
                         onClick={() => {
                           setLightboxImages([selectedOrder.productImage!])
@@ -1970,7 +1986,7 @@ export default function PurchasesPage() {
                 {selectedOrder.invoiceImage && (
                   <div>
                     <label className="text-sm font-medium text-gray-500 mb-2 block">Invoice</label>
-                    <div 
+                    <div
                       className="relative w-full max-w-md aspect-auto cursor-pointer hover:opacity-80 transition-opacity rounded-lg border-2 border-gray-200 overflow-hidden"
                       onClick={() => {
                         setLightboxImages([selectedOrder.invoiceImage!])
@@ -2018,7 +2034,7 @@ export default function PurchasesPage() {
                           )}
                         </div>
                       )}
-                      
+
                       {((selectedOrder as any).invoiceNumber || (selectedOrder as any).invoiceDate) && (
                         <div className="grid grid-cols-2 gap-4">
                           {(selectedOrder as any).invoiceNumber && (
@@ -2039,7 +2055,7 @@ export default function PurchasesPage() {
                       {(selectedOrder as any).transportImage && (
                         <div>
                           <label className="text-sm font-medium text-gray-500 mb-2 block">Transport Image</label>
-                          <div 
+                          <div
                             className="relative w-full max-w-md aspect-auto cursor-pointer hover:opacity-80 transition-opacity rounded-lg border-2 border-gray-200 overflow-hidden"
                             onClick={() => {
                               setLightboxImages([(selectedOrder as any).transportImage])
@@ -2071,7 +2087,7 @@ export default function PurchasesPage() {
                         <div>
                           <label className="text-sm font-medium text-gray-500 mb-2 block">Contact Persons</label>
                           <div className="space-y-2">
-                            {(selectedOrder as any).contactPersons.map((person: {name: string, mobile: string}, index: number) => (
+                            {(selectedOrder as any).contactPersons.map((person: { name: string, mobile: string }, index: number) => (
                               <div key={index} className="border rounded-lg p-3 bg-gray-50">
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
@@ -2104,11 +2120,11 @@ export default function PurchasesPage() {
                     {selectedOrder.gstAmount && selectedOrder.gstAmount > 0 && (
                       <div className="flex justify-between">
                         <span className="text-sm font-medium text-gray-700">
-                          GST {selectedOrder.gstType === 'percentage' && selectedOrder.gstPercentage 
-                            ? `(${selectedOrder.gstPercentage}%)` 
+                          GST {selectedOrder.gstType === 'percentage' && selectedOrder.gstPercentage
+                            ? `(${selectedOrder.gstPercentage}%)`
                             : selectedOrder.gstType === 'rupees' || (selectedOrder as any).gstAmountRupees
-                            ? '(Fixed)'
-                            : ''}:
+                              ? '(Fixed)'
+                              : ''}:
                         </span>
                         <span className="text-lg font-bold text-gray-900">
                           ₹{selectedOrder.gstAmount.toLocaleString()}
@@ -2265,7 +2281,7 @@ export default function PurchasesPage() {
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-xs text-blue-800">
-                    <strong>💡 Tip:</strong> {newCategoryParentId 
+                    <strong>💡 Tip:</strong> {newCategoryParentId
                       ? 'Sub-categories help organize products under main categories. Example: "Anarkali" under "Kurtis".'
                       : 'Root categories are main product types. You can add sub-categories later to organize further.'}
                   </p>

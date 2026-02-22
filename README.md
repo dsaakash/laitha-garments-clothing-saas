@@ -148,7 +148,34 @@ npm start
 
 For any questions or support, contact via WhatsApp: +91 7204219541
 
+## Groq AI Setup Assistant
+
+This project now includes an AI setup endpoint designed for phased rollout:
+
+- Admin-first access
+- Later tenant rollout using per-tenant modules
+
+### Environment variables
+
+Set these in `.env`:
+
+```bash
+GROQ_API_KEY=your_groq_api_key
+GROQ_MODEL=llama-3.3-70b-versatile
+AI_ADMIN_ROLLOUT_ENABLED=true
+AI_TENANT_ROLLOUT_ENABLED=false
+```
+
+### API endpoint
+
+- `GET /api/ai/setup-assistant` returns availability/config status for the current session.
+- `POST /api/ai/setup-assistant` generates a module-by-module setup plan.
+
+Tenant access requires both:
+
+1. `AI_TENANT_ROLLOUT_ENABLED=true`
+2. Tenant module includes `ai_setup_assistant`
+
 ---
 
 Built with ❤️ for Lalitha Garments
-

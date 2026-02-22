@@ -37,6 +37,8 @@ export default function InventoryPage() {
     supplierName: '',
     supplierAddress: '',
     supplierPhone: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    isDeadstock: false,
   })
   const [uploading, setUploading] = useState(false)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
@@ -58,10 +60,25 @@ export default function InventoryPage() {
   const [lightboxImages, setLightboxImages] = useState<string[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
+  const [apiSuppliers, setApiSuppliers] = useState<any[]>([])
+
   useEffect(() => {
     loadItems()
+    loadApiSuppliers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, supplierFilter])
+
+  const loadApiSuppliers = async () => {
+    try {
+      const response = await fetch('/api/suppliers')
+      const result = await response.json()
+      if (result.success) {
+        setApiSuppliers(result.data)
+      }
+    } catch (error) {
+      console.error('Failed to load API suppliers:', error)
+    }
+  }
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -95,6 +112,8 @@ export default function InventoryPage() {
             supplierName: '',
             supplierAddress: '',
             supplierPhone: '',
+            date: format(new Date(), 'yyyy-MM-dd'),
+            isDeadstock: false,
           })
         }
       }
@@ -198,6 +217,8 @@ export default function InventoryPage() {
             supplierName: formData.supplierName || undefined,
             supplierAddress: formData.supplierAddress || undefined,
             supplierPhone: formData.supplierPhone || undefined,
+            date: formData.date,
+            isDeadstock: formData.isDeadstock,
           }),
         })
         const result = await response.json()
@@ -225,6 +246,8 @@ export default function InventoryPage() {
             supplierName: formData.supplierName || undefined,
             supplierAddress: formData.supplierAddress || undefined,
             supplierPhone: formData.supplierPhone || undefined,
+            date: formData.date,
+            isDeadstock: formData.isDeadstock,
           }),
         })
         const result = await response.json()
@@ -358,6 +381,8 @@ export default function InventoryPage() {
       supplierName: item.supplierName || '',
       supplierAddress: item.supplierAddress || '',
       supplierPhone: item.supplierPhone || '',
+      date: item.createdAt ? item.createdAt.split('T')[0] : format(new Date(), 'yyyy-MM-dd'),
+      isDeadstock: (item as any).isDeadstock || false,
     })
     setPreviewImages(images)
     setShowModal(true)
@@ -399,6 +424,8 @@ export default function InventoryPage() {
       supplierName: '',
       supplierAddress: '',
       supplierPhone: '',
+      date: format(new Date(), 'yyyy-MM-dd'),
+      isDeadstock: false,
     })
     setEditingItem(null)
     setPreviewImages([])
@@ -839,7 +866,17 @@ export default function InventoryPage() {
                                     )
                                   })()}
                                 </td>
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.dressName}</td>
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {item.dressName}
+                                  {item.isDeadstock && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800">
+                                      Deadstock
+                                    </span>
+                                  )}
+                                  <div className="text-[10px] text-gray-400 font-normal mt-1">
+                                    Added: {format(new Date(item.createdAt), 'dd MMM yyyy')}
+                                  </div>
+                                </td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressCode}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.sizes.join(', ')}</td>
@@ -1018,7 +1055,17 @@ export default function InventoryPage() {
                             )
                           })()}
                         </td>
-                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.dressName}</td>
+                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {item.dressName}
+                          {item.isDeadstock && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800">
+                              Deadstock
+                            </span>
+                          )}
+                          <div className="text-[10px] text-gray-400 font-normal mt-1">
+                            Added: {format(new Date(item.createdAt), 'dd MMM yyyy')}
+                          </div>
+                        </td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressCode}</td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.sizes.join(', ')}</td>
@@ -1090,6 +1137,13 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center space-x-1 sm:space-x-2">
+                            <button
+                              onClick={() => openStockModal(item)}
+                              className="px-2 py-1.5 sm:px-3 bg-green-50 hover:bg-green-100 active:bg-green-200 text-green-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-green-200 min-w-[60px] whitespace-nowrap"
+                              title="Restock / Update Stock"
+                            >
+                              <span className="hidden sm:inline">📦 </span>Stock
+                            </button>
                             <button
                               onClick={() => handleEdit(item)}
                               className="px-2 py-1.5 sm:px-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-blue-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
@@ -1271,16 +1325,25 @@ export default function InventoryPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Images (optional)</label>
                   <div className="space-y-3">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => handleImageUpload(e)}
-                      disabled={uploading}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
-                    />
+                    <label className="flex flex-col items-center justify-center w-full min-h-[8rem] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                      <div className="flex flex-col items-center justify-center py-4 px-2 text-center">
+                        <svg className="w-8 h-8 mb-3 text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+                        </svg>
+                        <p className="mb-2 text-sm text-gray-600"><span className="font-semibold">Click to attach an image</span> or multiple images</p>
+                        <p className="text-xs text-gray-400">PNG, JPG, JPEG (MAX. 5MB per file)</p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => handleImageUpload(e)}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                    </label>
                     {uploading && (
-                      <p className="text-sm text-gray-500">Uploading...</p>
+                      <p className="text-sm text-purple-600 font-medium animate-pulse text-center">Uploading images...</p>
                     )}
                     {previewImages.length > 0 && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
@@ -1325,11 +1388,35 @@ export default function InventoryPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Supplier/Party Name</label>
                       <input
                         type="text"
+                        list="suppliers-list"
                         value={formData.supplierName}
-                        onChange={(e) => setFormData({ ...formData, supplierName: e.target.value })}
-                        placeholder="Enter supplier name"
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData(prev => {
+                            const newData = { ...prev, supplierName: value };
+                            // Auto-fill phone and address if they select an existing supplier from the API
+                            if (apiSuppliers && apiSuppliers.length > 0) {
+                              const existingSupplier = apiSuppliers.find(s => s.name === value);
+                              if (existingSupplier) {
+                                if (!prev.supplierPhone && existingSupplier.phone) {
+                                  newData.supplierPhone = existingSupplier.phone;
+                                }
+                                if (!prev.supplierAddress && existingSupplier.address) {
+                                  newData.supplierAddress = existingSupplier.address;
+                                }
+                              }
+                            }
+                            return newData;
+                          });
+                        }}
+                        placeholder="Select or enter supplier name"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
+                      <datalist id="suppliers-list">
+                        {apiSuppliers.map((supplier) => (
+                          <option key={supplier.id} value={supplier.name} />
+                        ))}
+                      </datalist>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Phone Number</label>
@@ -1350,6 +1437,33 @@ export default function InventoryPage() {
                         placeholder="Enter supplier address"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Other Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Date Added / Restocked</label>
+                      <input
+                        type="date"
+                        value={formData.date}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                    <div className="flex items-center mt-6">
+                      <input
+                        type="checkbox"
+                        id="isDeadstock"
+                        checked={formData.isDeadstock}
+                        onChange={(e) => setFormData({ ...formData, isDeadstock: e.target.checked })}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="isDeadstock" className="ml-2 block text-sm text-gray-700">
+                        Mark as Deadstock
+                      </label>
                     </div>
                   </div>
                 </div>

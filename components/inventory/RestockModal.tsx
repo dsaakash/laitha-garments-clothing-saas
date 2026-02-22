@@ -123,7 +123,12 @@ export default function RestockModal({ isOpen, onClose, item, onSuccess }: Resto
                     throw new Error(result.message || 'Failed to create Purchase Order')
                 }
 
-                alert('Stock added and Purchase Order created successfully!')
+                // Check if approval is required
+                if (result.approval && result.approval.required) {
+                    alert('✅ Purchase Order created successfully!\n\n⚠️ This PO requires approval before stock is updated.\nPlease check the Approvals page for pending requests.')
+                } else {
+                    alert('✅ Stock added and Purchase Order created successfully!')
+                }
             } else {
                 // Standard Stock Update (including 'correction' type for 'in')
                 const response = await fetch(`/api/inventory/${item.id}/stock`, {

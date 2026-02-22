@@ -23,6 +23,7 @@ export interface InventoryItem {
   quantityOut?: number
   currentStock?: number
   category?: string // Category (Kurtis, Dresses, Sarees, Home Textiles, etc.)
+  isDeadstock?: boolean // Flag items with no sales movement
   createdAt: string
   updatedAt: string
 }

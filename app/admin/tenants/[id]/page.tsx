@@ -21,6 +21,8 @@ interface Tenant {
     status: string
     plan: string
     trialEndDate: string
+    subscriptionEndDate?: string
+    subscriptionStartDate?: string
     subdomain: string
     workflowEnabled: boolean
     websiteBuilderEnabled: boolean
@@ -38,6 +40,7 @@ interface Credentials {
 }
 
 const AVAILABLE_MODULES = [
+    { id: 'ai_setup_assistant', label: 'AI Setup Assistant (Groq)' },
     { id: 'pos', label: 'POS System' },
     { id: 'inventory', label: 'Inventory Management' },
     { id: 'products', label: 'Products' },
@@ -69,6 +72,12 @@ export default function TenantDetailsPage() {
     const [upgrading, setUpgrading] = useState(false)
     const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
+    const [showRenewModal, setShowRenewModal] = useState(false)
+    const [renewing, setRenewing] = useState(false)
+    const [renewPlan, setRenewPlan] = useState<string>('basic')
+    const [renewMode, setRenewMode] = useState<'monthly' | 'yearly' | 'custom'>('monthly')
+    const [renewCustomDate, setRenewCustomDate] = useState<string>('')
+    const [renewPrice, setRenewPrice] = useState<number>(0)
 
     // Subscription Form State
     const [selectedPlan, setSelectedPlan] = useState<string>('free')
@@ -248,6 +257,42 @@ export default function TenantDetailsPage() {
         const diffTime = endDate.getTime() - today.getTime()
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
         return Math.max(0, diffDays)
+    }
+
+    const handleRenewSubscription = async () => {
+        if (!tenant) return
+
+        if (renewMode === 'custom' && !renewCustomDate) {
+            alert('Please pick a custom end date.')
+            return
+        }
+
+        setRenewing(true)
+        try {
+            const response = await fetch(`/api/tenants/${params.id}/renew`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    plan: renewPlan,
+                    billingCycle: renewMode,             // 'monthly' | 'yearly' | 'custom'
+                    monthlyRevenue: renewPrice,
+                    customEndDate: renewMode === 'custom' ? renewCustomDate : undefined,
+                }),
+            })
+            const result = await response.json()
+            if (result.success) {
+                alert(result.message || 'Subscription renewed!')
+                setShowRenewModal(false)
+                loadTenantDetails()
+            } else {
+                alert(result.message || 'Failed to renew subscription')
+            }
+        } catch (error) {
+            console.error('Failed to renew subscription:', error)
+            alert('Failed to renew subscription')
+        } finally {
+            setRenewing(false)
+        }
     }
 
     const handleUpdateSubscription = async () => {
@@ -442,6 +487,79 @@ export default function TenantDetailsPage() {
                                 </div>
                             )}
 
+                            {/* Subscription expiry info */}
+                            {tenant.subscriptionEndDate && (() => {
+                                const endDate = new Date(tenant.subscriptionEndDate)
+                                const now = new Date()
+                                const msLeft = endDate.getTime() - now.getTime()
+                                const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24))
+                                const isExpired = daysLeft <= 0
+                                const isWarning = !isExpired && daysLeft <= 7
+
+                                return (
+                                    <div className={`rounded-lg p-4 mb-4 border ${isExpired
+                                        ? 'bg-red-50 border-red-200'
+                                        : isWarning
+                                            ? 'bg-amber-50 border-amber-200'
+                                            : 'bg-green-50 border-green-200'
+                                        }`}>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className={`font-semibold text-sm ${isExpired ? 'text-red-800' : isWarning ? 'text-amber-800' : 'text-green-800'
+                                                    }`}>
+                                                    <Calendar className="w-4 h-4 inline mr-1" />
+                                                    {isExpired
+                                                        ? `Subscription expired ${Math.abs(daysLeft)} day${Math.abs(daysLeft) !== 1 ? 's' : ''} ago`
+                                                        : daysLeft === 0
+                                                            ? 'Subscription expires today!'
+                                                            : `Active — expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`}
+                                                </p>
+                                                <p className={`text-xs mt-1 ${isExpired ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-green-600'
+                                                    }`}>
+                                                    {endDate.toLocaleDateString('en-IN', {
+                                                        day: 'numeric', month: 'long', year: 'numeric'
+                                                    })}
+                                                </p>
+                                            </div>
+                                            <ActionButton
+                                                variant={isExpired ? 'danger' : 'secondary'}
+                                                size="sm"
+                                                icon={TrendingUp}
+                                                onClick={() => {
+                                                    setRenewPlan(tenant.plan || 'basic')
+                                                    setRenewMode(tenant.billingCycle === 'yearly' ? 'yearly' : 'monthly')
+                                                    setRenewCustomDate('')
+                                                    setRenewPrice(tenant.monthlyRevenue || 0)
+                                                    setShowRenewModal(true)
+                                                }}
+                                            >
+                                                {isExpired ? 'Renew Now' : 'Renew / Extend'}
+                                            </ActionButton>
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+
+                            {!tenant.subscriptionEndDate && tenant.status === 'active' && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                    <p className="text-blue-700 text-sm font-medium">
+                                        ⚠️ No subscription end date set. Use <strong>Renew Subscription</strong> to set a billing period.
+                                    </p>
+                                    <button
+                                        className="mt-2 text-sm text-blue-600 underline"
+                                        onClick={() => {
+                                            setRenewPlan(tenant.plan || 'basic')
+                                            setRenewMode('monthly')
+                                            setRenewCustomDate('')
+                                            setRenewPrice(tenant.monthlyRevenue || 0)
+                                            setShowRenewModal(true)
+                                        }}
+                                    >
+                                        Set subscription period →
+                                    </button>
+                                </div>
+                            )}
+
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                                 <div className="grid grid-cols-2 gap-x-8 gap-y-2">
                                     <div>
@@ -462,7 +580,7 @@ export default function TenantDetailsPage() {
                                     icon={Settings}
                                     onClick={() => setShowSubscriptionModal(true)}
                                 >
-                                    Manage Subscription
+                                    Manage Plan
                                 </ActionButton>
                             </div>
                         </div>
@@ -700,7 +818,92 @@ export default function TenantDetailsPage() {
 
                                 <div className="p-6 overflow-y-auto flex-1 space-y-8">
 
+                                    {/* ── Current subscription status banner ── */}
+                                    {(() => {
+                                        // Determine display from subscription end date or trial
+                                        const now = new Date()
+                                        let bannerColor = 'green'
+                                        let icon = '✅'
+                                        let headline = ''
+                                        let subline = ''
+                                        let daysLeft: number | null = null
+
+                                        if (tenant.subscriptionEndDate) {
+                                            const end = new Date(tenant.subscriptionEndDate)
+                                            const ms = end.getTime() - now.getTime()
+                                            daysLeft = Math.ceil(ms / (1000 * 60 * 60 * 24))
+
+                                            if (daysLeft <= 0) {
+                                                bannerColor = 'red'
+                                                icon = '🚫'
+                                                headline = `Expired ${Math.abs(daysLeft)} day${Math.abs(daysLeft) !== 1 ? 's' : ''} ago`
+                                                subline = `Since ${end.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                                            } else if (daysLeft <= 7) {
+                                                bannerColor = 'amber'
+                                                icon = '⚠️'
+                                                headline = `Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
+                                                subline = `On ${end.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                                            } else {
+                                                bannerColor = 'green'
+                                                icon = '✅'
+                                                headline = `Active — ${daysLeft} days remaining`
+                                                subline = `Until ${end.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                                            }
+                                        } else if (tenant.status === 'trial' && tenant.trialEndDate) {
+                                            const trialEnd = new Date(tenant.trialEndDate)
+                                            const ms = trialEnd.getTime() - now.getTime()
+                                            daysLeft = Math.ceil(ms / (1000 * 60 * 60 * 24))
+                                            bannerColor = daysLeft <= 0 ? 'red' : daysLeft <= 3 ? 'amber' : 'blue'
+                                            icon = daysLeft <= 0 ? '🚫' : '🕒'
+                                            headline = daysLeft <= 0
+                                                ? 'Trial expired'
+                                                : `Trial — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`
+                                            subline = `Trial ends ${trialEnd.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                                        } else if (tenant.status === 'active') {
+                                            bannerColor = 'blue'
+                                            icon = 'ℹ️'
+                                            headline = 'Active — no expiry date set'
+                                            subline = 'Use Renew Subscription to set a billing period'
+                                        } else {
+                                            return null
+                                        }
+
+                                        const colorMap: Record<string, { bg: string; border: string; text: string; sub: string; btn: string }> = {
+                                            green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-900', sub: 'text-green-600', btn: 'bg-green-600 hover:bg-green-700' },
+                                            amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-900', sub: 'text-amber-600', btn: 'bg-amber-600 hover:bg-amber-700' },
+                                            red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-900', sub: 'text-red-600', btn: 'bg-red-600 hover:bg-red-700' },
+                                            blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-900', sub: 'text-blue-600', btn: 'bg-blue-600 hover:bg-blue-700' },
+                                        }
+                                        const c = colorMap[bannerColor]
+
+                                        return (
+                                            <div className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 ${c.bg} ${c.border}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-2xl leading-none">{icon}</span>
+                                                    <div>
+                                                        <p className={`font-bold text-sm ${c.text}`}>{headline}</p>
+                                                        <p className={`text-xs mt-0.5 ${c.sub}`}>{subline}</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowSubscriptionModal(false)
+                                                        setRenewPlan(tenant.plan || 'basic')
+                                                        setRenewMode(tenant.billingCycle === 'yearly' ? 'yearly' : 'monthly')
+                                                        setRenewCustomDate('')
+                                                        setRenewPrice(tenant.monthlyRevenue || 0)
+                                                        setShowRenewModal(true)
+                                                    }}
+                                                    className={`flex-shrink-0 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${c.btn}`}
+                                                >
+                                                    {bannerColor === 'red' ? '🔄 Renew Now' : '🔄 Renew / Extend'}
+                                                </button>
+                                            </div>
+                                        )
+                                    })()}
+
                                     {/* Plan Selection */}
+
                                     <div>
                                         <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Select Plan</h4>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -833,6 +1036,205 @@ export default function TenantDetailsPage() {
                         </div>
                     )
                 }
+
+                {/* Renew Subscription Modal */}
+                {/* ─── Renew Subscription Modal ─────────────────────── */}
+                {showRenewModal && (() => {
+                    // Compute the previewed expiry date live
+                    const computedExpiry = (() => {
+                        if (renewMode === 'custom') {
+                            return renewCustomDate ? new Date(renewCustomDate) : null
+                        }
+                        const base =
+                            tenant.subscriptionEndDate && new Date(tenant.subscriptionEndDate) > new Date()
+                                ? new Date(tenant.subscriptionEndDate)
+                                : new Date()
+                        const d = new Date(base)
+                        if (renewMode === 'yearly') d.setFullYear(d.getFullYear() + 1)
+                        else d.setMonth(d.getMonth() + 1)
+                        return d
+                    })()
+
+                    const isEarlyRenewal =
+                        renewMode !== 'custom' &&
+                        !!tenant.subscriptionEndDate &&
+                        new Date(tenant.subscriptionEndDate) > new Date()
+
+                    // Min date for custom picker = tomorrow
+                    const tomorrow = new Date()
+                    tomorrow.setDate(tomorrow.getDate() + 1)
+                    const minDate = tomorrow.toISOString().split('T')[0]
+
+                    return (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+
+                                {/* Header */}
+                                <div className="bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-5 text-white">
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <h3 className="text-xl font-bold">Renew Subscription</h3>
+                                            <p className="text-purple-200 text-sm mt-0.5">{tenant.businessName}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowRenewModal(false)}
+                                            className="text-purple-200 hover:text-white text-xl font-bold leading-none mt-0.5"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
+
+                                    {/* ── Plan selection ── */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Plan</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['basic', 'premium', 'enterprise'].map((p) => (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => setRenewPlan(p)}
+                                                    className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${renewPlan === p
+                                                        ? 'border-purple-600 bg-purple-50 text-purple-700 shadow-sm'
+                                                        : 'border-gray-200 text-gray-500 hover:border-purple-300 hover:text-gray-900'
+                                                        }`}
+                                                >
+                                                    {p}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* ── Duration mode ── */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Subscription Duration</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {([
+                                                { mode: 'monthly', icon: '📅', label: 'Monthly', sub: '+1 month' },
+                                                { mode: 'yearly', icon: '🗓️', label: 'Yearly', sub: '+1 year' },
+                                                { mode: 'custom', icon: '✏️', label: 'Custom', sub: 'Pick date' },
+                                            ] as const).map(({ mode, icon, label, sub }) => (
+                                                <button
+                                                    key={mode}
+                                                    onClick={() => setRenewMode(mode)}
+                                                    className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition-all ${renewMode === mode
+                                                        ? 'border-purple-600 bg-purple-50 text-purple-700 shadow-sm'
+                                                        : 'border-gray-200 text-gray-500 hover:border-purple-300'
+                                                        }`}
+                                                >
+                                                    <span className="text-xl mb-1">{icon}</span>
+                                                    <span className="text-sm font-semibold">{label}</span>
+                                                    <span className="text-[11px] opacity-60 mt-0.5">{sub}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* ── Custom date picker (only shown when mode = custom) ── */}
+                                    {renewMode === 'custom' && (
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                                Subscription Valid Until
+                                            </label>
+                                            <input
+                                                type="date"
+                                                min={minDate}
+                                                value={renewCustomDate}
+                                                onChange={(e) => setRenewCustomDate(e.target.value)}
+                                                className="w-full border-2 border-gray-200 rounded-xl py-2.5 px-4 text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm font-medium"
+                                            />
+                                            {renewCustomDate && (
+                                                <p className="text-xs text-gray-500 mt-1.5">
+                                                    Access granted until{' '}
+                                                    <span className="font-semibold text-purple-700">
+                                                        {new Date(renewCustomDate).toLocaleDateString('en-IN', {
+                                                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                                                        })}
+                                                    </span>
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* ── Price override ── */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                            Price <span className="font-normal normal-case text-gray-400">(₹/month — override)</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">₹</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={renewPrice}
+                                                onChange={(e) => setRenewPrice(Number(e.target.value))}
+                                                className="w-full pl-7 border-2 border-gray-200 rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* ── Live Summary ── */}
+                                    <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 rounded-xl p-4">
+                                        <p className="text-xs font-bold text-purple-800 uppercase tracking-wider mb-3">📋 Renewal Summary</p>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">Plan</span>
+                                                <span className="font-semibold text-gray-900 capitalize">{renewPlan}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">Duration</span>
+                                                <span className="font-semibold text-gray-900">
+                                                    {renewMode === 'monthly' ? '1 Month (Auto)'
+                                                        : renewMode === 'yearly' ? '1 Year (Auto)'
+                                                            : 'Custom Date'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">Price</span>
+                                                <span className="font-semibold text-gray-900">₹{renewPrice}/month</span>
+                                            </div>
+                                            <div className="border-t border-purple-100 pt-2 flex justify-between items-start">
+                                                <span className="text-gray-500">Expires on</span>
+                                                <span className="font-bold text-purple-700 text-right">
+                                                    {computedExpiry
+                                                        ? computedExpiry.toLocaleDateString('en-IN', {
+                                                            day: 'numeric', month: 'long', year: 'numeric'
+                                                        })
+                                                        : <span className="text-gray-400 italic font-normal">Pick a date above</span>
+                                                    }
+                                                </span>
+                                            </div>
+                                            {isEarlyRenewal && (
+                                                <p className="text-[11px] text-purple-500 italic">* Extended from current expiry (early renewal — no days lost)</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                {/* Footer actions */}
+                                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                                    <ActionButton
+                                        variant="secondary"
+                                        onClick={() => setShowRenewModal(false)}
+                                        disabled={renewing}
+                                    >
+                                        Cancel
+                                    </ActionButton>
+                                    <ActionButton
+                                        variant="primary"
+                                        onClick={handleRenewSubscription}
+                                        disabled={renewing || (renewMode === 'custom' && !renewCustomDate)}
+                                    >
+                                        {renewing ? 'Renewing...' : '✅ Confirm Renewal'}
+                                    </ActionButton>
+                                </div>
+
+                            </div>
+                        </div>
+                    )
+                })()}
 
                 {/* Edit Profile Modal */}
                 {

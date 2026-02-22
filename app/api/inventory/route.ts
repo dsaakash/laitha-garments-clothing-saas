@@ -147,6 +147,7 @@ export async function GET(request: NextRequest) {
         quantityIn: row.quantity_in ? parseInt(row.quantity_in) : 0,
         quantityOut: row.quantity_out ? parseInt(row.quantity_out) : 0,
         currentStock: row.current_stock ? parseInt(row.current_stock) : 0,
+        isDeadstock: row.is_deadstock || false,
         createdAt: row.created_at.toISOString(),
         updatedAt: row.updated_at.toISOString(),
       }
@@ -187,8 +188,8 @@ export async function POST(request: NextRequest) {
     const result = await query(
       `INSERT INTO inventory 
        (dress_name, dress_type, dress_code, category, sizes, wholesale_price, selling_price, 
-        pricing_unit, price_per_piece, price_per_meter, image_url, product_images, fabric_type, supplier_name, supplier_address, supplier_phone, tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        pricing_unit, price_per_piece, price_per_meter, image_url, product_images, fabric_type, supplier_name, supplier_address, supplier_phone, tenant_id, created_at, is_deadstock)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        RETURNING *`,
       [
         body.dressName,
@@ -207,7 +208,9 @@ export async function POST(request: NextRequest) {
         body.supplierName || null,
         body.supplierAddress || null,
         body.supplierPhone || null,
-        tenantId
+        tenantId,
+        body.date ? new Date(body.date).toISOString() : new Date().toISOString(),
+        body.isDeadstock || false
       ]
     )
 
@@ -233,6 +236,7 @@ export async function POST(request: NextRequest) {
       quantityIn: item.quantity_in ? parseInt(item.quantity_in) : 0,
       quantityOut: item.quantity_out ? parseInt(item.quantity_out) : 0,
       currentStock: item.current_stock ? parseInt(item.current_stock) : 0,
+      isDeadstock: item.is_deadstock || false,
       createdAt: item.created_at.toISOString(),
       updatedAt: item.updated_at.toISOString(),
     }

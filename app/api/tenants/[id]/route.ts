@@ -21,6 +21,8 @@ function transformTenant(dbTenant: any): any {
         billingCycle: dbTenant.billing_cycle,
         nextBillingDate: dbTenant.next_billing_date,
         monthlyRevenue: parseFloat(dbTenant.monthly_revenue || 0),
+        subscriptionStartDate: dbTenant.subscription_start_date,
+        subscriptionEndDate: dbTenant.subscription_end_date,
         customDomain: dbTenant.custom_domain,
         subdomain: dbTenant.subdomain,
         workflowEnabled: dbTenant.workflow_enabled,
