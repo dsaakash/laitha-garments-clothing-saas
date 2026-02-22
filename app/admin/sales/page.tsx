@@ -25,6 +25,7 @@ export default function SalesPage() {
   const [itemModalIndex, setItemModalIndex] = useState<number | null>(null)
   const [filterMonth, setFilterMonth] = useState('')
   const [filterYear, setFilterYear] = useState('')
+  const [filterDate, setFilterDate] = useState('')
   const [searchPartyName, setSearchPartyName] = useState<string>('')
   const [selectedParty, setSelectedParty] = useState<string>('All')
   const [salesSummary, setSalesSummary] = useState<{
@@ -164,7 +165,7 @@ export default function SalesPage() {
   useEffect(() => {
     loadSales()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterMonth, filterYear, selectedParty])
+  }, [filterMonth, filterYear, filterDate, selectedParty])
 
   useEffect(() => {
     // Extract unique party names from sales
@@ -178,7 +179,10 @@ export default function SalesPage() {
       if (partyName) {
         params.append('partyName', partyName)
       }
-      if (filterYear) {
+      if (filterDate) {
+        params.append('startDate', filterDate)
+        params.append('endDate', filterDate)
+      } else if (filterYear) {
         const startDate = `${filterYear}-01-01`
         const endDate = `${filterYear}-12-31`
         params.append('startDate', startDate)
@@ -191,7 +195,7 @@ export default function SalesPage() {
         params.append('startDate', startDate)
         params.append('endDate', endDate)
       }
-      
+
       const response = await fetch(`/api/sales/summary?${params.toString()}`, { credentials: 'include' })
       const result = await response.json()
       if (result.success) {
@@ -200,7 +204,7 @@ export default function SalesPage() {
     } catch (error) {
       console.error('Failed to load sales summary:', error)
     }
-  }, [filterMonth, filterYear])
+  }, [filterMonth, filterYear, filterDate])
 
   useEffect(() => {
     // Load sales summary for selected party or all parties
@@ -210,7 +214,7 @@ export default function SalesPage() {
       // Load summary for all parties
       loadSalesSummary(null)
     }
-  }, [selectedParty, filterMonth, filterYear, loadSalesSummary])
+  }, [selectedParty, filterMonth, filterYear, filterDate, loadSalesSummary])
 
   const loadData = async () => {
     try {
@@ -235,12 +239,13 @@ export default function SalesPage() {
   const loadSales = async () => {
     try {
       const params = new URLSearchParams()
+      if (filterDate) params.append('date', filterDate)
       if (filterYear) params.append('year', filterYear)
       if (filterMonth) params.append('month', filterMonth)
       if (selectedParty && selectedParty !== 'All') {
         params.append('partyName', selectedParty)
       }
-      
+
       const response = await fetch(`/api/sales?${params.toString()}`, { credentials: 'include' })
       const result = await response.json()
       if (result.success) {
@@ -265,12 +270,12 @@ export default function SalesPage() {
   const handleItemSelect = (item: InventoryItem, index: number) => {
     const stock = item.currentStock || 0
     const status = getStockStatus(stock)
-    
+
     if (status === 'out_of_stock') {
       alert(`This item is out of stock. Current stock: 0`)
       return
     }
-    
+
     handleItemChange(index, 'inventoryId', item.id)
     setShowItemModal(false)
     setItemModalIndex(null)
@@ -297,7 +302,7 @@ export default function SalesPage() {
   // Webcam functions
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' } // Use back camera on mobile
       })
       streamRef.current = stream
@@ -316,12 +321,12 @@ export default function SalesPage() {
       const video = videoRef.current
       const canvas = canvasRef.current
       const ctx = canvas.getContext('2d')
-      
+
       if (ctx) {
         canvas.width = video.videoWidth
         canvas.height = video.videoHeight
         ctx.drawImage(video, 0, 0)
-        
+
         // Add sticker if selected
         if (selectedSticker) {
           ctx.fillStyle = 'rgba(34, 197, 94, 0.9)'
@@ -334,7 +339,7 @@ export default function SalesPage() {
             (stickerPosition.y / 100) * canvas.height
           )
         }
-        
+
         const imageData = canvas.toDataURL('image/jpeg', 0.9)
         setCapturedImage(imageData)
         setFormData({ ...formData, saleImage: imageData })
@@ -358,7 +363,7 @@ export default function SalesPage() {
             canvas.width = img.width
             canvas.height = img.height
             ctx.drawImage(img, 0, 0)
-            
+
             // Add text sticker
             ctx.fillStyle = 'rgba(34, 197, 94, 0.9)'
             ctx.font = `${Math.min(canvas.width, canvas.height) * 0.1}px Arial`
@@ -369,7 +374,7 @@ export default function SalesPage() {
               (stickerPosition.x / 100) * canvas.width,
               (stickerPosition.y / 100) * canvas.height
             )
-            
+
             const imageData = canvas.toDataURL('image/jpeg', 0.9)
             setCapturedImage(imageData)
             setFormData({ ...formData, saleImage: imageData })
@@ -385,8 +390,8 @@ export default function SalesPage() {
 
   const handlePaymentModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newPaymentMode = e.target.value
-    setFormData({ 
-      ...formData, 
+    setFormData({
+      ...formData,
       paymentMode: newPaymentMode,
       // Set default payment status for UPI
       paymentStatus: newPaymentMode === 'UPI' ? 'pending' : undefined
@@ -405,9 +410,9 @@ export default function SalesPage() {
       const result = await response.json()
       if (result.success) {
         // Update the sale in the local state immediately for better UX
-        setSales(prevSales => 
-          prevSales.map(sale => 
-            sale.id === saleId 
+        setSales(prevSales =>
+          prevSales.map(sale =>
+            sale.id === saleId
               ? { ...sale, paymentStatus: newStatus }
               : sale
           )
@@ -426,33 +431,33 @@ export default function SalesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       const saleItems = formData.items.map(itemForm => {
         const invItem = inventory.find(i => i.id === itemForm.inventoryId)
         if (!invItem) throw new Error('Inventory item not found')
-        
+
         // Ensure dressCode is always present - this is critical for invoices
         const dressCode = invItem.dressCode || ''
         if (!dressCode || dressCode.trim() === '') {
           console.warn(`⚠️ Warning: Inventory item "${invItem.dressName}" (ID: ${invItem.id}) has no dressCode`)
           alert(`Warning: Item "${invItem.dressName}" has no dress code. Please update the inventory item first.`)
         }
-        
+
         const purchasePrice = invItem.wholesalePrice
         let sellingPrice = invItem.sellingPrice
         let quantity = itemForm.quantity
         let usePerMeter = itemForm.usePerMeter || false
         let meters = itemForm.meters || 0
-        
+
         // If using per meter pricing
         if (usePerMeter && invItem.pricePerMeter && meters > 0) {
           sellingPrice = invItem.pricePerMeter
           quantity = meters
         }
-        
+
         const profit = (sellingPrice - purchasePrice) * quantity
-        
+
         return {
           inventoryId: itemForm.inventoryId,
           dressName: invItem.dressName,
@@ -468,10 +473,10 @@ export default function SalesPage() {
           profit,
         }
       })
-      
+
       // Calculate subtotal
       const subtotal = saleItems.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0)
-      
+
       // Calculate discount
       let discountAmount = 0
       if (formData.discountType === 'percentage' && formData.discountPercentage > 0) {
@@ -479,10 +484,10 @@ export default function SalesPage() {
       } else if (formData.discountType === 'rupees' && formData.discountAmount > 0) {
         discountAmount = formData.discountAmount
       }
-      
+
       // Calculate amount after discount
       const amountAfterDiscount = subtotal - discountAmount
-      
+
       // Calculate GST
       let gstAmount = 0
       if (formData.gstType === 'percentage' && formData.gstPercentage > 0) {
@@ -490,13 +495,13 @@ export default function SalesPage() {
       } else if (formData.gstType === 'rupees' && formData.gstAmount > 0) {
         gstAmount = formData.gstAmount
       }
-      
+
       // Calculate final total
       const finalTotal = amountAfterDiscount + gstAmount
-      
+
       const url = editingSale ? `/api/sales/${editingSale.id}` : '/api/sales'
       const method = editingSale ? 'PUT' : 'POST'
-      
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -522,7 +527,7 @@ export default function SalesPage() {
           saleImage: formData.saleImage || undefined,
         }),
       })
-      
+
       const result = await response.json()
       if (!result.success) {
         const errorMsg = result.error || result.message || 'Unknown error'
@@ -530,7 +535,7 @@ export default function SalesPage() {
         alert(`Failed to ${editingSale ? 'update' : 'add'} sale: ${errorMsg}`)
         return
       }
-      
+
       resetForm()
       await loadSales()
       setShowModal(false)
@@ -576,7 +581,7 @@ export default function SalesPage() {
     if (!confirm('Are you sure you want to delete this sale? This will restore inventory stock.')) {
       return
     }
-    
+
     try {
       const response = await fetch(`/api/sales/${id}`, {
         method: 'DELETE',
@@ -606,7 +611,7 @@ export default function SalesPage() {
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       const response = await fetch('/api/customers', {
         credentials: 'include',
@@ -615,15 +620,15 @@ export default function SalesPage() {
         body: JSON.stringify(customerFormData),
       })
       const result = await response.json()
-      
+
       if (!result.success) {
         alert('Failed to create customer')
         return
       }
-      
+
       // Reload customers list
       await loadData()
-      
+
       // Auto-select the newly created customer
       if (result.data && result.data.id) {
         setFormData(prev => ({
@@ -633,7 +638,7 @@ export default function SalesPage() {
         }))
         setUseCustomer(true)
       }
-      
+
       // Close customer modal and reset form
       setCustomerFormData({
         name: '',
@@ -722,7 +727,7 @@ export default function SalesPage() {
                   </p>
                 )}
               </div>
-              
+
               {/* Search by Party Name (for quick search) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Quick Search by Party Name</label>
@@ -740,57 +745,79 @@ export default function SalesPage() {
                 />
               </div>
             </div>
-            
+
             {/* Date Filters */}
-          <div className="flex gap-4 items-end">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Year</label>
-              <select
-                value={filterYear}
-                onChange={(e) => setFilterYear(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">All Years</option>
-                {years.map(year => (
-                  <option key={year} value={year.toString()}>{year}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Month</label>
-              <select
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">All Months</option>
-                <option value="01">January</option>
-                <option value="02">February</option>
-                <option value="03">March</option>
-                <option value="04">April</option>
-                <option value="05">May</option>
-                <option value="06">June</option>
-                <option value="07">July</option>
-                <option value="08">August</option>
-                <option value="09">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
-            </div>
+            <div className="flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Exact Date</label>
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => {
+                    setFilterDate(e.target.value)
+                    if (e.target.value) {
+                      setFilterMonth('')
+                      setFilterYear('')
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Year</label>
+                <select
+                  value={filterYear}
+                  onChange={(e) => {
+                    setFilterYear(e.target.value)
+                    if (e.target.value) setFilterDate('')
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">All Years</option>
+                  {years.map(year => (
+                    <option key={year} value={year.toString()}>{year}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Month</label>
+                <select
+                  value={filterMonth}
+                  onChange={(e) => {
+                    setFilterMonth(e.target.value)
+                    if (e.target.value) setFilterDate('')
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">All Months</option>
+                  <option value="01">January</option>
+                  <option value="02">February</option>
+                  <option value="03">March</option>
+                  <option value="04">April</option>
+                  <option value="05">May</option>
+                  <option value="06">June</option>
+                  <option value="07">July</option>
+                  <option value="08">August</option>
+                  <option value="09">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
+              </div>
               {(filterMonth || filterYear || searchPartyName || selectedParty !== 'All') && (
-              <button
-                onClick={() => {
-                  setFilterMonth('')
-                  setFilterYear('')
-                  setSearchPartyName('')
-                  setSelectedParty('All')
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-              >
-                Clear Filters
-              </button>
-            )}
+                <button
+                  onClick={() => {
+                    setFilterDate('')
+                    setFilterMonth('')
+                    setFilterYear('')
+                    setSearchPartyName('')
+                    setSelectedParty('All')
+                  }}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -805,7 +832,7 @@ export default function SalesPage() {
               <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
                 <p className="text-sm opacity-90 mb-1">Total Sales</p>
                 <p className="text-3xl font-bold">{salesSummary.totalSales}</p>
-          </div>
+              </div>
               <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
                 <p className="text-sm opacity-90 mb-1">Total Revenue</p>
                 <p className="text-3xl font-bold">₹{salesSummary.totalRevenue.toLocaleString('en-IN')}</p>
@@ -831,155 +858,155 @@ export default function SalesPage() {
         {(() => {
           // Filter sales based on search and date filters
           let filteredSales = sales
-          
+
           // Apply party name search filter (only if party dropdown is not selected)
           if (searchPartyName && selectedParty === 'All') {
-            filteredSales = filteredSales.filter(sale => 
+            filteredSales = filteredSales.filter(sale =>
               sale.partyName.toLowerCase().includes(searchPartyName.toLowerCase())
             )
           }
-          
+
           if (filteredSales.length === 0) {
             return (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+              <div className="bg-white rounded-lg shadow-md p-12 text-center">
                 <p className="text-gray-500 text-lg">
                   {searchPartyName || filterMonth || filterYear
                     ? `No sales found matching your filters.`
                     : 'No sales recorded yet. Record your first sale!'}
                 </p>
-          </div>
+              </div>
             )
           }
-          
+
           return (
-          <div className="space-y-4">
+            <div className="space-y-4">
               {filteredSales.map((sale) => {
-              const totalProfit = sale.items.reduce((sum, item) => sum + item.profit, 0)
-              return (
-                <div key={sale.id} className="bg-white rounded-lg shadow-md p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{sale.partyName}</h3>
-                      <p className="text-sm text-gray-500">
-                        {format(new Date(sale.date), 'dd MMM yyyy')} • Bill: {sale.billNumber}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-green-600">₹{sale.totalAmount.toLocaleString()}</p>
-                      <p className="text-sm text-gray-500">Profit: ₹{totalProfit.toLocaleString()}</p>
+                const totalProfit = sale.items.reduce((sum, item) => sum + item.profit, 0)
+                return (
+                  <div key={sale.id} className="bg-white rounded-lg shadow-md p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">{sale.partyName}</h3>
+                        <p className="text-sm text-gray-500">
+                          {format(new Date(sale.date), 'dd MMM yyyy')} • Bill: {sale.billNumber}
+                        </p>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(sale)}
-                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-all border border-blue-200"
-                          title="Edit Sale"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(sale.id)}
-                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-md text-sm font-medium transition-all border border-red-200"
-                          title="Delete Sale"
-                        >
-                          🗑️ Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="px-6 py-4">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
-                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <span className="text-sm font-medium text-blue-700">{sale.paymentMode}</span>
-                      </div>
-                      {sale.paymentStatus && (
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={sale.paymentStatus}
-                            onChange={(e) => handleUpdatePaymentStatus(sale.id, e.target.value as 'paid' | 'pending' | 'failed')}
-                            className="text-xs px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                            onClick={(e) => e.stopPropagation()}
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-green-600">₹{sale.totalAmount.toLocaleString()}</p>
+                          <p className="text-sm text-gray-500">Profit: ₹{totalProfit.toLocaleString()}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit(sale)}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-all border border-blue-200"
+                            title="Edit Sale"
                           >
-                            <option value="pending">⏳ Pending</option>
-                            <option value="paid">✅ Paid</option>
-                            <option value="failed">❌ Failed</option>
-                          </select>
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(sale.id)}
+                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-md text-sm font-medium transition-all border border-red-200"
+                            title="Delete Sale"
+                          >
+                            🗑️ Delete
+                          </button>
                         </div>
-                      )}
-                      {sale.upiId && (
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                          <span className="px-2 py-1 bg-gray-100 rounded">UPI ID: {sale.upiId}</span>
-                        </div>
-                      )}
-                      {sale.upiTransactionId && (
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                          <span className="px-2 py-1 bg-gray-100 rounded">TXN: {sale.upiTransactionId}</span>
-                        </div>
-                      )}
+                      </div>
                     </div>
-                    {sale.saleImage && (
-                      <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+
+                    <div className="px-6 py-4">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                           </svg>
-                          <p className="text-sm font-semibold text-gray-700">Sale Proof Image</p>
+                          <span className="text-sm font-medium text-blue-700">{sale.paymentMode}</span>
                         </div>
-                        <div className="relative group max-w-xs aspect-auto rounded-xl border-2 border-gray-200 shadow-md cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 overflow-hidden">
-                          <Image 
-                            src={sale.saleImage} 
-                            alt="Sale proof" 
-                            fill
-                            className="object-contain"
-                            sizes="(max-width: 768px) 100vw, 384px"
-                            onClick={() => window.open(sale.saleImage, '_blank')}
-                          />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-xl transition-all duration-200 flex items-center justify-center">
-                            <span className="opacity-0 group-hover:opacity-100 text-white text-sm font-medium bg-black bg-opacity-50 px-3 py-1 rounded-lg">
-                              Click to view full size
-                            </span>
+                        {sale.paymentStatus && (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={sale.paymentStatus}
+                              onChange={(e) => handleUpdatePaymentStatus(sale.id, e.target.value as 'paid' | 'pending' | 'failed')}
+                              className="text-xs px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="pending">⏳ Pending</option>
+                              <option value="paid">✅ Paid</option>
+                              <option value="failed">❌ Failed</option>
+                            </select>
+                          </div>
+                        )}
+                        {sale.upiId && (
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <span className="px-2 py-1 bg-gray-100 rounded">UPI ID: {sale.upiId}</span>
+                          </div>
+                        )}
+                        {sale.upiTransactionId && (
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <span className="px-2 py-1 bg-gray-100 rounded">TXN: {sale.upiTransactionId}</span>
+                          </div>
+                        )}
+                      </div>
+                      {sale.saleImage && (
+                        <div className="mt-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-sm font-semibold text-gray-700">Sale Proof Image</p>
+                          </div>
+                          <div className="relative group max-w-xs aspect-auto rounded-xl border-2 border-gray-200 shadow-md cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 overflow-hidden">
+                            <Image
+                              src={sale.saleImage}
+                              alt="Sale proof"
+                              fill
+                              className="object-contain"
+                              sizes="(max-width: 768px) 100vw, 384px"
+                              onClick={() => window.open(sale.saleImage, '_blank')}
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-xl transition-all duration-200 flex items-center justify-center">
+                              <span className="opacity-0 group-hover:opacity-100 text-white text-sm font-medium bg-black bg-opacity-50 px-3 py-1 rounded-lg">
+                                Click to view full size
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
-                  <div className="border-t pt-4">
-                    <table className="min-w-full">
-                      <thead>
-                        <tr className="text-left text-xs font-medium text-gray-500 uppercase">
-                          <th className="pb-2">Item</th>
-                          <th className="pb-2">Type</th>
-                          <th className="pb-2">Code</th>
-                          <th className="pb-2">Size</th>
-                          <th className="pb-2">Qty</th>
-                          <th className="pb-2">Price</th>
-                          <th className="pb-2">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sale.items.map((item, idx) => (
-                          <tr key={idx} className="border-b">
-                            <td className="py-2 text-sm">{item.dressName}</td>
-                            <td className="py-2 text-sm text-gray-500">{item.dressType}</td>
-                            <td className="py-2 text-sm text-gray-500">{item.dressCode}</td>
-                            <td className="py-2 text-sm text-gray-500">{item.size}</td>
-                            <td className="py-2 text-sm text-gray-500">{item.quantity}</td>
-                            <td className="py-2 text-sm text-gray-500">₹{item.sellingPrice}</td>
-                            <td className="py-2 text-sm font-medium">₹{(item.sellingPrice * item.quantity).toLocaleString()}</td>
+                    <div className="border-t pt-4">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="pb-2">Item</th>
+                            <th className="pb-2">Type</th>
+                            <th className="pb-2">Code</th>
+                            <th className="pb-2">Size</th>
+                            <th className="pb-2">Qty</th>
+                            <th className="pb-2">Price</th>
+                            <th className="pb-2">Total</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {sale.items.map((item, idx) => (
+                            <tr key={idx} className="border-b">
+                              <td className="py-2 text-sm">{item.dressName}</td>
+                              <td className="py-2 text-sm text-gray-500">{item.dressType}</td>
+                              <td className="py-2 text-sm text-gray-500">{item.dressCode}</td>
+                              <td className="py-2 text-sm text-gray-500">{item.size}</td>
+                              <td className="py-2 text-sm text-gray-500">{item.quantity}</td>
+                              <td className="py-2 text-sm text-gray-500">₹{item.sellingPrice}</td>
+                              <td className="py-2 text-sm font-medium">₹{(item.sellingPrice * item.quantity).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
           )
         })()}
 
@@ -1012,776 +1039,775 @@ export default function SalesPage() {
                   </svg>
                 </button>
               </div>
-              
+
               {/* Modal Content */}
               <div className="overflow-y-auto flex-1 p-8">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Bill Number *
-                      <span className="ml-2 text-xs text-gray-500 font-normal">
-                        (Auto-generated, click to edit)
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.billNumber}
-                      onChange={(e) => setFormData({ ...formData, billNumber: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50"
-                      placeholder="Will be auto-generated..."
-                      title="Bill number is auto-generated. You can edit it if needed for special cases."
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <input
-                      type="checkbox"
-                      id="useCustomer"
-                      checked={useCustomer}
-                      onChange={(e) => {
-                        setUseCustomer(e.target.checked)
-                        if (!e.target.checked) {
-                          setFormData(prev => ({ ...prev, customerId: '', partyName: '' }))
-                        }
-                      }}
-                      className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
-                    />
-                    <label htmlFor="useCustomer" className="text-sm font-medium text-gray-700">
-                      Select from existing customers
-                    </label>
-                  </div>
-                  {useCustomer ? (
-                    <div className="flex gap-2">
-                    <select
-                      required
-                      value={formData.customerId}
-                      onChange={(e) => handleCustomerSelect(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Select Customer</option>
-                      {customers.map(customer => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name} - {customer.phone}
-                        </option>
-                      ))}
-                    </select>
-                      <button
-                        type="button"
-                        onClick={() => setShowCustomerModal(true)}
-                        className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-center"
-                        title="Add New Customer"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      required
-                      value={formData.partyName}
-                      onChange={(e) => setFormData({ ...formData, partyName: e.target.value })}
-                      placeholder="Enter party/customer name"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  )}
-                  {customers.length === 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      No customers yet. <a href="/admin/customers" className="text-purple-600 hover:underline">Add customers</a> to use this feature.
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode *</label>
-                    <select
-                      required
-                      value={formData.paymentMode}
-                      onChange={handlePaymentModeChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="UPI - GPay">UPI - GPay</option>
-                      <option value="UPI - PhonePe">UPI - PhonePe</option>
-                      <option value="UPI - Paytm">UPI - Paytm</option>
-                      <option value="Bank Transfer">Bank Transfer</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">UPI Transaction ID (if UPI)</label>
-                    <input
-                      type="text"
-                      value={formData.upiTransactionId}
-                      onChange={(e) => setFormData({ ...formData, upiTransactionId: e.target.value })}
-                      placeholder="TXN123456"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium">Items</h3>
-                    <button
-                      type="button"
-                      onClick={handleAddItem}
-                      className="text-purple-600 hover:text-purple-700 text-sm font-medium"
-                    >
-                      ➕ Add Item
-                    </button>
-                  </div>
-                  
-                  {formData.items.length === 0 ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50">
-                      <div className="flex flex-col items-center">
-                        <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-                          <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                          </svg>
-                        </div>
-                        <p className="text-gray-600 font-medium mb-2">No items added yet</p>
-                        <p className="text-gray-500 text-sm">Click &quot;Add Item&quot; to start adding products</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {formData.items.map((item, index) => {
-                        const selectedItem = getSelectedInventoryItem(item.inventoryId)
-                        return (
-                          <div key={index} className="border-2 border-gray-200 rounded-xl p-5 bg-gradient-to-br from-white to-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
-                            <div className="grid grid-cols-3 gap-4 mb-3">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Dress *</label>
-                                {selectedItem ? (
-                                  <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenItemModal(index)}
-                                        className="flex-1 px-3 py-2 border-2 border-purple-300 bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 text-left flex items-center justify-between"
-                                >
-                                        <span className="font-medium">{selectedItem.dressName}</span>
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                        </svg>
-                                      </button>
-                                    </div>
-                                    <div className={`px-2 py-1 rounded text-xs font-medium border ${getStockStatusColor(getStockStatus(selectedItem.currentStock))}`}>
-                                      {getStockStatusText(getStockStatus(selectedItem.currentStock), selectedItem.currentStock || 0)}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      Code: {selectedItem.dressCode} • {selectedItem.dressType}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenItemModal(index)}
-                                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-purple-400 hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-600 flex items-center justify-center gap-2"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    <span>Search & Select Product</span>
-                                  </button>
-                                )}
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Size *</label>
-                                <select
-                                  required
-                                  value={item.size}
-                                  onChange={(e) => handleItemChange(index, 'size', e.target.value)}
-                                  disabled={!selectedItem}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
-                                >
-                                  <option value="">Select Size</option>
-                                  {selectedItem?.sizes.map(size => (
-                                    <option key={size} value={size}>{size}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
-                                <input
-                                  type="number"
-                                  required
-                                  min="1"
-                                  max={selectedItem?.currentStock || undefined}
-                                  value={item.quantity}
-                                  onChange={(e) => {
-                                    const quantity = parseInt(e.target.value) || 0
-                                    const availableStock = selectedItem?.currentStock || 0
-                                    
-                                    if (quantity > availableStock) {
-                                      alert(`Insufficient stock. Available: ${availableStock}, Requested: ${quantity}`)
-                                      return
-                                    }
-                                    
-                                    handleItemChange(index, 'quantity', quantity)
-                                  }}
-                                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                                    selectedItem && item.quantity > (selectedItem.currentStock || 0)
-                                      ? 'border-red-300 bg-red-50'
-                                      : 'border-gray-300'
-                                  }`}
-                                />
-                                {selectedItem && item.quantity > (selectedItem.currentStock || 0) && (
-                                  <p className="mt-1 text-xs text-red-600">
-                                    Only {selectedItem.currentStock || 0} units available
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            {/* Per Meter Pricing Option */}
-                            {selectedItem && selectedItem.pricePerMeter && (
-                              <div className="mb-3 pt-3 border-t border-gray-200">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={item.usePerMeter || false}
-                                    onChange={(e) => {
-                                      const newItems = [...formData.items]
-                                      newItems[index] = { 
-                                        ...newItems[index], 
-                                        usePerMeter: e.target.checked,
-                                        meters: e.target.checked ? (newItems[index].meters || 0) : undefined
-                                      }
-                                      setFormData({ ...formData, items: newItems })
-                                    }}
-                                    className="rounded"
-                                  />
-                                  <span className="text-sm font-medium text-gray-700">Use Per Meter Pricing (₹{selectedItem.pricePerMeter}/meter)</span>
-                                </label>
-                                {item.usePerMeter && (
-                                  <div className="mt-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Meters *</label>
-                                    <input
-                                      type="number"
-                                      required
-                                      min="0.01"
-                                      step="0.01"
-                                      value={item.meters || ''}
-                                      onChange={(e) => handleItemChange(index, 'meters', parseFloat(e.target.value))}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                      placeholder="e.g., 2.5"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            
-                            {selectedItem && (
-                              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-medium text-gray-500">Price:</span>
-                                  <span className="text-sm font-semibold text-gray-800">
-                                    ₹{item.usePerMeter && selectedItem.pricePerMeter 
-                                      ? selectedItem.pricePerMeter 
-                                      : selectedItem.sellingPrice}
-                                    {item.usePerMeter && '/meter'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-medium text-gray-500">Profit:</span>
-                                  <span className="text-sm font-semibold text-green-600">
-                                    ₹{((item.usePerMeter && selectedItem.pricePerMeter ? selectedItem.pricePerMeter : selectedItem.sellingPrice) - selectedItem.wholesalePrice).toFixed(2)}
-                                    {item.usePerMeter ? '/meter' : '/unit'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 ml-auto">
-                                  <span className="text-xs font-medium text-gray-500">Total:</span>
-                                  <span className="text-sm font-bold text-blue-600">
-                                    ₹{(
-                                      (item.usePerMeter && selectedItem.pricePerMeter && item.meters
-                                        ? selectedItem.pricePerMeter * item.meters
-                                        : selectedItem.sellingPrice * item.quantity)
-                                    ).toLocaleString()}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            <div className="flex justify-end mt-3">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItem(index)}
-                                className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center gap-1 hover:bg-red-50 px-3 py-1.5 rounded-md transition-all duration-200"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Discount Section */}
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Discount (Optional)</h3>
-                  <div className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Discount Type</label>
-                      <div className="flex flex-wrap gap-4">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            value="percentage"
-                            checked={formData.discountType === 'percentage'}
-                            onChange={(e) => setFormData({ ...formData, discountType: 'percentage' as const, discountAmount: 0 })}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">Percentage (%)</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            value="rupees"
-                            checked={formData.discountType === 'rupees'}
-                            onChange={(e) => setFormData({ ...formData, discountType: 'rupees' as const, discountPercentage: 0 })}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">Fixed Amount (₹)</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            value=""
-                            checked={formData.discountType === ''}
-                            onChange={(e) => setFormData({ ...formData, discountType: '' as const, discountPercentage: 0, discountAmount: 0 })}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">No Discount</span>
-                        </label>
-                      </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.date}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
                     </div>
-                    {formData.discountType === 'percentage' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Discount Percentage</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={formData.discountPercentage}
-                          onChange={(e) => setFormData({ ...formData, discountPercentage: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="e.g., 10 for 10%"
-                        />
-                      </div>
-                    )}
-                    {formData.discountType === 'rupees' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Discount Amount (₹)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={formData.discountAmount}
-                          onChange={(e) => setFormData({ ...formData, discountAmount: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="e.g., 500"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* GST Section */}
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">GST (Optional)</h3>
-                  <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">GST Type</label>
-                      <div className="flex flex-wrap gap-4">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            value="percentage"
-                            checked={formData.gstType === 'percentage'}
-                            onChange={(e) => setFormData({ ...formData, gstType: 'percentage' as const, gstAmount: 0 })}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">Percentage (%)</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            value="rupees"
-                            checked={formData.gstType === 'rupees'}
-                            onChange={(e) => setFormData({ ...formData, gstType: 'rupees' as const, gstPercentage: 0 })}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">Fixed Amount (₹)</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            value=""
-                            checked={formData.gstType === ''}
-                            onChange={(e) => setFormData({ ...formData, gstType: '' as const, gstPercentage: 0, gstAmount: 0 })}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">No GST</span>
-                        </label>
-                      </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Bill Number *
+                        <span className="ml-2 text-xs text-gray-500 font-normal">
+                          (Auto-generated, click to edit)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.billNumber}
+                        onChange={(e) => setFormData({ ...formData, billNumber: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50"
+                        placeholder="Will be auto-generated..."
+                        title="Bill number is auto-generated. You can edit it if needed for special cases."
+                      />
                     </div>
-                    {formData.gstType === 'percentage' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">GST Percentage</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={formData.gstPercentage}
-                          onChange={(e) => setFormData({ ...formData, gstPercentage: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="e.g., 18 for 18%"
-                        />
-                      </div>
-                    )}
-                    {formData.gstType === 'rupees' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">GST Amount (₹)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={formData.gstAmount}
-                          onChange={(e) => setFormData({ ...formData, gstAmount: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="e.g., 500"
-                        />
-                      </div>
-                    )}
                   </div>
-                </div>
-
-                {/* Total Summary */}
-                {formData.items.length > 0 && (() => {
-                  const subtotal = formData.items.reduce((sum, item) => {
-                    const invItem = inventory.find(i => i.id === item.inventoryId)
-                    if (!invItem) return sum
-                    const price = item.usePerMeter && invItem.pricePerMeter && item.meters
-                      ? invItem.pricePerMeter * item.meters
-                      : invItem.sellingPrice * item.quantity
-                    return sum + price
-                  }, 0)
-                  
-                  const discount = formData.discountType === 'percentage' && formData.discountPercentage > 0
-                    ? (subtotal * formData.discountPercentage) / 100
-                    : formData.discountType === 'rupees' && formData.discountAmount > 0
-                    ? formData.discountAmount
-                    : 0
-                  
-                  const amountAfterDiscount = subtotal - discount
-                  
-                  const gst = formData.gstType === 'percentage' && formData.gstPercentage > 0
-                    ? (amountAfterDiscount * formData.gstPercentage) / 100
-                    : formData.gstType === 'rupees' && formData.gstAmount > 0
-                    ? formData.gstAmount
-                    : 0
-                  
-                  const finalTotal = amountAfterDiscount + gst
-                  
-                  return (
-                    <div className="border-t pt-6">
-                      <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-5 border-2 border-green-200">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Total Summary</h3>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Subtotal:</span>
-                            <span className="font-medium">₹{subtotal.toLocaleString()}</span>
-                          </div>
-                          {discount > 0 && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Discount {formData.discountType === 'percentage' ? `(${formData.discountPercentage}%)` : ''}:</span>
-                              <span className="font-medium text-red-600">-₹{discount.toLocaleString()}</span>
-                            </div>
-                          )}
-                          {gst > 0 && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">GST {formData.gstType === 'percentage' ? `(${formData.gstPercentage}%)` : ''}:</span>
-                              <span className="font-medium text-blue-600">+₹{gst.toLocaleString()}</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between text-xl font-bold border-t pt-3 mt-3">
-                            <span>Total Amount:</span>
-                            <span className="text-green-600">₹{finalTotal.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
+                  <div>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <input
+                        type="checkbox"
+                        id="useCustomer"
+                        checked={useCustomer}
+                        onChange={(e) => {
+                          setUseCustomer(e.target.checked)
+                          if (!e.target.checked) {
+                            setFormData(prev => ({ ...prev, customerId: '', partyName: '' }))
+                          }
+                        }}
+                        className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                      />
+                      <label htmlFor="useCustomer" className="text-sm font-medium text-gray-700">
+                        Select from existing customers
+                      </label>
                     </div>
-                  )
-                })()}
-
-                {/* Sale Image Capture Section */}
-                <div className="border-t pt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-1">Sale Proof Image</label>
-                      <p className="text-xs text-gray-500">Capture an image as proof of sale (Optional)</p>
-                    </div>
-                    {capturedImage && (
-                      <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium flex items-center gap-1">
-                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        Image Captured
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-4">
-                    {capturedImage ? (
-                      <div className="relative group">
-                        <div className="relative overflow-hidden rounded-xl border-2 border-gray-200 shadow-lg w-full aspect-auto max-h-96 bg-gray-50">
-                          <Image 
-                            src={capturedImage} 
-                            alt="Captured sale proof" 
-                            fill
-                            className="object-contain"
-                            sizes="(max-width: 768px) 100vw, 50vw"
-                          />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCapturedImage(null)
-                                setFormData({ ...formData, saleImage: '' })
-                              }}
-                              className="opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg transform hover:scale-105"
-                            >
-                              🗑️ Remove Image
-                            </button>
-                          </div>
-                        </div>
+                    {useCustomer ? (
+                      <div className="flex gap-2">
+                        <select
+                          required
+                          value={formData.customerId}
+                          onChange={(e) => handleCustomerSelect(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="">Select Customer</option>
+                          {customers.map(customer => (
+                            <option key={customer.id} value={customer.id}>
+                              {customer.name} - {customer.phone}
+                            </option>
+                          ))}
+                        </select>
                         <button
                           type="button"
-                          onClick={() => {
-                            setCapturedImage(null)
-                            setFormData({ ...formData, saleImage: '' })
-                          }}
-                          className="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-all duration-200 hover:scale-110 md:hidden"
+                          onClick={() => setShowCustomerModal(true)}
+                          className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-center"
+                          title="Add New Customer"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                           </svg>
                         </button>
                       </div>
                     ) : (
-                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gradient-to-br from-gray-50 to-gray-100 hover:border-blue-400 transition-all duration-200">
+                      <input
+                        type="text"
+                        required
+                        value={formData.partyName}
+                        onChange={(e) => setFormData({ ...formData, partyName: e.target.value })}
+                        placeholder="Enter party/customer name"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    )}
+                    {customers.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        No customers yet. <a href="/admin/customers" className="text-purple-600 hover:underline">Add customers</a> to use this feature.
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode *</label>
+                      <select
+                        required
+                        value={formData.paymentMode}
+                        onChange={handlePaymentModeChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="UPI - GPay">UPI - GPay</option>
+                        <option value="UPI - PhonePe">UPI - PhonePe</option>
+                        <option value="UPI - Paytm">UPI - Paytm</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">UPI Transaction ID (if UPI)</label>
+                      <input
+                        type="text"
+                        value={formData.upiTransactionId}
+                        onChange={(e) => setFormData({ ...formData, upiTransactionId: e.target.value })}
+                        placeholder="TXN123456"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium">Items</h3>
+                      <button
+                        type="button"
+                        onClick={handleAddItem}
+                        className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                      >
+                        ➕ Add Item
+                      </button>
+                    </div>
+
+                    {formData.items.length === 0 ? (
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50">
                         <div className="flex flex-col items-center">
-                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                            <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                            <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
                           </div>
-                          <p className="text-gray-600 font-medium mb-2">No image captured yet</p>
-                          <p className="text-gray-500 text-sm mb-4">Capture a photo as proof of sale</p>
-                          <button
-                            type="button"
-                            onClick={startCamera}
-                            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            Capture Image
-                          </button>
+                          <p className="text-gray-600 font-medium mb-2">No items added yet</p>
+                          <p className="text-gray-500 text-sm">Click &quot;Add Item&quot; to start adding products</p>
                         </div>
                       </div>
-                    )}
-                    
-                    {/* Sticker Selection */}
-                    {capturedImage && (
-                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                        <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                          <span className="text-lg">🎨</span>
-                          Add Verification Sticker
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {stickers.map((sticker) => (
-                            <button
-                              key={sticker}
-                              type="button"
-                              onClick={() => addStickerToImage(sticker)}
-                              className="px-4 py-2.5 bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400 rounded-lg text-xl font-medium transition-all duration-200 transform hover:scale-110 shadow-sm hover:shadow-md"
-                            >
-                              {sticker}
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-xs text-gray-500 mt-3">Click a sticker to add it to your image</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {formData.items.map((item, index) => {
+                          const selectedItem = getSelectedInventoryItem(item.inventoryId)
+                          return (
+                            <div key={index} className="border-2 border-gray-200 rounded-xl p-5 bg-gradient-to-br from-white to-gray-50 shadow-sm hover:shadow-md transition-all duration-200">
+                              <div className="grid grid-cols-3 gap-4 mb-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Dress *</label>
+                                  {selectedItem ? (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenItemModal(index)}
+                                          className="flex-1 px-3 py-2 border-2 border-purple-300 bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 text-left flex items-center justify-between"
+                                        >
+                                          <span className="font-medium">{selectedItem.dressName}</span>
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                      <div className={`px-2 py-1 rounded text-xs font-medium border ${getStockStatusColor(getStockStatus(selectedItem.currentStock))}`}>
+                                        {getStockStatusText(getStockStatus(selectedItem.currentStock), selectedItem.currentStock || 0)}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        Code: {selectedItem.dressCode} • {selectedItem.dressType}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenItemModal(index)}
+                                      className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-md hover:border-purple-400 hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-600 flex items-center justify-center gap-2"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                      </svg>
+                                      <span>Search & Select Product</span>
+                                    </button>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Size *</label>
+                                  <select
+                                    required
+                                    value={item.size}
+                                    onChange={(e) => handleItemChange(index, 'size', e.target.value)}
+                                    disabled={!selectedItem}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
+                                  >
+                                    <option value="">Select Size</option>
+                                    {selectedItem?.sizes.map(size => (
+                                      <option key={size} value={size}>{size}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+                                  <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    max={selectedItem?.currentStock || undefined}
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const quantity = parseInt(e.target.value) || 0
+                                      const availableStock = selectedItem?.currentStock || 0
+
+                                      if (quantity > availableStock) {
+                                        alert(`Insufficient stock. Available: ${availableStock}, Requested: ${quantity}`)
+                                        return
+                                      }
+
+                                      handleItemChange(index, 'quantity', quantity)
+                                    }}
+                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${selectedItem && item.quantity > (selectedItem.currentStock || 0)
+                                        ? 'border-red-300 bg-red-50'
+                                        : 'border-gray-300'
+                                      }`}
+                                  />
+                                  {selectedItem && item.quantity > (selectedItem.currentStock || 0) && (
+                                    <p className="mt-1 text-xs text-red-600">
+                                      Only {selectedItem.currentStock || 0} units available
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Per Meter Pricing Option */}
+                              {selectedItem && selectedItem.pricePerMeter && (
+                                <div className="mb-3 pt-3 border-t border-gray-200">
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.usePerMeter || false}
+                                      onChange={(e) => {
+                                        const newItems = [...formData.items]
+                                        newItems[index] = {
+                                          ...newItems[index],
+                                          usePerMeter: e.target.checked,
+                                          meters: e.target.checked ? (newItems[index].meters || 0) : undefined
+                                        }
+                                        setFormData({ ...formData, items: newItems })
+                                      }}
+                                      className="rounded"
+                                    />
+                                    <span className="text-sm font-medium text-gray-700">Use Per Meter Pricing (₹{selectedItem.pricePerMeter}/meter)</span>
+                                  </label>
+                                  {item.usePerMeter && (
+                                    <div className="mt-2">
+                                      <label className="block text-sm font-medium text-gray-700 mb-1">Meters *</label>
+                                      <input
+                                        type="number"
+                                        required
+                                        min="0.01"
+                                        step="0.01"
+                                        value={item.meters || ''}
+                                        onChange={(e) => handleItemChange(index, 'meters', parseFloat(e.target.value))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        placeholder="e.g., 2.5"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {selectedItem && (
+                                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-gray-500">Price:</span>
+                                    <span className="text-sm font-semibold text-gray-800">
+                                      ₹{item.usePerMeter && selectedItem.pricePerMeter
+                                        ? selectedItem.pricePerMeter
+                                        : selectedItem.sellingPrice}
+                                      {item.usePerMeter && '/meter'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-gray-500">Profit:</span>
+                                    <span className="text-sm font-semibold text-green-600">
+                                      ₹{((item.usePerMeter && selectedItem.pricePerMeter ? selectedItem.pricePerMeter : selectedItem.sellingPrice) - selectedItem.wholesalePrice).toFixed(2)}
+                                      {item.usePerMeter ? '/meter' : '/unit'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 ml-auto">
+                                    <span className="text-xs font-medium text-gray-500">Total:</span>
+                                    <span className="text-sm font-bold text-blue-600">
+                                      ₹{(
+                                        (item.usePerMeter && selectedItem.pricePerMeter && item.meters
+                                          ? selectedItem.pricePerMeter * item.meters
+                                          : selectedItem.sellingPrice * item.quantity)
+                                      ).toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex justify-end mt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItem(index)}
+                                  className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center gap-1 hover:bg-red-50 px-3 py-1.5 rounded-md transition-all duration-200"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
-                </div>
 
-                {/* Camera Modal */}
-                {showCamera && (
-                  <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 overflow-hidden">
-                      {/* Header */}
-                      <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                          </div>
-                          <h3 className="text-xl font-bold text-white">Capture Sale Proof Image</h3>
+                  {/* Discount Section */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Discount (Optional)</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Discount Type</label>
+                        <div className="flex flex-wrap gap-4">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="radio"
+                              value="percentage"
+                              checked={formData.discountType === 'percentage'}
+                              onChange={(e) => setFormData({ ...formData, discountType: 'percentage' as const, discountAmount: 0 })}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">Percentage (%)</span>
+                          </label>
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="radio"
+                              value="rupees"
+                              checked={formData.discountType === 'rupees'}
+                              onChange={(e) => setFormData({ ...formData, discountType: 'rupees' as const, discountPercentage: 0 })}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">Fixed Amount (₹)</span>
+                          </label>
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="radio"
+                              value=""
+                              checked={formData.discountType === ''}
+                              onChange={(e) => setFormData({ ...formData, discountType: '' as const, discountPercentage: 0, discountAmount: 0 })}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">No Discount</span>
+                          </label>
                         </div>
-                        <button
-                          type="button"
-                          onClick={stopCamera}
-                          className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all duration-200"
-                        >
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
                       </div>
-
-                      {/* Camera View */}
-                      <div className="p-6">
-                        <div className="relative bg-black rounded-xl overflow-hidden shadow-2xl mb-4">
-                          <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            className="w-full h-auto max-h-[60vh] object-cover"
+                      {formData.discountType === 'percentage' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Discount Percentage</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={formData.discountPercentage}
+                            onChange={(e) => setFormData({ ...formData, discountPercentage: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="e.g., 10 for 10%"
                           />
-                          <canvas ref={canvasRef} className="hidden" />
-                          {selectedSticker && (
-                            <div
-                              className="absolute text-7xl font-bold text-green-400 opacity-90 pointer-events-none drop-shadow-2xl"
-                              style={{
-                                left: `${stickerPosition.x}%`,
-                                top: `${stickerPosition.y}%`,
-                                transform: 'translate(-50%, -50%)',
-                                textShadow: '0 0 20px rgba(0,0,0,0.8)',
-                              }}
-                            >
-                              {selectedSticker}
+                        </div>
+                      )}
+                      {formData.discountType === 'rupees' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Discount Amount (₹)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={formData.discountAmount}
+                            onChange={(e) => setFormData({ ...formData, discountAmount: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="e.g., 500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* GST Section */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">GST (Optional)</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">GST Type</label>
+                        <div className="flex flex-wrap gap-4">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="radio"
+                              value="percentage"
+                              checked={formData.gstType === 'percentage'}
+                              onChange={(e) => setFormData({ ...formData, gstType: 'percentage' as const, gstAmount: 0 })}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">Percentage (%)</span>
+                          </label>
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="radio"
+                              value="rupees"
+                              checked={formData.gstType === 'rupees'}
+                              onChange={(e) => setFormData({ ...formData, gstType: 'rupees' as const, gstPercentage: 0 })}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">Fixed Amount (₹)</span>
+                          </label>
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="radio"
+                              value=""
+                              checked={formData.gstType === ''}
+                              onChange={(e) => setFormData({ ...formData, gstType: '' as const, gstPercentage: 0, gstAmount: 0 })}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">No GST</span>
+                          </label>
+                        </div>
+                      </div>
+                      {formData.gstType === 'percentage' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">GST Percentage</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={formData.gstPercentage}
+                            onChange={(e) => setFormData({ ...formData, gstPercentage: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="e.g., 18 for 18%"
+                          />
+                        </div>
+                      )}
+                      {formData.gstType === 'rupees' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">GST Amount (₹)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={formData.gstAmount}
+                            onChange={(e) => setFormData({ ...formData, gstAmount: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="e.g., 500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Total Summary */}
+                  {formData.items.length > 0 && (() => {
+                    const subtotal = formData.items.reduce((sum, item) => {
+                      const invItem = inventory.find(i => i.id === item.inventoryId)
+                      if (!invItem) return sum
+                      const price = item.usePerMeter && invItem.pricePerMeter && item.meters
+                        ? invItem.pricePerMeter * item.meters
+                        : invItem.sellingPrice * item.quantity
+                      return sum + price
+                    }, 0)
+
+                    const discount = formData.discountType === 'percentage' && formData.discountPercentage > 0
+                      ? (subtotal * formData.discountPercentage) / 100
+                      : formData.discountType === 'rupees' && formData.discountAmount > 0
+                        ? formData.discountAmount
+                        : 0
+
+                    const amountAfterDiscount = subtotal - discount
+
+                    const gst = formData.gstType === 'percentage' && formData.gstPercentage > 0
+                      ? (amountAfterDiscount * formData.gstPercentage) / 100
+                      : formData.gstType === 'rupees' && formData.gstAmount > 0
+                        ? formData.gstAmount
+                        : 0
+
+                    const finalTotal = amountAfterDiscount + gst
+
+                    return (
+                      <div className="border-t pt-6">
+                        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-5 border-2 border-green-200">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">Total Summary</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Subtotal:</span>
+                              <span className="font-medium">₹{subtotal.toLocaleString()}</span>
                             </div>
-                          )}
-                          {/* Capture Frame Overlay */}
-                          <div className="absolute inset-0 pointer-events-none">
-                            <div className="absolute inset-4 border-4 border-white border-dashed rounded-lg opacity-50"></div>
+                            {discount > 0 && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Discount {formData.discountType === 'percentage' ? `(${formData.discountPercentage}%)` : ''}:</span>
+                                <span className="font-medium text-red-600">-₹{discount.toLocaleString()}</span>
+                              </div>
+                            )}
+                            {gst > 0 && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">GST {formData.gstType === 'percentage' ? `(${formData.gstPercentage}%)` : ''}:</span>
+                                <span className="font-medium text-blue-600">+₹{gst.toLocaleString()}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-xl font-bold border-t pt-3 mt-3">
+                              <span>Total Amount:</span>
+                              <span className="text-green-600">₹{finalTotal.toLocaleString()}</span>
+                            </div>
                           </div>
                         </div>
-                        
-                        {/* Sticker Selection for Live Preview */}
-                        {!selectedSticker && (
-                          <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
-                            <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                              <span className="text-lg">🎨</span>
-                              Add Sticker (Optional)
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                              {stickers.map((sticker) => (
-                                <button
-                                  key={sticker}
-                                  type="button"
-                                  onClick={() => setSelectedSticker(sticker)}
-                                  className="px-5 py-3 bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400 rounded-lg text-2xl font-medium transition-all duration-200 transform hover:scale-110 shadow-sm hover:shadow-md"
-                                >
-                                  {sticker}
-                                </button>
-                              ))}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2">Select a sticker to overlay on the image</p>
-                          </div>
-                        )}
+                      </div>
+                    )
+                  })()}
 
-                        {selectedSticker && (
-                          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-2xl">{selectedSticker}</span>
-                                <span className="text-sm font-medium text-blue-800">Sticker Selected</span>
-                              </div>
+                  {/* Sale Image Capture Section */}
+                  <div className="border-t pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-1">Sale Proof Image</label>
+                        <p className="text-xs text-gray-500">Capture an image as proof of sale (Optional)</p>
+                      </div>
+                      {capturedImage && (
+                        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium flex items-center gap-1">
+                          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                          Image Captured
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-4">
+                      {capturedImage ? (
+                        <div className="relative group">
+                          <div className="relative overflow-hidden rounded-xl border-2 border-gray-200 shadow-lg w-full aspect-auto max-h-96 bg-gray-50">
+                            <Image
+                              src={capturedImage}
+                              alt="Captured sale proof"
+                              fill
+                              className="object-contain"
+                              sizes="(max-width: 768px) 100vw, 50vw"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
                               <button
                                 type="button"
-                                onClick={() => setSelectedSticker(null)}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                onClick={() => {
+                                  setCapturedImage(null)
+                                  setFormData({ ...formData, saleImage: '' })
+                                }}
+                                className="opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg transform hover:scale-105"
                               >
-                                Remove
+                                🗑️ Remove Image
                               </button>
                             </div>
                           </div>
-                        )}
-                        
-                        {/* Action Buttons */}
-                        <div className="flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCapturedImage(null)
+                              setFormData({ ...formData, saleImage: '' })
+                            }}
+                            className="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-lg transition-all duration-200 hover:scale-110 md:hidden"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gradient-to-br from-gray-50 to-gray-100 hover:border-blue-400 transition-all duration-200">
+                          <div className="flex flex-col items-center">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            </div>
+                            <p className="text-gray-600 font-medium mb-2">No image captured yet</p>
+                            <p className="text-gray-500 text-sm mb-4">Capture a photo as proof of sale</p>
+                            <button
+                              type="button"
+                              onClick={startCamera}
+                              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              Capture Image
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sticker Selection */}
+                      {capturedImage && (
+                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                          <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                            <span className="text-lg">🎨</span>
+                            Add Verification Sticker
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {stickers.map((sticker) => (
+                              <button
+                                key={sticker}
+                                type="button"
+                                onClick={() => addStickerToImage(sticker)}
+                                className="px-4 py-2.5 bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400 rounded-lg text-xl font-medium transition-all duration-200 transform hover:scale-110 shadow-sm hover:shadow-md"
+                              >
+                                {sticker}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-3">Click a sticker to add it to your image</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Camera Modal */}
+                  {showCamera && (
+                    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 backdrop-blur-sm">
+                      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            </div>
+                            <h3 className="text-xl font-bold text-white">Capture Sale Proof Image</h3>
+                          </div>
                           <button
                             type="button"
                             onClick={stopCamera}
-                            className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-all duration-200 hover:border-gray-400"
+                            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all duration-200"
                           >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={captureImage}
-                            className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                            Capture Photo
                           </button>
+                        </div>
+
+                        {/* Camera View */}
+                        <div className="p-6">
+                          <div className="relative bg-black rounded-xl overflow-hidden shadow-2xl mb-4">
+                            <video
+                              ref={videoRef}
+                              autoPlay
+                              playsInline
+                              className="w-full h-auto max-h-[60vh] object-cover"
+                            />
+                            <canvas ref={canvasRef} className="hidden" />
+                            {selectedSticker && (
+                              <div
+                                className="absolute text-7xl font-bold text-green-400 opacity-90 pointer-events-none drop-shadow-2xl"
+                                style={{
+                                  left: `${stickerPosition.x}%`,
+                                  top: `${stickerPosition.y}%`,
+                                  transform: 'translate(-50%, -50%)',
+                                  textShadow: '0 0 20px rgba(0,0,0,0.8)',
+                                }}
+                              >
+                                {selectedSticker}
+                              </div>
+                            )}
+                            {/* Capture Frame Overlay */}
+                            <div className="absolute inset-0 pointer-events-none">
+                              <div className="absolute inset-4 border-4 border-white border-dashed rounded-lg opacity-50"></div>
+                            </div>
+                          </div>
+
+                          {/* Sticker Selection for Live Preview */}
+                          {!selectedSticker && (
+                            <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
+                              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <span className="text-lg">🎨</span>
+                                Add Sticker (Optional)
+                              </label>
+                              <div className="flex flex-wrap gap-2">
+                                {stickers.map((sticker) => (
+                                  <button
+                                    key={sticker}
+                                    type="button"
+                                    onClick={() => setSelectedSticker(sticker)}
+                                    className="px-5 py-3 bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400 rounded-lg text-2xl font-medium transition-all duration-200 transform hover:scale-110 shadow-sm hover:shadow-md"
+                                  >
+                                    {sticker}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-2">Select a sticker to overlay on the image</p>
+                            </div>
+                          )}
+
+                          {selectedSticker && (
+                            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-2xl">{selectedSticker}</span>
+                                  <span className="text-sm font-medium text-blue-800">Sticker Selected</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedSticker(null)}
+                                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Action Buttons */}
+                          <div className="flex justify-end gap-3">
+                            <button
+                              type="button"
+                              onClick={stopCamera}
+                              className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-all duration-200 hover:border-gray-400"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={captureImage}
+                              className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              Capture Photo
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <div className="flex justify-end space-x-4 pt-4 border-t">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false)
-                      resetForm()
-                    }}
-                    className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-all duration-200 hover:border-gray-400"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={formData.items.length === 0}
-                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    {editingSale ? 'Update Sale' : 'Record Sale'}
-                  </button>
-                </div>
-              </form>
+                  <div className="flex justify-end space-x-4 pt-4 border-t">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowModal(false)
+                        resetForm()
+                      }}
+                      className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-all duration-200 hover:border-gray-400"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={formData.items.length === 0}
+                      className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {editingSale ? 'Update Sale' : 'Record Sale'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
