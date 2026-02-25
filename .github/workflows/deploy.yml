@@ -53,13 +53,20 @@ jobs:
       - name: Trigger Render Deploy Hook
         run: |
           echo "🚀 Triggering Render deployment..."
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          DEPLOY_URL="${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+          # Render deploy hooks expect a POST request
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$DEPLOY_URL")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
           
-          if [ "$RESPONSE" -eq 200 ] || [ "$RESPONSE" -eq 201 ]; then
-            echo "✅ Deploy triggered successfully (HTTP $RESPONSE)"
+          echo "Response body: $BODY"
+          
+          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 201 ]; then
+            echo "✅ Deploy triggered successfully (HTTP $HTTP_CODE)"
           else
-            echo "❌ Deploy trigger failed (HTTP $RESPONSE)"
+            echo "❌ Deploy trigger failed (HTTP $HTTP_CODE)"
+            echo "Response: $BODY"
             exit 1
           fi
 
