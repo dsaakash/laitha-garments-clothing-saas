@@ -1,6 +1,6 @@
 # ──────────────────────────────────────────────────────────────
 # Deploy – Trigger Render deploy on push to main
-# Uses Render Deploy Hook to kick off a new deploy
+# After successful deploy, auto-creates a GitHub Release
 # ──────────────────────────────────────────────────────────────
 name: Deploy to Render
 
@@ -8,6 +8,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:   # allow manual deploys from GitHub UI
+
+permissions:
+  contents: write   # needed to create tags and releases
 
 jobs:
   # ───────── CI Gate ─────────
@@ -70,15 +73,96 @@ jobs:
             exit 1
           fi
 
-      - name: Post-deploy summary
+  # ───────── Release ─────────
+  release:
+    name: 🏷️ Create Release
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full git history for changelog
+
+      - name: Generate version tag and changelog
+        id: version
         run: |
-          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          # Read version from package.json
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          
+          # Create a unique release tag using package version + short SHA
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          DATE_TAG=$(date -u '+%Y%m%d')
+          RELEASE_TAG="v${PKG_VERSION}-${DATE_TAG}.${SHORT_SHA}"
+          RELEASE_NAME="Release ${PKG_VERSION} (${DATE_TAG})"
+
+          echo "tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
+          echo "version=${PKG_VERSION}" >> $GITHUB_OUTPUT
+
+          # Generate changelog from last release tag (if any)
+          PREV_TAG=$(git tag --sort=-v:refname | head -n 1 2>/dev/null || echo "")
+
+          {
+            echo "## 🚀 ${RELEASE_NAME}"
+            echo ""
+            echo "**Deployed to production** on $(date -u '+%B %d, %Y at %H:%M UTC')"
+            echo ""
+            echo "### 📦 Changes"
+            echo ""
+
+            if [ -z "$PREV_TAG" ]; then
+              echo "🎉 **Initial release!**"
+              echo ""
+              git log --oneline --pretty=format:"- %s (%h)" -20
+            else
+              git log ${PREV_TAG}..HEAD --oneline --pretty=format:"- %s (%h)"
+            fi
+
+            echo ""
+            echo ""
+            echo "---"
+            echo ""
+            echo "| Detail | Value |"
+            echo "| ------ | ----- |"
+            echo "| **Version** | \`${PKG_VERSION}\` |"
+            echo "| **Commit** | \`${{ github.sha }}\` |"
+            echo "| **Branch** | \`${{ github.ref_name }}\` |"
+            echo "| **Deployed by** | ${{ github.actor }} |"
+          } > RELEASE_NOTES.md
+
+          cat RELEASE_NOTES.md
+
+      - name: Create Git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.version.outputs.tag }} -m "${{ steps.version.outputs.name }}"
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post summary
+        run: |
+          echo "## 🚀 Deployment & Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Release** | \`${{ steps.version.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Branch** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Timestamp** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Deployed by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 Check your [Render Dashboard](https://dashboard.render.com) for deploy progress." >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployed to Render & GitHub Release created!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }})" >> $GITHUB_STEP_SUMMARY
