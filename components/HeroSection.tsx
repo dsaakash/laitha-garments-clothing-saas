@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, MessageCircle, Video, X } from 'lucide-react'
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
+import { ArrowRight, MessageCircle, Video, X, ChevronDown, Star, Users, Award } from 'lucide-react'
 
 export default function HeroSection() {
   const [showBookingModal, setShowBookingModal] = useState(false)
@@ -19,8 +19,17 @@ export default function HeroSection() {
   })
   const [submitting, setSubmitting] = useState(false)
   const [enquiryId, setEnquiryId] = useState<number | null>(null)
+  const [scrolled, setScrolled] = useState(false)
 
   const WHATSAPP_NUMBER = '917204219541'
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const handleGetFreeConsultation = () => {
     setShowBookingModal(true)
@@ -32,7 +41,6 @@ export default function HeroSection() {
     setSubmitting(true)
 
     try {
-      // Determine product name based on booking type
       let productName = 'Free Consultation - Appointment Booking'
       if (bookingType === 'product_showcase') {
         productName = 'Product Showcase - WhatsApp Video Call'
@@ -42,7 +50,6 @@ export default function HeroSection() {
         productName = 'In-Person Visit Consultation'
       }
 
-      // Create enquiry with booking details and save to database
       const response = await fetch('/api/enquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,12 +73,10 @@ export default function HeroSection() {
         throw new Error(result.error || 'Failed to create enquiry')
       }
 
-      // Store enquiry ID for reference
       if (result.data?.id) {
         setEnquiryId(result.data.id)
       }
 
-      // Move to Step 2
       setShowStep2(true)
     } catch (error) {
       console.error('Failed to create enquiry:', error)
@@ -113,6 +118,12 @@ export default function HeroSection() {
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
+  const trustBadges = [
+    { icon: Star, label: '500+ Happy Customers', value: '4.9★' },
+    { icon: Users, label: 'Trusted by Families', value: '100+' },
+    { icon: Award, label: 'Quality Assured', value: '100%' },
+  ]
+
   return (
     <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-cream-50 via-white to-primary-50/30 px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 overflow-hidden">
       {/* Header */}
@@ -120,9 +131,10 @@ export default function HeroSection() {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5 }}
-        className="absolute top-0 left-0 right-0 z-50 transition-all duration-300"
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'shadow-lg' : ''
+          }`}
       >
-        <div className="glass border-b-0">
+        <div className={`transition-all duration-500 ${scrolled ? 'glass border-b-0 py-2' : 'glass border-b-0 py-0'}`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
             <Link href="/" className="text-xl sm:text-2xl font-serif text-sage-800 font-semibold hover:text-primary-600 transition-colors flex items-center gap-2">
               <span className="text-2xl">🌸</span> Lalitha Garments
@@ -173,6 +185,18 @@ export default function HeroSection() {
         className="absolute bottom-10 sm:bottom-20 right-5 sm:right-10 w-64 sm:w-96 h-64 sm:h-96 bg-sage-100/30 rounded-full blur-3xl"
       />
 
+      {/* Floating decorative shapes */}
+      <motion.div
+        animate={{ y: [-10, 10, -10], rotate: [0, 5, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-1/4 right-[15%] w-16 h-16 bg-primary-200/20 rounded-2xl blur-sm hidden lg:block"
+      />
+      <motion.div
+        animate={{ y: [10, -10, 10], rotate: [0, -5, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        className="absolute bottom-1/3 left-[10%] w-12 h-12 bg-sage-200/30 rounded-full blur-sm hidden lg:block"
+      />
+
       <div className="max-w-7xl mx-auto text-center z-10 relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -180,7 +204,8 @@ export default function HeroSection() {
           transition={{ delay: 0.2 }}
           className="mb-4 sm:mb-6"
         >
-          <span className="inline-block px-4 sm:px-6 py-2 bg-white/50 backdrop-blur-sm border border-primary-100 text-primary-700 rounded-full text-xs sm:text-sm font-bold tracking-wide shadow-sm mb-3 sm:mb-4">
+          <span className="inline-flex items-center gap-2 px-4 sm:px-6 py-2 bg-white/60 backdrop-blur-sm border border-primary-100 text-primary-700 rounded-full text-xs sm:text-sm font-bold tracking-wide shadow-sm mb-3 sm:mb-4">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
             ✨ QUALITY SAREES, DRESSES & KURTIS
           </span>
         </motion.div>
@@ -191,7 +216,15 @@ export default function HeroSection() {
           transition={{ delay: 0.4, duration: 0.8 }}
           className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-serif font-bold text-sage-800 mb-6 sm:mb-8 leading-tight tracking-tight px-2"
         >
-          Lalitha <span className="text-primary-600">Garments</span>
+          Lalitha <span className="text-primary-600 relative">
+            Garments
+            <motion.span
+              className="absolute -bottom-2 left-0 w-full h-1 bg-primary-300/50 rounded-full"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ delay: 1.2, duration: 0.8 }}
+            />
+          </span>
         </motion.h1>
 
         <motion.p
@@ -216,7 +249,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center items-center px-4"
+          className="flex flex-col sm:flex-row gap-4 justify-center items-center px-4 mb-12"
         >
           <button
             onClick={handleGetFreeConsultation}
@@ -236,7 +269,45 @@ export default function HeroSection() {
             <span className="group-hover:translate-x-1 transition-transform">→</span>
           </Link>
         </motion.div>
+
+        {/* Trust Badges Bar */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.0 }}
+          className="flex flex-wrap justify-center gap-4 sm:gap-8 px-4"
+        >
+          {trustBadges.map((badge, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 1.1 + index * 0.15 }}
+              className="flex items-center gap-2 bg-white/60 backdrop-blur-sm border border-gray-100 rounded-full px-4 py-2 shadow-sm"
+            >
+              <badge.icon className="w-4 h-4 text-primary-500" />
+              <span className="text-xs sm:text-sm font-semibold text-sage-700">{badge.value}</span>
+              <span className="text-xs text-sage-500 hidden sm:inline">{badge.label}</span>
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
+
+      {/* Scroll Indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+      >
+        <span className="text-xs text-sage-400 font-medium tracking-widest uppercase">Scroll to explore</span>
+        <motion.div
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <ChevronDown className="w-5 h-5 text-sage-400" />
+        </motion.div>
+      </motion.div>
 
       {/* Modern Booking Modal */}
       <AnimatePresence>
@@ -256,11 +327,30 @@ export default function HeroSection() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="glass-card bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden relative z-10 max-h-[90vh] flex flex-col"
             >
+              {/* Progress Bar */}
+              <div className="h-1 bg-gray-100">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full"
+                  initial={{ width: '50%' }}
+                  animate={{ width: showStep2 ? '100%' : '50%' }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+
               {/* Modal Header */}
               <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-cream-50 to-white flex justify-between items-center">
                 <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${!showStep2 ? 'bg-primary-500 text-white' : 'bg-green-500 text-white'}`}>
+                      {showStep2 ? '✓' : '1'}
+                    </span>
+                    <span className="text-xs text-sage-400">→</span>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${showStep2 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                      2
+                    </span>
+                  </div>
                   <h3 className="text-2xl font-serif font-bold text-sage-900">
-                    {showStep2 ? 'Step 2: Connect' : 'Step 1: Details'}
+                    {showStep2 ? 'Connect With Us' : 'Your Details'}
                   </h3>
                   <p className="text-sm text-sage-600">
                     {showStep2 ? 'Choose how you want to connect' : 'Tell us about your preferences'}
@@ -342,20 +432,23 @@ export default function HeroSection() {
                     <div>
                       <label className="block text-sm font-semibold text-sage-700 mb-3">Consultation Type</label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <label className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${bookingType === 'visit' ? 'border-primary-500 bg-primary-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                        <label className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${bookingType === 'visit' ? 'border-primary-500 bg-primary-50 shadow-md' : 'border-gray-100 hover:border-gray-200'}`}>
                           <input type="radio" className="hidden" name="bookingType" value="visit" checked={bookingType === 'visit'} onChange={() => setBookingType('visit')} />
                           <div className="text-2xl mb-1">🏢</div>
                           <div className="font-bold text-sm text-sage-900">In-Store</div>
+                          <div className="text-xs text-sage-500 mt-1">Visit our store</div>
                         </label>
-                        <label className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${bookingType === 'online_meeting' ? 'border-primary-500 bg-primary-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                        <label className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${bookingType === 'online_meeting' ? 'border-primary-500 bg-primary-50 shadow-md' : 'border-gray-100 hover:border-gray-200'}`}>
                           <input type="radio" className="hidden" name="bookingType" value="online_meeting" checked={bookingType === 'online_meeting'} onChange={() => setBookingType('online_meeting')} />
                           <div className="text-2xl mb-1">💻</div>
                           <div className="font-bold text-sm text-sage-900">Online Call</div>
+                          <div className="text-xs text-sage-500 mt-1">Video meeting</div>
                         </label>
-                        <label className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${bookingType === 'product_showcase' ? 'border-primary-500 bg-primary-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                        <label className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${bookingType === 'product_showcase' ? 'border-primary-500 bg-primary-50 shadow-md' : 'border-gray-100 hover:border-gray-200'}`}>
                           <input type="radio" className="hidden" name="bookingType" value="product_showcase" checked={bookingType === 'product_showcase'} onChange={() => setBookingType('product_showcase')} />
                           <div className="text-2xl mb-1">📱</div>
                           <div className="font-bold text-sm text-sage-900">Video Shop</div>
+                          <div className="text-xs text-sage-500 mt-1">See products live</div>
                         </label>
                       </div>
                     </div>
@@ -378,7 +471,11 @@ export default function HeroSection() {
                     >
                       {submitting ? (
                         <span className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                      ) : 'Confirm Booking'}
+                      ) : (
+                        <>
+                          Continue to Step 2 <ArrowRight className="w-5 h-5" />
+                        </>
+                      )}
                     </button>
                   </form>
                 ) : (
@@ -429,4 +526,3 @@ export default function HeroSection() {
     </section>
   )
 }
-

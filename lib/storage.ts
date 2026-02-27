@@ -48,7 +48,7 @@ export interface Sale {
   paymentMode: string
   upiTransactionId?: string
   upiId?: string // Customer UPI ID for payment requests
-  paymentStatus?: 'paid' | 'pending' | 'failed' // Payment status
+  paymentStatus?: 'paid' | 'pending' | 'due' | 'failed' // Payment status
   saleImage?: string // Image captured as proof of sale
   createdAt: string
 }

@@ -43,7 +43,7 @@ export default function SalesPage() {
     paymentMode: 'Cash',
     upiTransactionId: '',
     upiId: '',
-    paymentStatus: undefined as 'paid' | 'pending' | 'failed' | undefined,
+    paymentStatus: 'paid' as 'paid' | 'pending' | 'due' | 'failed',
     saleImage: '',
     items: [] as Array<{
       inventoryId: string
@@ -91,7 +91,7 @@ export default function SalesPage() {
       paymentMode: 'Cash',
       upiTransactionId: '',
       upiId: '',
-      paymentStatus: undefined,
+      paymentStatus: 'paid' as 'paid' | 'pending' | 'due' | 'failed',
       saleImage: '',
       items: [] as Array<{
         inventoryId: string
@@ -390,16 +390,40 @@ export default function SalesPage() {
 
   const handlePaymentModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newPaymentMode = e.target.value
+    // Set default payment status based on payment mode
+    let defaultStatus: 'paid' | 'pending' | 'due' | 'failed' = 'paid'
+    if (newPaymentMode.startsWith('UPI') || newPaymentMode === 'Bank Transfer') {
+      defaultStatus = 'pending'
+    }
     setFormData({
       ...formData,
       paymentMode: newPaymentMode,
-      // Set default payment status for UPI
-      paymentStatus: newPaymentMode === 'UPI' ? 'pending' : undefined
+      paymentStatus: defaultStatus
     })
   }
 
+  const getPaymentStatusStyle = (status: string) => {
+    switch (status) {
+      case 'paid': return 'bg-green-100 text-green-800 border-green-300'
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+      case 'due': return 'bg-orange-100 text-orange-800 border-orange-300'
+      case 'failed': return 'bg-red-100 text-red-800 border-red-300'
+      default: return 'bg-gray-100 text-gray-800 border-gray-300'
+    }
+  }
 
-  const handleUpdatePaymentStatus = async (saleId: string, newStatus: 'paid' | 'pending' | 'failed') => {
+  const getPaymentStatusIcon = (status: string) => {
+    switch (status) {
+      case 'paid': return '✅'
+      case 'pending': return '⏳'
+      case 'due': return '📅'
+      case 'failed': return '❌'
+      default: return '❓'
+    }
+  }
+
+
+  const handleUpdatePaymentStatus = async (saleId: string, newStatus: 'paid' | 'pending' | 'due' | 'failed') => {
     try {
       const response = await fetch(`/api/sales/${saleId}/payment-status`, {
         method: 'PATCH',
@@ -523,7 +547,7 @@ export default function SalesPage() {
           paymentMode: formData.paymentMode,
           upiTransactionId: formData.upiTransactionId || undefined,
           upiId: formData.upiId || undefined,
-          paymentStatus: formData.paymentMode === 'UPI' ? (formData.paymentStatus || 'pending') : (formData.paymentStatus || undefined),
+          paymentStatus: formData.paymentStatus || 'paid',
           saleImage: formData.saleImage || undefined,
         }),
       })
@@ -556,7 +580,7 @@ export default function SalesPage() {
       paymentMode: sale.paymentMode,
       upiTransactionId: sale.upiTransactionId || '',
       upiId: sale.upiId || '',
-      paymentStatus: sale.paymentStatus,
+      paymentStatus: sale.paymentStatus || 'paid',
       saleImage: sale.saleImage || '',
       items: sale.items.map(item => ({
         inventoryId: item.inventoryId || '',
@@ -916,27 +940,34 @@ export default function SalesPage() {
                     </div>
 
                     <div className="px-6 py-4">
-                      <div className="flex items-center gap-4 mb-4">
+                      <div className="flex flex-wrap items-center gap-3 mb-4">
+                        {/* Payment Mode Badge */}
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
                           <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                           </svg>
                           <span className="text-sm font-medium text-blue-700">{sale.paymentMode}</span>
                         </div>
-                        {sale.paymentStatus && (
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={sale.paymentStatus}
-                              onChange={(e) => handleUpdatePaymentStatus(sale.id, e.target.value as 'paid' | 'pending' | 'failed')}
-                              className="text-xs px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <option value="pending">⏳ Pending</option>
-                              <option value="paid">✅ Paid</option>
-                              <option value="failed">❌ Failed</option>
-                            </select>
-                          </div>
-                        )}
+
+                        {/* Payment Status - Always visible with colored pill */}
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${getPaymentStatusStyle(sale.paymentStatus || 'paid')}`}>
+                            {getPaymentStatusIcon(sale.paymentStatus || 'paid')} {(sale.paymentStatus || 'paid').charAt(0).toUpperCase() + (sale.paymentStatus || 'paid').slice(1)}
+                          </span>
+                          <select
+                            value={sale.paymentStatus || 'paid'}
+                            onChange={(e) => handleUpdatePaymentStatus(sale.id, e.target.value as 'paid' | 'pending' | 'due' | 'failed')}
+                            className={`text-xs px-2 py-1.5 rounded-lg border font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer ${getPaymentStatusStyle(sale.paymentStatus || 'paid')}`}
+                            onClick={(e) => e.stopPropagation()}
+                            title="Change payment status"
+                          >
+                            <option value="paid">✅ Paid</option>
+                            <option value="pending">⏳ Pending</option>
+                            <option value="due">📅 Due</option>
+                            <option value="failed">❌ Failed</option>
+                          </select>
+                        </div>
+
                         {sale.upiId && (
                           <div className="flex items-center gap-2 text-xs text-gray-600">
                             <span className="px-2 py-1 bg-gray-100 rounded">UPI ID: {sale.upiId}</span>
@@ -1150,16 +1181,53 @@ export default function SalesPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">UPI Transaction ID (if UPI)</label>
-                      <input
-                        type="text"
-                        value={formData.upiTransactionId}
-                        onChange={(e) => setFormData({ ...formData, upiTransactionId: e.target.value })}
-                        placeholder="TXN123456"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status *</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {(['paid', 'pending', 'due', 'failed'] as const).map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, paymentStatus: status })}
+                            className={`px-2 py-2 rounded-lg text-xs font-bold border-2 transition-all text-center ${formData.paymentStatus === status
+                                ? status === 'paid' ? 'bg-green-100 text-green-800 border-green-400 shadow-sm ring-2 ring-green-300'
+                                  : status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-400 shadow-sm ring-2 ring-yellow-300'
+                                    : status === 'due' ? 'bg-orange-100 text-orange-800 border-orange-400 shadow-sm ring-2 ring-orange-300'
+                                      : 'bg-red-100 text-red-800 border-red-400 shadow-sm ring-2 ring-red-300'
+                                : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                              }`}
+                          >
+                            {getPaymentStatusIcon(status)} {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
+
+                  {/* UPI-specific fields */}
+                  {(formData.paymentMode.startsWith('UPI') || formData.paymentMode === 'Bank Transfer') && (
+                    <div className="grid grid-cols-2 gap-4 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                      <div>
+                        <label className="block text-sm font-medium text-blue-700 mb-1">Transaction ID</label>
+                        <input
+                          type="text"
+                          value={formData.upiTransactionId}
+                          onChange={(e) => setFormData({ ...formData, upiTransactionId: e.target.value })}
+                          placeholder="TXN123456"
+                          className="w-full px-3 py-2 border border-blue-200 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-blue-700 mb-1">UPI ID (Optional)</label>
+                        <input
+                          type="text"
+                          value={formData.upiId}
+                          onChange={(e) => setFormData({ ...formData, upiId: e.target.value })}
+                          placeholder="user@upi"
+                          className="w-full px-3 py-2 border border-blue-200 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="border-t pt-4">
                     <div className="flex justify-between items-center mb-4">
@@ -1263,8 +1331,8 @@ export default function SalesPage() {
                                       handleItemChange(index, 'quantity', quantity)
                                     }}
                                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${selectedItem && item.quantity > (selectedItem.currentStock || 0)
-                                        ? 'border-red-300 bg-red-50'
-                                        : 'border-gray-300'
+                                      ? 'border-red-300 bg-red-50'
+                                      : 'border-gray-300'
                                       }`}
                                   />
                                   {selectedItem && item.quantity > (selectedItem.currentStock || 0) && (

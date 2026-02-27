@@ -17,9 +17,9 @@ export async function PATCH(
       )
     }
 
-    if (!paymentStatus || !['paid', 'pending', 'failed'].includes(paymentStatus)) {
+    if (!paymentStatus || !['paid', 'pending', 'due', 'failed'].includes(paymentStatus)) {
       return NextResponse.json(
-        { success: false, message: 'Invalid payment status. Must be: paid, pending, or failed' },
+        { success: false, message: 'Invalid payment status. Must be: paid, pending, due, or failed' },
         { status: 400 }
       )
     }
