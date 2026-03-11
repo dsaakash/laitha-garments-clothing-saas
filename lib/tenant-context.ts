@@ -30,14 +30,15 @@ export function getTenantContext(request: NextRequest) {
         tenantId,
         userType,
         isTenant: userType === 'tenant',
+        isAdmin: userType === 'admin',
         isSuperAdmin: userType === 'superadmin',
         isUser: userType === 'user',
         hasAccess: (resourceTenantId: string | null) => {
             // Superadmin has access to everything
             if (userType === 'superadmin') return true
 
-            // Tenants only have access to their own resources
-            if (userType === 'tenant') {
+            // Tenants and Admins only have access to their own resources
+            if (userType === 'tenant' || userType === 'admin') {
                 return tenantId === resourceTenantId
             }
 
@@ -63,8 +64,11 @@ export function buildTenantFilter(context: ReturnType<typeof getTenantContext>, 
             // Superadmin sees all data (no filter)
             return { where: '', params: [] }
         }
-        // For other users, if table has no tenant_id, they can't filter - return empty result
-        // This is for tables like business_profile that don't have tenant isolation
+        // For Tenants and Admins, if table has no tenant_id, they can't filter - return empty result
+        // UNLESS we want them to see shared data. But usually this is an error state.
+        if (context.isTenant || context.isAdmin) {
+            return { where: 'WHERE 1=0', params: [] }
+        }
         return { where: 'WHERE 1=0', params: [] }
     }
 
@@ -76,8 +80,8 @@ export function buildTenantFilter(context: ReturnType<typeof getTenantContext>, 
         }
     }
 
-    if (context.isTenant && context.tenantId) {
-        // Tenant sees only their data
+    if ((context.isTenant || context.isAdmin) && context.tenantId) {
+        // Tenant or Admin sees only their data
         return {
             where: 'WHERE tenant_id = $1',
             params: [context.tenantId]

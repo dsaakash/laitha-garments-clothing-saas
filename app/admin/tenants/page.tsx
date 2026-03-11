@@ -6,7 +6,7 @@ import PageHeader from '@/components/PageHeader'
 import ActionButton from '@/components/ActionButton'
 import StatusBadge from '@/components/StatusBadge'
 import { Tenant } from '@/lib/tenantStorage'
-import { Plus, Search, Building2, Users, DollarSign, Clock } from 'lucide-react'
+import { Plus, Search, Building2, Users, DollarSign, Clock, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -21,6 +21,17 @@ export default function TenantsPage() {
         trialTenants: 0,
         mrr: 0,
     })
+
+    // Edit Modal State
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+    const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
+    const [editForm, setEditForm] = useState({
+        businessName: '',
+        ownerName: '',
+        status: '',
+        plan: ''
+    })
+    const [saving, setSaving] = useState(false)
 
     useEffect(() => {
         loadTenants()
@@ -80,6 +91,44 @@ export default function TenantsPage() {
         } catch (error) {
             console.error('Failed to delete tenant:', error)
             alert('Failed to delete tenant')
+        }
+    }
+
+    const handleEdit = (tenant: Tenant) => {
+        setEditingTenant(tenant)
+        setEditForm({
+            businessName: tenant.businessName,
+            ownerName: tenant.ownerName,
+            status: tenant.status,
+            plan: tenant.plan
+        })
+        setIsEditModalOpen(true)
+    }
+
+    const handleSaveEdit = async () => {
+        if (!editingTenant) return
+
+        setSaving(true)
+        try {
+            const response = await fetch(`/api/tenants/${editingTenant.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editForm)
+            })
+            const result = await response.json()
+
+            if (result.success) {
+                alert('Tenant updated successfully')
+                setIsEditModalOpen(false)
+                loadTenants()
+            } else {
+                alert(result.message || 'Failed to update tenant')
+            }
+        } catch (error) {
+            console.error('Failed to update tenant:', error)
+            alert('Failed to update tenant')
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -285,6 +334,14 @@ export default function TenantsPage() {
 
                                             <div className="flex gap-2">
                                                 <ActionButton
+                                                    variant="primary"
+                                                    size="sm"
+                                                    onClick={() => handleEdit(tenant)}
+                                                >
+                                                    <Edit2 className="w-4 h-4 mr-1" />
+                                                    Edit
+                                                </ActionButton>
+                                                <ActionButton
                                                     variant="secondary"
                                                     size="sm"
                                                     onClick={() => router.push(`/admin/tenants/${tenant.id}`)}
@@ -314,6 +371,85 @@ export default function TenantsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Edit Modal */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="p-6 border-b border-gray-100">
+                            <h3 className="text-xl font-bold text-gray-900">Edit Tenant</h3>
+                            <p className="text-sm text-gray-500">Update business information</p>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Business Name</label>
+                                <input
+                                    type="text"
+                                    value={editForm.businessName}
+                                    onChange={(e) => setEditForm({ ...editForm, businessName: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Owner Name</label>
+                                <input
+                                    type="text"
+                                    value={editForm.ownerName}
+                                    onChange={(e) => setEditForm({ ...editForm, ownerName: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                                    <select
+                                        value={editForm.status}
+                                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    >
+                                        <option value="trial">Trial</option>
+                                        <option value="active">Active</option>
+                                        <option value="suspended">Suspended</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Plan</label>
+                                    <select
+                                        value={editForm.plan}
+                                        onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                    >
+                                        <option value="free">Free</option>
+                                        <option value="basic">Basic</option>
+                                        <option value="premium">Premium</option>
+                                        <option value="enterprise">Enterprise</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-gray-50 flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900"
+                            >
+                                Cancel
+                            </button>
+                            <ActionButton
+                                variant="primary"
+                                disabled={saving}
+                                onClick={handleSaveEdit}
+                            >
+                                {saving ? 'Saving...' : 'Save Changes'}
+                            </ActionButton>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     )
 }

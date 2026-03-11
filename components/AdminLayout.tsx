@@ -15,6 +15,8 @@ import {
   ShoppingCart,
   Package,
   Users,
+  User,
+  Store,
   Shirt,
   BookOpen,
   Banknote,
@@ -55,9 +57,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [userPermissions, setUserPermissions] = useState<Record<string, string[]>>({})
   const [userName, setUserName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [businessName, setBusinessName] = useState<string>('Lalitha Garments')
+  const [businessName, setBusinessName] = useState<string>('')
   const [workflowEnabled, setWorkflowEnabled] = useState<boolean>(false)
   const [tenantModules, setTenantModules] = useState<string[]>([])
+  const [isInitializing, setIsInitializing] = useState(true)
 
   // Check trial expiry for tenants
   useTrialCheck()
@@ -112,62 +115,55 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 setUserPermissions(data.admin.permissions)
               }
 
-              // Fetch tenant business name and workflow settings if this is a tenant user
-              if (data.admin.tenant_id) {
-                console.log('🏢 Fetching tenant info for:', data.admin.tenant_id)
+              // Unified fetching logic
+              const fetchBusinessInfo = async () => {
+                try {
+                  // 1. Fetch from business profile (prioritize custom name)
+                  const businessRes = await fetch('/api/business', { credentials: 'include' })
+                  const businessData = await businessRes.json()
 
-                // Initialize modules from auth check if available
-                if (data.admin.modules) {
-                  console.log('📦 Tenant modules from auth:', data.admin.modules)
-                  setTenantModules(data.admin.modules)
+                  if (businessData.success && businessData.data?.businessName) {
+                    setBusinessName(businessData.data.businessName)
+                  } else if (data.admin.tenant_id) {
+                    // 2. Fallback to tenant table name
+                    const tenantRes = await fetch(`/api/tenants/${data.admin.tenant_id}`)
+                    const tenantData = await tenantRes.json()
+                    if (tenantData.success && tenantData.data?.businessName) {
+                      setBusinessName(tenantData.data.businessName)
+                    }
+                  } else {
+                    setBusinessName('Lalitha Garments')
+                  }
+                } catch (err) {
+                  console.error('Error fetching business info:', err)
+                  setBusinessName('Lalitha Garments')
+                } finally {
+                  // Only stop initializing once we have tried to fetch everything
+                  setIsInitializing(false)
                 }
+              }
 
+              fetchBusinessInfo()
+
+              // Also fetch modules/workflow if tenant_id exists
+              if (data.admin.tenant_id) {
                 fetch(`/api/tenants/${data.admin.tenant_id}`)
                   .then(res => res.json())
                   .then(tenantData => {
                     if (tenantData.success && tenantData.data) {
-                      console.log('🏢 Tenant business name:', tenantData.data.businessName)
-                      console.log('🔧 Workflow enabled:', tenantData.data.workflowEnabled)
-                      console.log('📦 Tenant modules:', tenantData.data.modules)
-                      setBusinessName(tenantData.data.businessName)
                       setWorkflowEnabled(tenantData.data.workflowEnabled || false)
                       setTenantModules(tenantData.data.modules || [])
                     }
                   })
-                  .catch(err => console.error('Error fetching tenant:', err))
-              } else {
-                // Not a tenant, fetch business profile for superadmin
-                // For superadmin, use business profile if available, otherwise "Lalitha Garments"
-                fetch('/api/business', { credentials: 'include' })
-                  .then(res => res.json())
-                  .then(businessData => {
-                    if (businessData.success && businessData.data && businessData.data.businessName) {
-                      // For superadmin, prefer business profile name, but default to "Lalitha Garments"
-                      setBusinessName(businessData.data.businessName || 'Lalitha Garments')
-                    } else {
-                      // No business profile found, default to Lalitha Garments for superadmin
-                      setBusinessName('Lalitha Garments')
-                    }
-                  })
-                  .catch(err => {
-                    console.error('Failed to fetch business profile:', err)
-                    // Keep default 'Lalitha Garments' if fetch fails
-                    setBusinessName('Lalitha Garments')
-                  })
-                setWorkflowEnabled(false)
               }
             } else {
-              console.warn('⚠️ No admin data in response')
-              console.warn('   authenticated:', data.authenticated)
-              console.warn('   admin:', data.admin)
-              // Default to superadmin to show all menu items
-              setUserRole('superadmin')
+              setIsInitializing(false)
             }
           })
           .catch(err => {
             console.error('❌ Error fetching user role:', err)
-            // Default to superadmin on error to ensure all menu items are visible
             setUserRole('superadmin')
+            setIsInitializing(false)
           })
       }
     })
@@ -433,21 +429,41 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <div className="flex items-start justify-between gap-3">
               {!sidebarCollapsed && (
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Building2 className="w-5 h-5" style={{ color: 'var(--accent, #9333ea)' }} />
-                    <h1 className="text-lg font-bold tracking-tight truncate">{businessName}</h1>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-medium py-1 px-2 rounded-md w-fit" style={{ color: 'var(--sidebar-text, #e2e8f0)', backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent, #9333ea)' }}></div>
-                    {userRole === 'user' ? 'User Portal' : 'Admin Portal'}
-                  </div>
+                  {isInitializing && !businessName ? (
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-10 bg-white/10 rounded-xl w-3/4"></div>
+                      <div className="h-4 bg-white/5 rounded-lg w-1/2"></div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-2 rounded-xl bg-purple-500 shadow-[0_0_15px_rgba(147,51,234,0.4)]">
+                          <Store className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex flex-col">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-purple-200/50 font-black mb-0.5">Your Store</p>
+                          <h1 className="text-xl font-extrabold text-white truncate leading-none tracking-tight drop-shadow-sm">
+                            {businessName || 'Loading...'}
+                          </h1>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-4">
+                        <div className="flex items-center gap-2 text-[9px] font-black py-1.5 px-3 rounded-full shadow-lg border border-white/10" style={{ color: '#ffffff', backgroundColor: 'var(--accent, #9333ea)' }}>
+                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse shadow-[0_0_8px_rgba(255,255,255,0.8)]"></div>
+                          <span className="uppercase tracking-[0.15em]">{userRole === 'user' ? 'Member' : 'Admin Portal'}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
               {sidebarCollapsed && (
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg" style={{ backgroundColor: 'var(--accent, #9333ea)' }}>
-                  <span className="font-bold text-lg">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-2xl relative group overflow-hidden" style={{ backgroundColor: 'var(--accent, #9333ea)' }}>
+                  <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent"></div>
+                  <span className="font-black text-xl text-white relative z-10">
                     {businessName.slice(0, 1).toUpperCase()}
                   </span>
+                  <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </div>
               )}
 
@@ -555,6 +571,39 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
           {/* Footer */}
           <div className={`flex-shrink-0 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`} style={{ borderTop: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+            {/* User & Store ID Section */}
+            <div className={`flex flex-col gap-2 ${sidebarCollapsed ? 'items-center' : 'px-1'}`}>
+              <div className={`flex items-center gap-3 w-full ${sidebarCollapsed ? 'justify-center py-2' : 'px-3 py-3'} rounded-2xl bg-white/5 border border-white/10 relative group hover:bg-white/10 transition-all duration-300`}>
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 flex items-center justify-center border border-white/10 flex-shrink-0 shadow-inner">
+                  <User className="w-5 h-5 text-white" />
+                </div>
+                {!sidebarCollapsed && (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-0.5">Logged in as</p>
+                    <p className="text-sm font-bold text-white truncate leading-tight">{userName || 'User'}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <Building2 className="w-3 h-3 text-purple-400" />
+                      <p className="text-[11px] text-purple-200/70 truncate font-semibold">{businessName}</p>
+                    </div>
+                  </div>
+                )}
+                {sidebarCollapsed && (
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-2 text-white text-xs font-medium rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-50 whitespace-nowrap scale-95 group-hover:scale-100" style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[9px] uppercase tracking-wider text-white/40 font-bold">User Profile</p>
+                      <p className="font-bold text-sm">{userName || 'User'}</p>
+                      <div className="flex items-center gap-1.5 py-1 px-2 rounded-md bg-white/5 border border-white/5">
+                        <Building2 className="w-3 h-3 text-purple-400" />
+                        <p className="text-[10px] text-white/80">{businessName}</p>
+                      </div>
+                      {userEmail && <p className="text-[9px] text-white/40 opacity-60 italic">{userEmail}</p>}
+                    </div>
+                    <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rotate-45" style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)', borderLeft: '1px solid rgba(255,255,255,0.15)', borderBottom: '1px solid rgba(255,255,255,0.15)' }}></div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Collapse/Expand Toggle Button - Bottom */}
             <button
               onClick={toggleSidebar}
