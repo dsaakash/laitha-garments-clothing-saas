@@ -419,7 +419,7 @@ export default function ApprovalsPage() {
                                                                 </span>
                                                             )}
                                                             {record.comments && (
-                                                                <p className="text-gray-600 mt-1 italic">"{record.comments}"</p>
+                                                                <p className="text-gray-600 mt-1 italic">&quot;{record.comments}&quot;</p>
                                                             )}
                                                         </div>
                                                     )}
