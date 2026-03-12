@@ -7,6 +7,8 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, loginType } = await request.json()
 
+    console.log('API ROUTE process.env.DATABASE_URL is:', process.env.DATABASE_URL ? 'SET' : 'UNDEFINED')
+
     console.log('🔐 Login attempt:', { email, loginType, passwordLength: password?.length })
 
     if (!email || !password) {

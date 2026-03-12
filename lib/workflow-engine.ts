@@ -23,6 +23,7 @@ export interface ApprovalRequest {
     requester_id: number
     approver_role_id: number
     created_at: Date
+    payload?: any
 }
 
 /**
@@ -69,19 +70,20 @@ export async function checkWorkflow(
  * Creates an approval request record in the DB.
  */
 export async function createApprovalRequest(
-    workflowId: number,
+    workflowId: number | null,
     entityType: string,
     entityId: string | number,
     requesterId: number,
     approverRoleId: number,
-    tenantId?: string
+    tenantId?: string,
+    payload?: any
 ): Promise<ApprovalRequest> {
     const result = await query(
         `INSERT INTO approval_requests 
-     (workflow_id, entity_type, entity_id, status, requester_id, approver_role_id, tenant_id)
-     VALUES ($1, $2, $3, 'pending', $4, $5, $6)
+     (workflow_id, entity_type, entity_id, status, requester_id, approver_role_id, tenant_id, payload)
+     VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7)
      RETURNING *`,
-        [workflowId, entityType, entityId.toString(), requesterId, approverRoleId, tenantId || null]
+        [workflowId, entityType, entityId.toString(), requesterId, approverRoleId, tenantId || null, payload ? JSON.stringify(payload) : null]
     )
 
     return result.rows[0]
@@ -92,9 +94,8 @@ export async function createApprovalRequest(
  */
 export async function getPendingApprovals(roleId: number, tenantId?: string): Promise<any[]> {
     let sql = `
-    SELECT ar.*, w.module, w.trigger_type, w.trigger_value, a.name as requester_name
+    SELECT ar.*, a.name as requester_name
     FROM approval_requests ar
-    JOIN workflows w ON ar.workflow_id = w.id
     LEFT JOIN admins a ON ar.requester_id = a.id
     WHERE ar.status = 'pending' AND ar.approver_role_id = $1
   `

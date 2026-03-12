@@ -50,6 +50,7 @@ export default function PurchasesPage() {
     invoiceNumber: '',
     invoiceDate: '',
     transportCharges: 0,
+    restockInventory: true,
   })
   const [contactPersons, setContactPersons] = useState<Array<{ name: string, mobile: string }>>([])
   const [uploadingTransportImage, setUploadingTransportImage] = useState(false)
@@ -546,6 +547,7 @@ export default function PurchasesPage() {
         contactPersons: contactPersons.filter(cp => cp.name.trim() || cp.mobile.trim()).length > 0
           ? contactPersons.filter(cp => cp.name.trim() || cp.mobile.trim())
           : undefined,
+        restockRequested: formData.restockInventory
       }
 
       let response
@@ -599,6 +601,7 @@ export default function PurchasesPage() {
       invoiceNumber: (order as any).invoiceNumber || '',
       invoiceDate: (order as any).invoiceDate || '',
       transportCharges: (order as any).transportCharges || 0,
+      restockInventory: (order as any).restockRequested ?? true,
     })
     setContactPersons((order as any).contactPersons || [])
 
@@ -673,6 +676,7 @@ export default function PurchasesPage() {
       invoiceNumber: '',
       invoiceDate: '',
       transportCharges: 0,
+      restockInventory: true,
     })
     setItems([{
       productName: '',
@@ -1059,9 +1063,19 @@ export default function PurchasesPage() {
                       <h3 className="text-lg font-bold text-gray-900 truncate">
                         {order.customPoNumber || `PO-${order.id}`}
                       </h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                        Pending
-                      </span>
+                      {order.status === 'open' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                          Approved
+                        </span>
+                      ) : order.status === 'rejected' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+                          Rejected
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                          Pending
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-500 truncate">{order.supplierName}</p>
                     {order.items && order.items.length > 0 && (
@@ -1805,6 +1819,24 @@ export default function PurchasesPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
+
+                {/* Restock Choice */}
+                {editingOrder && (
+                  <div className="border-t border-gray-200 pt-4 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer p-4 bg-purple-50 rounded-lg border border-purple-100 transition-colors hover:bg-purple-100">
+                      <input
+                        type="checkbox"
+                        checked={formData.restockInventory}
+                        onChange={(e) => setFormData({ ...formData, restockInventory: e.target.checked })}
+                        className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer"
+                      />
+                      <div className="flex flex-col">
+                        <span className="font-bold text-purple-900">Restock items in inventory upon approval?</span>
+                        <span className="text-sm text-purple-700">If checked, inventory quantities will automatically increment when this Purchase Order is approved.</span>
+                      </div>
+                    </label>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center pt-4">
                   <button

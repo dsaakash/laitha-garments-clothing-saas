@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getTenantContext } from '@/lib/tenant-context'
+import { checkWorkflow, createApprovalRequest } from '@/lib/workflow-engine'
+import { decodeBase64 } from '@/lib/utils'
 
 export async function PUT(
   request: NextRequest,
@@ -61,17 +64,50 @@ export async function PUT(
     if (body.invoiceDate) transportDetails.invoiceDate = body.invoiceDate
     if (body.contactPersons && body.contactPersons.length > 0) transportDetails.contactPersons = body.contactPersons
     
+    // Check old PO status
+    const oldPoResult = await query('SELECT status, tenant_id FROM purchase_orders WHERE id = $1', [id])
+    if (oldPoResult.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Purchase order not found' },
+        { status: 404 }
+      )
+    }
+    const oldPo = oldPoResult.rows[0]
+    const oldStatus = oldPo.status || 'open'
+    const hasOldStock = oldStatus === 'open' || oldStatus === 'approved'
+
+    // Get tenant context for workflow
+    const context = getTenantContext(request)
+    const tenantId = context.isTenant ? context.tenantId : oldPo.tenant_id
+
+    // Check for Workflows
+    let poStatus = 'pending_approval' // Always require approval for PO updates
+    let workflowRule = null
+
+    try {
+      const session = request.cookies.get('admin_session')
+      if (session) {
+        workflowRule = await checkWorkflow('purchases', { ...body, total_amount: grandTotal }, tenantId || undefined)
+      }
+    } catch (wfError) {
+      console.error('Workflow check failed:', wfError)
+    }
+
+    // Default to Superadmin (role ID 1) if no rule matched
+    const approverRoleId = workflowRule ? workflowRule.approver_role_id : 1
+
     // Update purchase order
     const result = await query(
       `UPDATE purchase_orders 
        SET date = $1, supplier_id = $2, supplier_name = $3, custom_po_number = $4, 
            invoice_image = $5, subtotal = $6, gst_amount = $7, grand_total = $8, 
            gst_type = $9, gst_percentage = $10, gst_amount_rupees = $11, notes = $12,
-           transport_charges = $13, transport_details = $14,
+           transport_charges = $13, transport_details = $14, status = $15,
            -- Legacy fields
-           product_name = $15, product_image = $16, sizes = $17, fabric_type = $18, 
-           quantity = $19, price_per_piece = $20, total_amount = $21
-       WHERE id = $22
+           product_name = $16, product_image = $17, sizes = $18, fabric_type = $19, 
+           quantity = $20, price_per_piece = $21, total_amount = $22,
+           restock_requested = $23
+       WHERE id = $24
        RETURNING *`,
       [
         body.date,
@@ -88,6 +124,7 @@ export async function PUT(
         body.notes || null,
         transportCharges,
         Object.keys(transportDetails).length > 0 ? JSON.stringify(transportDetails) : null,
+        poStatus,
         // Legacy fields
         items.length > 0 ? items[0].productName : '',
         items.length > 0 && items[0].productImages?.length > 0 ? items[0].productImages[0] : null,
@@ -96,16 +133,40 @@ export async function PUT(
         items.length > 0 ? items[0].quantity : 0,
         items.length > 0 ? items[0].pricePerPiece : 0,
         grandTotal,
+        body.restockRequested ?? true,
         id,
       ]
     )
-    
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, message: 'Purchase order not found' },
-        { status: 404 }
-      )
+
+    // Capture approval request
+    let requesterId = 0
+    let requesterRoleId = 3 // default to user
+    try {
+      const session = request.cookies.get('admin_session')
+      if (session) {
+        const decoded = decodeBase64(session.value)
+        requesterId = parseInt(decoded.split(':')[1])
+        const adminResult = await query('SELECT role_id FROM admins WHERE id = $1', [requesterId])
+        if (adminResult.rows.length > 0) {
+            requesterRoleId = parseInt(adminResult.rows[0].role_id)
+        }
+      }
+    } catch (e) {}
+
+    // Enforce 2-step approval (Admin -> Superadmin). First stage is Admin (2)
+    let initialApproverRoleId = workflowRule ? workflowRule.approver_role_id : 2
+    if (requesterRoleId === 1) { // Superadmin bypasses admin check
+        initialApproverRoleId = 1
     }
+
+    await createApprovalRequest(
+      workflowRule?.id || null, // Pass null if no explicit rule
+      'purchase_order',
+      id,
+      requesterId,
+      initialApproverRoleId,
+      tenantId || undefined
+    )
     
     // Get old quantities BEFORE deleting items - include fabric_type
     const oldItemsResult = await query(
@@ -115,8 +176,9 @@ export async function PUT(
     const oldItemsMap = new Map<string, number>()
     oldItemsResult.rows.forEach((row: any) => {
       // Use the old item's fabric_type, not the new item's
+      const normalizedProductName = (row.product_name || '').trim().replace(/\s+/g, ' ')
       const oldFabricType = row.fabric_type || 'standard'
-      const key = `${row.product_name}_${oldFabricType}`.replace(/\s+/g, '_').toUpperCase()
+      const key = `${normalizedProductName}_${oldFabricType}`.replace(/\s+/g, '_').toUpperCase()
       oldItemsMap.set(key, (oldItemsMap.get(key) || 0) + parseInt(row.quantity))
     })
     
@@ -133,200 +195,76 @@ export async function PUT(
     try {
       // Delete existing items and recreate
       await query('DELETE FROM purchase_order_items WHERE purchase_order_id = $1', [id])
-      
       // Insert updated items
-    for (const item of items) {
-      await query(
-        `INSERT INTO purchase_order_items 
-         (purchase_order_id, product_name, category, sizes, fabric_type, 
-          quantity, price_per_piece, total_amount, product_images)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          id,
-          item.productName,
-          item.category || 'Custom',
-          item.sizes || [],
-          item.fabricType || null,
-          item.quantity,
-          item.pricePerPiece,
-          item.totalAmount,
-          item.productImages || [],
-        ]
-      )
-      
-      // Update inventory
-      // Normalize product name: trim, remove extra spaces, standardize
-      const normalizedProductName = item.productName.trim().replace(/\s+/g, ' ')
-      const dressCode = `${normalizedProductName}_${item.fabricType || 'standard'}`.replace(/\s+/g, '_').toUpperCase()
-      
-      // Try exact match first (by dress_code)
-      let existingInventory = await query(
-        'SELECT * FROM inventory WHERE dress_code = $1',
-        [dressCode]
-      )
-      
-      // If no exact match, try normalized name match (normalize spaces in database too)
-      if (existingInventory.rows.length === 0) {
-        const normalizedNameLower = normalizedProductName.toLowerCase()
-        existingInventory = await query(
-          `SELECT * FROM inventory 
-           WHERE LOWER(TRIM(REPLACE(dress_name, '  ', ' '))) = $1
-           AND (fabric_type = $2 OR (fabric_type IS NULL AND $2 = 'standard'))
-           LIMIT 1`,
-          [normalizedNameLower, item.fabricType || 'standard']
-        )
-      }
-      
-      // If still no match, try partial match on dress_code
-      if (existingInventory.rows.length === 0) {
-        const searchPattern = `%${normalizedProductName.replace(/\s+/g, '_').toUpperCase()}%`
-        existingInventory = await query(
-          `SELECT * FROM inventory 
-           WHERE LOWER(dress_code) LIKE LOWER($1)
-           LIMIT 1`,
-          [searchPattern]
-        )
-      }
-      
-      if (existingInventory.rows.length > 0) {
-        const existing = existingInventory.rows[0]
-        const existingSizes = existing.sizes || []
-        const newSizes = item.sizes || []
-        const mergedSizes = Array.from(new Set([...existingSizes, ...newSizes]))
-        
-        // Calculate stock difference: new quantity - old quantity
-        const newPurchaseQuantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : (item.quantity || 0)
-        // Use the same dressCode format for lookup
-        const oldQuantity = oldItemsMap.get(dressCode) || 0
-        const quantityDifference = newPurchaseQuantity - oldQuantity
-        
-        // Update stock: adjust quantity_in and current_stock based on the exact difference
-        const currentQuantityIn = parseInt(existing.quantity_in) || 0
-        const currentQuantityOut = parseInt(existing.quantity_out) || 0
-        const currentStock = parseInt(existing.current_stock) || 0
-        const newQuantityIn = currentQuantityIn + quantityDifference
-        // Maintain relationship: current_stock = quantity_in - quantity_out
-        const newCurrentStock = newQuantityIn - currentQuantityOut
-        
-        // Validate: quantity_in should never be negative
-        if (newQuantityIn < 0) {
-          console.error(`❌ Invalid stock update for ${item.productName}: quantity_in would be negative (${newQuantityIn}). Current: ${currentQuantityIn}, Difference: ${quantityDifference}. Skipping.`)
-          continue
-        }
-        
-        console.log(`📦 Updating stock for ${item.productName}: Change ${quantityDifference > 0 ? '+' : ''}${quantityDifference} units (Old PO: ${oldQuantity}, New PO: ${newPurchaseQuantity}, Stock: ${currentStock} → ${newCurrentStock})`)
-        
-        // Update dress_code if it doesn't match (normalize it)
-        const updateDressCode = existing.dress_code !== dressCode ? dressCode : existing.dress_code
-        
+      for (const item of items) {
         await query(
-          `UPDATE inventory 
-           SET sizes = $1, 
-               dress_code = $2,
-               dress_type = COALESCE($3, dress_type),
-               wholesale_price = $4, selling_price = $5,
-               fabric_type = COALESCE($6, fabric_type),
-               supplier_name = COALESCE($7, supplier_name),
-               quantity_in = $8,
-               current_stock = $9,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $10`,
+          `INSERT INTO purchase_order_items 
+           (purchase_order_id, product_name, category, sizes, fabric_type, 
+            quantity, price_per_piece, total_amount, product_images)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
-            mergedSizes,
-            updateDressCode,
-            item.category || existing.dress_type, // Sync category to dress_type
-            item.pricePerPiece,
-            (parseFloat(item.pricePerPiece) * 2).toFixed(2),
-            item.fabricType,
-            body.supplierName,
-            newQuantityIn,
-            newCurrentStock,
-            existing.id,
-          ]
-        )
-        
-        // Validate relationship after update
-        const calculatedStock = newQuantityIn - currentQuantityOut
-        if (newCurrentStock !== calculatedStock) {
-          console.warn(`Stock relationship mismatch for inventory ${existing.id}. Expected: ${calculatedStock}, Got: ${newCurrentStock}`)
-        }
-      } else {
-        // New inventory item - set initial stock to the exact purchase order quantity
-        const purchaseQuantity = typeof item.quantity === 'string' ? parseInt(item.quantity) : (item.quantity || 0)
-        // For new items, quantity_out starts at 0, so current_stock = quantity_in
-        console.log(`📦 Creating new inventory item ${item.productName} with initial stock: ${purchaseQuantity}`)
-        
-        await query(
-          `INSERT INTO inventory 
-           (dress_name, dress_type, dress_code, sizes, wholesale_price, selling_price,
-            image_url, fabric_type, supplier_name, quantity_in, quantity_out, current_stock)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-          [
+            id,
             item.productName,
             item.category || 'Custom',
-            dressCode,
             item.sizes || [],
+            item.fabricType || null,
+            item.quantity,
             item.pricePerPiece,
-            (parseFloat(item.pricePerPiece) * 2).toFixed(2),
-            item.productImages && item.productImages.length > 0 ? item.productImages[0] : null,
-            item.fabricType,
-            body.supplierName,
-            purchaseQuantity, // quantity_in = purchase order quantity
-            0, // quantity_out starts at 0
-            purchaseQuantity, // current_stock = quantity_in - quantity_out = purchaseQuantity - 0
+            item.totalAmount,
+            item.productImages || [],
           ]
         )
       }
-    }
-    
-    // Handle deleted items - items that were in old list but not in new list
-    const newItemsKeys = new Set(
-      items.map((item: any) => {
-        const fabricType = item.fabricType || 'standard'
-        return `${item.productName}_${fabricType}`.replace(/\s+/g, '_').toUpperCase()
-      })
-    )
-    
-    for (const oldItem of oldItemsForDeletion) {
-      const oldItemKey = `${oldItem.productName}_${oldItem.fabricType}`.replace(/\s+/g, '_').toUpperCase()
+
+      // Compute inventory diffs to be applied upon approval
+      const pendingUpdates: any[] = []
       
-      // If this old item is not in the new items, we need to subtract its stock
-      if (!newItemsKeys.has(oldItemKey)) {
-        const dressCode = oldItemKey
-        const inventoryResult = await query(
-          'SELECT id, quantity_in, quantity_out, current_stock FROM inventory WHERE dress_code = $1',
-          [dressCode]
-        )
+      const newItemsKeys = new Set()
+
+      for (const item of items) {
+        // Standardize the key
+        const normalizedProductName = item.productName.trim().replace(/\s+/g, ' ')
+        const fabricType = item.fabricType || 'standard'
+        const key = `${normalizedProductName}_${fabricType}`.replace(/\s+/g, '_').toUpperCase()
         
-        if (inventoryResult.rows.length > 0) {
-          const inventory = inventoryResult.rows[0]
-          const currentQuantityIn = parseInt(inventory.quantity_in) || 0
-          const currentQuantityOut = parseInt(inventory.quantity_out) || 0
-          const currentStock = parseInt(inventory.current_stock) || 0
-          const quantityToSubtract = oldItem.quantity
-          
-          const newQuantityIn = Math.max(0, currentQuantityIn - quantityToSubtract)
-          // Maintain relationship: current_stock = quantity_in - quantity_out
-          const newCurrentStock = Math.max(0, newQuantityIn - currentQuantityOut)
-          
-          // Validate: quantity_in should never be negative (already handled by Math.max, but log if it would be)
-          if (currentQuantityIn - quantityToSubtract < 0) {
-            console.warn(`⚠️  Warning: Deleting item ${oldItem.productName} would make quantity_in negative. Clamping to 0.`)
-          }
-          
-          console.log(`📦 Removing stock for deleted item ${oldItem.productName}: Subtracting ${quantityToSubtract} units (Stock: ${currentStock} → ${newCurrentStock})`)
-          
-          await query(
-            `UPDATE inventory 
-             SET quantity_in = $1, 
-                 current_stock = $2,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $3`,
-            [newQuantityIn, newCurrentStock, inventory.id]
-          )
+        newItemsKeys.add(key)
+        
+        const oldQuantity = oldItemsMap.get(key) || 0
+        const newQuantity = (typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity) || 0
+        const quantityDifference = newQuantity - oldQuantity
+        
+        pendingUpdates.push({
+          productName: item.productName,
+          category: item.category || 'Custom',
+          sizes: item.sizes || [],
+          fabricType: item.fabricType || null,
+          pricePerPiece: item.pricePerPiece,
+          productImages: item.productImages || [],
+          quantityDifference
+        })
+      }
+      
+      // Handle deleted items (they were in oldItems but not in newItems)
+      for (const oldItem of oldItemsForDeletion) {
+        const normalizedOldName = oldItem.productName.trim().replace(/\s+/g, ' ')
+        const oldFabricType = oldItem.fabricType || 'standard'
+        const oldKey = `${normalizedOldName}_${oldFabricType}`.replace(/\s+/g, '_').toUpperCase()
+        
+        if (!newItemsKeys.has(oldKey)) {
+          pendingUpdates.push({
+            productName: oldItem.productName,
+            fabricType: oldItem.fabricType,
+            quantityDifference: -oldItem.quantity
+          })
         }
       }
-    }
+
+      // Save pending updates back to purchase order
+      await query(
+        `UPDATE purchase_orders SET pending_inventory_updates = $1 WHERE id = $2`,
+        [JSON.stringify(pendingUpdates), id]
+      )
+
     
       // Commit transaction
       await query('COMMIT')

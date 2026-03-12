@@ -160,6 +160,7 @@ export interface PurchaseOrder {
   quantity?: number
   pricePerPiece?: number
   totalAmount?: number
+  status?: string
 }
 
 // In-memory storage (will be lost on server restart)

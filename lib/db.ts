@@ -2,6 +2,7 @@ import { Pool } from 'pg'
 
 // Determine SSL configuration based on connection string
 function getPoolConfig() {
+  console.log('DATABASE_URL is:', process.env.DATABASE_URL ? 'SET' : 'UNDEFINED')
   const connectionString = process.env.DATABASE_URL
   
   if (!connectionString) {
@@ -33,13 +34,19 @@ function getPoolConfig() {
 }
 
 // Create a connection pool with lazy initialization
-let pool: Pool | null = null
+// Use global object to keep connection pool across Next.js HMR
+const globalAny: any = global
+let pool: Pool | null = globalAny.pgPool || null
 
 function getPool(): Pool {
   if (!pool) {
     try {
       const config = getPoolConfig()
       pool = new Pool(config)
+      
+      if (process.env.NODE_ENV !== 'production') {
+        globalAny.pgPool = pool
+      }
       
       // Set up event handlers
       pool.on('connect', () => {

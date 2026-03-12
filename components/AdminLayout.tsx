@@ -59,6 +59,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [businessName, setBusinessName] = useState<string>('')
   const [workflowEnabled, setWorkflowEnabled] = useState<boolean>(false)
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0)
   const [tenantModules, setTenantModules] = useState<string[]>([])
   const [isInitializing, setIsInitializing] = useState(true)
 
@@ -134,6 +135,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   } else {
                     setBusinessName('Lalitha Garments')
                   }
+                  
+                  // Also fetch pending approvals if admin or tenant
+                  if (role === 'admin' || role === 'superadmin') {
+                     const approvalsRes = await fetch('/api/approvals', { credentials: 'include' })
+                     const approvalsData = await approvalsRes.json()
+                     if (approvalsData.success && approvalsData.stats) {
+                       setPendingApprovalsCount(approvalsData.stats.pending || 0)
+                     }
+                  }
+                  
                 } catch (err) {
                   console.error('Error fetching business info:', err)
                   setBusinessName('Lalitha Garments')
@@ -322,9 +333,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     resource?: string;
     action?: string;
     module?: string;
+    badge?: number;
     subItems?: { href: string; label: string }[];
   }[] = [
       { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, resource: 'dashboard' },
+      { href: '/admin/approvals', label: 'Approvals', icon: ShieldCheck, resource: 'purchases', module: 'purchases', badge: pendingApprovalsCount },
       { href: '/admin/tenants', label: 'Tenants', icon: Building2, resource: 'tenants', action: 'manage' }, // Usually superadmin only
       { href: '/admin/research', label: 'Raw Research', icon: Search, resource: 'research', action: 'read', module: 'research' },
       { href: '/admin/setup', label: 'Setup Wizard', icon: Rocket, resource: 'dashboard', module: 'setup' },
@@ -516,6 +529,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
                     {!sidebarCollapsed && (
                       <span className="font-medium text-sm flex-1">{item.label}</span>
+                    )}
+
+                    {!sidebarCollapsed && item.badge !== undefined && item.badge > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md animate-pulse">
+                        {item.badge}
+                      </span>
                     )}
 
                     {!sidebarCollapsed && hasSubItems && (

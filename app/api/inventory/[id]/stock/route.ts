@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getTenantContext } from '@/lib/tenant-context'
+import { checkWorkflow, createApprovalRequest } from '@/lib/workflow-engine'
+import { decodeBase64 } from '@/lib/utils'
 
 export async function POST(
   request: NextRequest,
@@ -130,33 +133,55 @@ export async function POST(
       newCurrentStock = calculatedStock
     }
 
-    // Update inventory
-    const result = await query(
-      `UPDATE inventory 
-       SET quantity_in = $1, quantity_out = $2, current_stock = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
-       RETURNING *`,
-      [newQuantityIn, newQuantityOut, newCurrentStock, id]
-    )
+    let requesterId = 0
+    let requesterRoleId = 3 // default to user
+    let tenantId: string | undefined = undefined
+    
+    try {
+      const context = getTenantContext(request)
+      if (context.isTenant) tenantId = context.tenantId || undefined
 
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, message: 'Failed to update stock' },
-        { status: 500 }
-      )
+      const session = request.cookies.get('admin_session')
+      if (session) {
+        const decoded = decodeBase64(session.value)
+        requesterId = parseInt(decoded.split(':')[1])
+        const adminResult = await query('SELECT role_id FROM admins WHERE id = $1', [requesterId])
+        if (adminResult.rows.length > 0) {
+            requesterRoleId = parseInt(adminResult.rows[0].role_id)
+        }
+      }
+    } catch (e) {}
+
+    let workflowRule = null
+    try {
+      workflowRule = await checkWorkflow('inventory_stock_update', { inventoryId: id, quantity, type: body.type }, tenantId)
+    } catch (e) {}
+    
+    let initialApproverRoleId = workflowRule ? workflowRule.approver_role_id : 2
+    if (requesterRoleId === 1) { // Superadmin bypasses admin check
+        initialApproverRoleId = 1
     }
 
-    const updatedItem = result.rows[0]
-    
-    // Optionally create a stock transaction log (you can create a stock_transactions table later)
+    await createApprovalRequest(
+      workflowRule?.id || null, // null if no explicit rule
+      'inventory_stock_update', // entity type
+      id.toString(),             // entity id
+      requesterId,               
+      initialApproverRoleId,
+      tenantId || undefined,
+      { newQuantityIn, newQuantityOut, newCurrentStock, type: body.type, quantity } // Payload containing calculated data!
+    )
     
     return NextResponse.json({
       success: true,
+      pendingApproval: true,
+      message: 'Stock update submitted for approval.',
       data: {
-        id: updatedItem.id.toString(),
-        quantityIn: parseInt(updatedItem.quantity_in),
-        quantityOut: parseInt(updatedItem.quantity_out),
-        currentStock: parseInt(updatedItem.current_stock),
+        id: id.toString(),
+        // Return original data since it's pending
+        quantityIn: parseInt(current.quantity_in) || 0,
+        quantityOut: parseInt(current.quantity_out) || 0,
+        currentStock: parseInt(current.current_stock) || 0,
       }
     })
   } catch (error: any) {
