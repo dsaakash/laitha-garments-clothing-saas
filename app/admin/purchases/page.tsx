@@ -912,6 +912,129 @@ export default function PurchasesPage() {
     }
   }
 
+  // Download single order as PDF
+  const downloadOrderAsPDF = async (order: PurchaseOrder) => {
+    try {
+      const response = await fetch('/api/purchase-order/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ order }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF')
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.html) {
+        // Open HTML in new window for printing
+        const printWindow = window.open('', '_blank')
+        if (printWindow) {
+          printWindow.document.write(data.html)
+          printWindow.document.close()
+        }
+      } else {
+        throw new Error('Invalid response from server')
+      }
+    } catch (error) {
+      console.error('PDF download error:', error)
+      alert('Failed to generate PDF. Please try again.')
+    }
+  }
+
+  // Download single order as Excel
+  const downloadOrderAsExcel = (order: PurchaseOrder) => {
+    try {
+      const exportData: any[] = []
+      const poNumber = order.customPoNumber || `PO-${order.id}`
+
+      if (order.items && order.items.length > 0) {
+        // If order has multiple items, create a row for each item
+        order.items.forEach((item, index) => {
+          exportData.push({
+            'PO Number': poNumber,
+            'Date': format(new Date(order.date), 'dd/MM/yyyy'),
+            'Supplier Name': order.supplierName,
+            'Product Name': item.productName,
+            'Category': item.category || '',
+            'Sizes': Array.isArray(item.sizes) ? item.sizes.join(', ') : '',
+            'Fabric Type': item.fabricType || '',
+            'Quantity': item.quantity,
+            'Price Per Piece (₹)': item.pricePerPiece,
+            'Item Total (₹)': item.totalAmount,
+            'Subtotal (₹)': order.subtotal || order.totalAmount,
+            'GST Type': order.gstType || '',
+            'GST Percentage': order.gstPercentage || '',
+            'GST Amount (₹)': order.gstAmount || '',
+            'Grand Total (₹)': order.grandTotal || order.totalAmount,
+            'Notes': order.notes || '',
+            'Created At': new Date(order.createdAt).toLocaleDateString(),
+          })
+        })
+      } else {
+        // Legacy single-item order
+        exportData.push({
+          'PO Number': poNumber,
+          'Date': format(new Date(order.date), 'dd/MM/yyyy'),
+          'Supplier Name': order.supplierName,
+          'Product Name': order.productName || '',
+          'Category': '',
+          'Sizes': Array.isArray(order.sizes) ? order.sizes.join(', ') : '',
+          'Fabric Type': order.fabricType || '',
+          'Quantity': order.quantity || 0,
+          'Price Per Piece (₹)': order.pricePerPiece || 0,
+          'Item Total (₹)': order.totalAmount,
+          'Subtotal (₹)': order.subtotal || order.totalAmount,
+          'GST Type': order.gstType || '',
+          'GST Percentage': order.gstPercentage || '',
+          'GST Amount (₹)': order.gstAmount || '',
+          'Grand Total (₹)': order.grandTotal || order.totalAmount,
+          'Notes': order.notes || '',
+          'Created At': new Date(order.createdAt).toLocaleDateString(),
+        })
+      }
+
+      // Create workbook and worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Purchase Order')
+
+      // Set column widths
+      const colWidths = [
+        { wch: 15 }, // PO Number
+        { wch: 12 }, // Date
+        { wch: 20 }, // Supplier Name
+        { wch: 25 }, // Product Name
+        { wch: 15 }, // Category
+        { wch: 20 }, // Sizes
+        { wch: 15 }, // Fabric Type
+        { wch: 10 }, // Quantity
+        { wch: 18 }, // Price Per Piece
+        { wch: 15 }, // Item Total
+        { wch: 15 }, // Subtotal
+        { wch: 12 }, // GST Type
+        { wch: 15 }, // GST Percentage
+        { wch: 15 }, // GST Amount
+        { wch: 15 }, // Grand Total
+        { wch: 30 }, // Notes
+        { wch: 12 }, // Created At
+      ]
+      ws['!cols'] = colWidths
+
+      // Generate filename
+      const filename = `Purchase_Order_${poNumber}_${format(new Date(order.date), 'yyyy-MM-dd')}.xlsx`
+
+      // Save file
+      XLSX.writeFile(wb, filename)
+    } catch (error) {
+      console.error('Excel export error:', error)
+      alert('Failed to export to Excel. Please try again.')
+    }
+  }
+
   return (
     <AdminLayout>
       <div>
@@ -1085,6 +1208,26 @@ export default function PurchasesPage() {
                     )}
                   </div>
                   <div className="flex space-x-1 flex-shrink-0 z-10 relative" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        downloadOrderAsPDF(order)
+                      }}
+                      className="px-2 py-1.5 sm:px-3 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-red-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
+                      title="Download PDF"
+                    >
+                      <span className="hidden sm:inline">📄 </span>PDF
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        downloadOrderAsExcel(order)
+                      }}
+                      className="px-2 py-1.5 sm:px-3 bg-green-50 hover:bg-green-100 active:bg-green-200 text-green-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-green-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
+                      title="Download Excel"
+                    >
+                      <span className="hidden sm:inline">📊 </span>Excel
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -1894,15 +2037,40 @@ export default function PurchasesPage() {
                     return productName ? ` - ${productName}` : ''
                   })()}
                 </h2>
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false)
-                    setSelectedOrder(null)
-                  }}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ×
-                </button>
+                <div className="flex gap-3">
+                  {/* Download PDF Button */}
+                  <button
+                    onClick={() => downloadOrderAsPDF(selectedOrder)}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                    title="Download as PDF"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    PDF
+                  </button>
+                  {/* Download Excel Button */}
+                  <button
+                    onClick={() => downloadOrderAsExcel(selectedOrder)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                    title="Download as Excel"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Excel
+                  </button>
+                  {/* Close Button */}
+                  <button
+                    onClick={() => {
+                      setShowDetailModal(false)
+                      setSelectedOrder(null)
+                    }}
+                    className="text-gray-400 hover:text-gray-600 text-2xl ml-2"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-6">

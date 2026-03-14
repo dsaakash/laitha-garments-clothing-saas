@@ -76,7 +76,15 @@ export async function GET(request: NextRequest) {
 
     // Get tenant context from middleware-injected headers
     const context = getTenantContext(request)
-    const tenantFilter = buildTenantFilter(context)
+    let tenantFilter = buildTenantFilter(context)
+
+    // For public visitors (no session), show only Lalitha Garments items (tenant_id IS NULL)
+    if (!context.userType) {
+      tenantFilter = {
+        where: 'WHERE tenant_id IS NULL',
+        params: []
+      }
+    }
 
     let queryText = 'SELECT * FROM inventory'
     const params: any[] = [...tenantFilter.params]
