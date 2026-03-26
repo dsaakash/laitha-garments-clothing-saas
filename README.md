@@ -148,9 +148,9 @@ npm start
 
 For any questions or support, contact via WhatsApp: +91 7204219541
 
-## Groq AI Setup Assistant
+## AI Setup Assistant for Business Setup
 
-This project now includes an AI setup endpoint designed for phased rollout:
+This project now includes an AI setup assistant endpoint designed for phased rollout, generating a tailored, module-by-module ERP implementation plan based on the specific business profile.
 
 - Admin-first access
 - Later tenant rollout using per-tenant modules
@@ -166,15 +166,17 @@ AI_ADMIN_ROLLOUT_ENABLED=true
 AI_TENANT_ROLLOUT_ENABLED=false
 ```
 
-### API endpoint
+### API endpoints
 
-- `GET /api/ai/setup-assistant` returns availability/config status for the current session.
-- `POST /api/ai/setup-assistant` generates a module-by-module setup plan.
+- **`GET /api/ai/setup-assistant`**: Returns availability and configuration status for the current session (configured status, canUse flags).
+- **`POST /api/ai/setup-assistant`**: Generates a concrete, module-by-module setup plan for the business. You can pass business details such as `businessName`, `businessType`, `goals`, `currentSetupNotes`, and `requestedModules` in the JSON body.
+
+### Tenant Access
 
 Tenant access requires both:
 
 1. `AI_TENANT_ROLLOUT_ENABLED=true`
-2. Tenant module includes `ai_setup_assistant`
+2. Tenant module array includes `ai_setup_assistant`
 
 ---
 
