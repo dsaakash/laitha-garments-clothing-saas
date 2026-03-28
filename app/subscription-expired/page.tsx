@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Phone, MessageCircle, LogOut, AlertCircle, Calendar, Clock, RefreshCw } from 'lucide-react'
 
@@ -19,11 +19,7 @@ export default function SubscriptionExpiredPage() {
     const [loading, setLoading] = useState(true)
     const [checking, setChecking] = useState(false)
 
-    useEffect(() => {
-        loadSubscriptionInfo()
-    }, [])
-
-    const loadSubscriptionInfo = async () => {
+    const loadSubscriptionInfo = useCallback(async () => {
         try {
             const res = await fetch('/api/auth/subscription-status')
             const data = await res.json()
@@ -48,7 +44,11 @@ export default function SubscriptionExpiredPage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [router])
+
+    useEffect(() => {
+        loadSubscriptionInfo()
+    }, [loadSubscriptionInfo])
 
     const handleCheckRenewal = async () => {
         setChecking(true)

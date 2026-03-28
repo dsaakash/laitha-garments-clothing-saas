@@ -283,7 +283,7 @@ export default function SubscriptionPage() {
           <div className="flex flex-wrap justify-center items-center gap-12 opacity-30 grayscale hover:grayscale-0 transition-all duration-700">
              <div className="text-xl font-black italic tracking-tighter">ZARA</div>
              <div className="text-xl font-black italic tracking-tighter">H&M</div>
-             <div className="text-xl font-black italic tracking-tighter">LEVI'S</div>
+             <div className="text-xl font-black italic tracking-tighter">LEVI&apos;S</div>
              <div className="text-xl font-black italic tracking-tighter">NIKE</div>
           </div>
         </motion.div>

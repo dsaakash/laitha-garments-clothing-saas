@@ -269,7 +269,7 @@ export default function WhatsAppCommunityPage() {
                 <ol className="text-sm text-green-700 space-y-1 list-decimal list-inside">
                   <li>Open WhatsApp and go to your Community</li>
                   <li>Tap the community name at the top</li>
-                  <li>Scroll down and tap "Invite via link"</li>
+                  <li>Scroll down and tap &quot;Invite via link&quot;</li>
                   <li>Copy the link and paste it here</li>
                 </ol>
               </div>

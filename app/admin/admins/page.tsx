@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import AdminLayout from '@/components/AdminLayout'
 import { Admin } from '@/lib/db-auth'
 
@@ -32,6 +32,11 @@ export default function AdminsPage() {
     loadRoles()
   }, [])
 
+  const handleCloseModal = useCallback(() => {
+    setShowModal(false)
+    resetForm()
+  }, [])
+
   // Handle ESC key to close modals
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
@@ -44,7 +49,7 @@ export default function AdminsPage() {
       window.addEventListener('keydown', handleEsc)
       return () => window.removeEventListener('keydown', handleEsc)
     }
-  }, [showModal])
+  }, [showModal, handleCloseModal])
 
   // Update role fallback when roleId changes
   useEffect(() => {
@@ -187,10 +192,7 @@ export default function AdminsPage() {
     setEditingAdmin(null)
   }
 
-  const handleCloseModal = () => {
-    setShowModal(false)
-    resetForm()
-  }
+
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {

@@ -132,7 +132,7 @@ export default function EditResearchPage() {
     } finally {
       setLoadingData(false)
     }
-  }, [id])
+  }, [id, router])
 
   useEffect(() => {
     if (id) {

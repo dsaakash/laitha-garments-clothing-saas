@@ -104,7 +104,7 @@ export default function ResearchDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, router])
 
   useEffect(() => {
     if (id) {
