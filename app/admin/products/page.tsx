@@ -9,6 +9,7 @@ interface InventoryItem {
   dressName: string
   dressType: string
   dressCode: string
+  rackNumber?: string
   imageUrl?: string
   sizes: string[]
   fabricType?: string
@@ -49,6 +50,27 @@ export default function ProductsPage() {
   })
   const [submitting, setSubmitting] = useState(false)
   const [enquirySubmitted, setEnquirySubmitted] = useState(false)
+  const [rackModuleEnabled, setRackModuleEnabled] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/auth/check')
+      .then(res => res.json())
+      .then(data => {
+        if (data.admin && data.admin.tenant_id) {
+          fetch(`/api/tenants/${data.admin.tenant_id}`)
+            .then(res => res.json())
+            .then(tenantData => {
+              if (tenantData.success && tenantData.data?.modules?.includes('rack_number')) {
+                setRackModuleEnabled(true)
+              }
+            })
+            .catch(console.error)
+        } else if (data.admin && data.admin.role === 'superadmin') {
+          setRackModuleEnabled(true)
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   // Reset form when enquiry modal closes and auto-select fabric type when opens
   useEffect(() => {
@@ -322,6 +344,11 @@ export default function ProductsPage() {
                   <p className="text-sm text-gray-500 mb-2">
                     {item.dressType} - {item.dressCode}
                   </p>
+                  {rackModuleEnabled && item.rackNumber && (
+                    <p className="text-xs font-medium text-purple-700 bg-purple-100 px-2 py-1 rounded inline-block mb-2 border border-purple-200">
+                      Rack: {item.rackNumber}
+                    </p>
+                  )}
                   {item.fabricType && (
                     <p className="text-xs text-gray-400 mb-3">Fabric: {item.fabricType}</p>
                   )}
@@ -411,6 +438,13 @@ export default function ProductsPage() {
                       <span className="text-sm font-medium text-gray-500">Product Code</span>
                       <p className="text-lg text-gray-900">{selectedItem.dressCode}</p>
                     </div>
+                    
+                    {rackModuleEnabled && selectedItem.rackNumber && (
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Rack Number</span>
+                        <p className="text-lg text-gray-900 font-medium">{selectedItem.rackNumber}</p>
+                      </div>
+                    )}
                     
                     {selectedItem.fabricType && (
                       <div>

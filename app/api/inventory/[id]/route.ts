@@ -75,6 +75,7 @@ export async function PUT(
   try {
     const body = await request.json()
     const id = parseInt(params.id)
+    console.log('PUT Inventory Request:', { id, rackNumber: body.rackNumber })
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -122,20 +123,21 @@ export async function PUT(
 
     const result = await query(
       `UPDATE inventory 
-       SET dress_name = $1, dress_type = $2, dress_code = $3, category = $4, sizes = $5,
-           wholesale_price = $6, selling_price = $7, pricing_unit = $8, price_per_piece = $9, price_per_meter = $10,
-           image_url = $11, product_images = $12, fabric_type = $13, 
-           supplier_name = $14, supplier_address = $15, supplier_phone = $16, 
-           created_at = COALESCE($17, created_at),
-           is_deadstock = $18,
+       SET dress_name = $1, dress_type = $2, dress_code = $3, category = $4, rack_number = $5, sizes = $6,
+           wholesale_price = $7, selling_price = $8, pricing_unit = $9, price_per_piece = $10, price_per_meter = $11,
+           image_url = $12, product_images = $13, fabric_type = $14, 
+           supplier_name = $15, supplier_address = $16, supplier_phone = $17, 
+           created_at = COALESCE($18, created_at),
+           is_deadstock = $19,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $19
+       WHERE id = $20
        RETURNING *`,
       [
         body.dressName,
         body.dressType,
         body.dressCode,
         category,
+        body.rackNumber || null,
         body.sizes || [],
         body.wholesalePrice,
         body.sellingPrice,
@@ -153,6 +155,8 @@ export async function PUT(
         id,
       ]
     )
+
+    console.log('Update result for ID', id, ':', result.rows[0]?.rack_number)
 
     // If any relevant field changed, update all related sale_items to reflect the changes
     if (anyFieldChanged) {
@@ -255,6 +259,7 @@ export async function PUT(
       dressType: item.dress_type,
       dressCode: item.dress_code,
       category: item.category || determineCategory(item.dress_type, item.dress_name),
+      rackNumber: item.rack_number || undefined,
       sizes: item.sizes || [],
       wholesalePrice: parseFloat(item.wholesale_price),
       sellingPrice: parseFloat(item.selling_price),

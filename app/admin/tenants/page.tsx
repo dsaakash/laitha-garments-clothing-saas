@@ -29,7 +29,8 @@ export default function TenantsPage() {
         businessName: '',
         ownerName: '',
         status: '',
-        plan: ''
+        plan: '',
+        modules: [] as string[]
     })
     const [saving, setSaving] = useState(false)
 
@@ -100,7 +101,8 @@ export default function TenantsPage() {
             businessName: tenant.businessName,
             ownerName: tenant.ownerName,
             status: tenant.status,
-            plan: tenant.plan
+            plan: tenant.plan,
+            modules: tenant.modules || []
         })
         setIsEditModalOpen(true)
     }
@@ -430,6 +432,8 @@ export default function TenantsPage() {
                                     </select>
                                 </div>
                             </div>
+
+
                         </div>
 
                         <div className="p-6 bg-gray-50 flex justify-end gap-3">

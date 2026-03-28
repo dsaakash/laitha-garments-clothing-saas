@@ -66,6 +66,27 @@ export default function SalesPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const [rackModuleEnabled, setRackModuleEnabled] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/auth/check')
+      .then(res => res.json())
+      .then(data => {
+        if (data.admin && data.admin.tenant_id) {
+          fetch(`/api/tenants/${data.admin.tenant_id}`)
+            .then(res => res.json())
+            .then(tenantData => {
+              if (tenantData.success && tenantData.data?.modules?.includes('rack_number')) {
+                setRackModuleEnabled(true)
+              }
+            })
+            .catch(console.error)
+        } else if (data.admin && data.admin.role === 'superadmin') {
+          setRackModuleEnabled(true)
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   const stopCamera = useCallback(() => {
     try {
@@ -1891,6 +1912,7 @@ export default function SalesPage() {
             }}
             onSelect={(item) => handleItemSelect(item, itemModalIndex)}
             inventory={inventory}
+            showRackNumber={rackModuleEnabled}
           />
         )}
 

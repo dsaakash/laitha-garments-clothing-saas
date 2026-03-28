@@ -59,6 +59,7 @@ const AVAILABLE_MODULES = [
     { id: 'business', label: 'Business Profile' },
     { id: 'admins', label: 'Admin Management' },
     { id: 'roles', label: 'Roles & Permissions' },
+    { id: 'whatsapp_community', label: 'WhatsApp Community' },
 ]
 
 export default function TenantDetailsPage() {
@@ -1011,6 +1012,33 @@ export default function TenantDetailsPage() {
                                                     )}
                                                 </div>
                                             ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Inventory Configuration */}
+                                    <div className="pt-6 border-t border-gray-100">
+                                        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Inventory Configuration</h4>
+                                        <div 
+                                            onClick={() => handleModuleToggle('rack_number')}
+                                            className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all ${selectedModules.includes('rack_number')
+                                                ? 'border-purple-500 bg-purple-50 shadow-sm'
+                                                : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${selectedModules.includes('rack_number') ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-500'}`}>
+                                                    <LayoutGrid className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <p className={`font-bold ${selectedModules.includes('rack_number') ? 'text-purple-900' : 'text-gray-700'}`}>
+                                                        Enable Rack / Shelf Tracking
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">Allow assigning custom physical locations to inventory items</p>
+                                                </div>
+                                            </div>
+                                            <div className={`w-12 h-6 rounded-full relative transition-colors ${selectedModules.includes('rack_number') ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${selectedModules.includes('rack_number') ? 'left-7' : 'left-1'}`}></div>
+                                            </div>
                                         </div>
                                     </div>
 

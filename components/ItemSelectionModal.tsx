@@ -11,6 +11,7 @@ interface ItemSelectionModalProps {
   inventory: InventoryItem[]
   multiSelect?: boolean // Allow selecting multiple items without closing
   selectedItems?: string[] // Array of selected item IDs for multi-select mode
+  showRackNumber?: boolean // Show rack number if module is enabled
 }
 
 type SortOption = 'name' | 'code' | 'price' | 'stock'
@@ -23,6 +24,7 @@ export default function ItemSelectionModal({
   inventory,
   multiSelect = false,
   selectedItems = [],
+  showRackNumber = false,
 }: ItemSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
@@ -52,7 +54,7 @@ export default function ItemSelectionModal({
           item.dressCode.toLowerCase().includes(query) ||
           item.dressType.toLowerCase().includes(query) ||
           ((item as any).category || '').toLowerCase().includes(query) ||
-          (item.fabricType || '').toLowerCase().includes(query)
+          (item.rackNumber || '').toLowerCase().includes(query)
         )
       })
     }
@@ -349,9 +351,16 @@ export default function ItemSelectionModal({
                       <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-1">
                         {item.dressName}
                       </h3>
-                      <p className="text-xs text-gray-500 mb-1">
-                        {item.dressCode}
-                      </p>
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="text-xs text-gray-500">
+                          {item.dressCode}
+                        </p>
+                        {showRackNumber && item.rackNumber && (
+                          <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded border border-purple-200 font-medium">
+                            Rack: {item.rackNumber}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-400 mb-2">
                         {category} • {item.dressType}
                       </p>

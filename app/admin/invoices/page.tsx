@@ -22,6 +22,84 @@ export default function InvoicesPage() {
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+  const [communityLink, setCommunityLink] = useState<string>('')
+
+  // Fetch community link on mount
+  useEffect(() => {
+    const fetchCommunityLink = async () => {
+      try {
+        const res = await fetch('/api/whatsapp-community/link')
+        const result = await res.json()
+        if (result.success && result.data?.link) {
+          setCommunityLink(result.data.link)
+        }
+      } catch (err) {
+        console.warn('Failed to fetch community link:', err)
+      }
+    }
+    fetchCommunityLink()
+  }, [])
+
+  const sendCommunityLink = async (sale: Sale) => {
+    try {
+      // Get customer phone number
+      const customer = getCustomer(sale)
+      let phoneNumber = ''
+      
+      if (customer && customer.phone) {
+        phoneNumber = customer.phone.replace(/\D/g, '')
+      } else {
+        // If no customer, ask user to enter phone number
+        const inputPhone = prompt('Enter customer WhatsApp number (with country code, e.g., 919876543210):')
+        if (!inputPhone) return
+        phoneNumber = inputPhone.replace(/\D/g, '')
+      }
+
+      if (!phoneNumber) {
+        alert('Please enter a valid phone number')
+        return
+      }
+
+      // Get community link
+      let link = communityLink
+      if (!link) {
+        // Try to fetch again
+        const res = await fetch('/api/whatsapp-community/link')
+        const result = await res.json()
+        if (result.success && result.data?.link) {
+          link = result.data.link
+          setCommunityLink(link)
+        }
+      }
+
+      if (!link) {
+        // Prompt for link
+        const inputLink = prompt('Enter WhatsApp Community invite link:', 'https://chat.whatsapp.com/...')
+        if (!inputLink) return
+        link = inputLink
+      }
+
+      const customerName = customer?.name || sale.partyName || 'there'
+      const businessName = businessProfile?.businessName || 'Lalitha Garments'
+      
+      let message = `Hi ${customerName}! 👋\n\n`
+      message += `Thank you for shopping with ${businessName}! 🛍️\n\n`
+      message += `Join our exclusive WhatsApp Community for:\n`
+      message += `• Early access to new collections\n`
+      message += `• Special discounts & offers\n`
+      message += `• Style tips & fashion updates\n\n`
+      message += `👉 ${link}\n\n`
+      message += `See you there! 🌸`
+
+      // Open WhatsApp
+      const encodedMessage = encodeURIComponent(message)
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`
+      window.open(whatsappUrl, '_blank')
+    } catch (error) {
+      console.error('Send community link error:', error)
+      alert('Error sending community link. Please try again.')
+    }
+  }
   const [userRole, setUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [searchPartyName, setSearchPartyName] = useState<string>('')
@@ -834,46 +912,48 @@ export default function InvoicesPage() {
           }
 
           return (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white rounded-lg shadow-md overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Number</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Party Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Date</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Bill #</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Party Name</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Amount</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Payment</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredSales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-2 py-3 text-sm text-gray-900">
                       {format(new Date(sale.date), 'dd MMM yyyy')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                    <td className="px-2 py-3 text-sm text-gray-900 font-medium">
                       {sale.billNumber}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-2 py-3 text-sm text-gray-900">
                       <div>
-                        <p className="font-medium">{sale.partyName}</p>
+                        <p className="font-medium truncate max-w-[150px]" title={sale.partyName}>{sale.partyName}</p>
                         {getCustomer(sale) && (
                           <p className="text-xs text-gray-500">{getCustomer(sale)?.phone}</p>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                    <td className="px-2 py-3 text-sm font-medium text-green-600">
                       ₹{sale.totalAmount.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {sale.paymentMode}
-                      {sale.upiTransactionId && (
-                        <span className="block text-xs text-gray-400">{sale.upiTransactionId}</span>
-                      )}
+                    <td className="px-2 py-3 text-sm text-gray-500">
+                      <div className="flex flex-col">
+                        <span>{sale.paymentMode}</span>
+                        {sale.upiTransactionId && (
+                          <span className="text-xs text-gray-400 truncate max-w-[100px]" title={sale.upiTransactionId}>{sale.upiTransactionId}</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                    <td className="px-2 py-3 text-xs">
+                      <div className="flex flex-wrap gap-1">
                         <button
                           onClick={async () => {
                             try {
@@ -883,10 +963,10 @@ export default function InvoicesPage() {
                               alert('Failed to view PDF. Please try again.')
                             }
                           }}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View PDF"
+                          className="text-blue-600 hover:text-blue-900 px-1 py-0.5 rounded hover:bg-blue-50"
+                          title="View"
                         >
-                          👁️ View
+                          👁️
                         </button>
                         <button
                           onClick={async () => {
@@ -897,10 +977,10 @@ export default function InvoicesPage() {
                               alert('Failed to print PDF. Please try again.')
                             }
                           }}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Print PDF"
+                          className="text-purple-600 hover:text-purple-900 px-1 py-0.5 rounded hover:bg-purple-50"
+                          title="Print"
                         >
-                          🖨️ Print
+                          🖨️
                         </button>
                         <button
                           onClick={async () => {
@@ -911,26 +991,33 @@ export default function InvoicesPage() {
                               alert('Failed to download PDF. Please try again.')
                             }
                           }}
-                          className="text-green-600 hover:text-green-900"
-                          title="Download PDF"
+                          className="text-green-600 hover:text-green-900 px-1 py-0.5 rounded hover:bg-green-50"
+                          title="Download"
                         >
-                          📥 Download
+                          📥
                         </button>
                         <button
                           onClick={() => sendViaWhatsApp(sale)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Send via WhatsApp"
+                          className="text-green-600 hover:text-green-900 px-1 py-0.5 rounded hover:bg-green-50"
+                          title="WhatsApp"
                         >
-                          💬 WhatsApp
+                          💬
+                        </button>
+                        <button
+                          onClick={() => sendCommunityLink(sale)}
+                          className="text-pink-600 hover:text-pink-900 px-1 py-0.5 rounded hover:bg-pink-50"
+                          title="Community"
+                        >
+                          🌸
                         </button>
                         <button
                           onClick={() => {
                             window.location.href = `/admin/sales`
                           }}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Edit Sale"
+                          className="text-purple-600 hover:text-purple-900 px-1 py-0.5 rounded hover:bg-purple-50"
+                          title="Edit"
                         >
-                          ✏️ Edit
+                          ✏️
                         </button>
                         <button
                           onClick={async () => {
@@ -953,10 +1040,10 @@ export default function InvoicesPage() {
                               alert('Failed to delete sale')
                             }
                           }}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete Sale"
+                          className="text-red-600 hover:text-red-900 px-1 py-0.5 rounded hover:bg-red-50"
+                          title="Delete"
                         >
-                          🗑️ Delete
+                          🗑️
                         </button>
                       </div>
                     </td>

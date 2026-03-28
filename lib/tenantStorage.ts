@@ -36,6 +36,7 @@ export interface Tenant {
     // Features (optional per tenant)
     workflowEnabled: boolean
     websiteBuilderEnabled: boolean
+    modules?: string[] // Array of enabled modules like 'rack_number'
 
     // Metadata
     createdAt: string

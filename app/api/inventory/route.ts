@@ -140,6 +140,7 @@ export async function GET(request: NextRequest) {
         dressType: row.dress_type,
         dressCode: row.dress_code,
         category: category,
+        rackNumber: row.rack_number || undefined,
         sizes: row.sizes || [],
         wholesalePrice: parseFloat(row.wholesale_price),
         sellingPrice: parseFloat(row.selling_price),
@@ -195,15 +196,16 @@ export async function POST(request: NextRequest) {
 
     const result = await query(
       `INSERT INTO inventory 
-       (dress_name, dress_type, dress_code, category, sizes, wholesale_price, selling_price, 
+       (dress_name, dress_type, dress_code, category, rack_number, sizes, wholesale_price, selling_price, 
         pricing_unit, price_per_piece, price_per_meter, image_url, product_images, fabric_type, supplier_name, supplier_address, supplier_phone, tenant_id, created_at, is_deadstock)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
        RETURNING *`,
       [
         body.dressName,
         body.dressType,
         body.dressCode,
         category,
+        body.rackNumber || null,
         body.sizes || [],
         body.wholesalePrice,
         body.sellingPrice,
@@ -229,6 +231,7 @@ export async function POST(request: NextRequest) {
       dressType: item.dress_type,
       dressCode: item.dress_code,
       category: item.category || determineCategory(item.dress_type, item.dress_name),
+      rackNumber: item.rack_number || undefined,
       sizes: item.sizes || [],
       wholesalePrice: parseFloat(item.wholesale_price),
       sellingPrice: parseFloat(item.selling_price),

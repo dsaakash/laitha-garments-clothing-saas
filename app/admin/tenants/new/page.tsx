@@ -303,6 +303,35 @@ export default function NewTenantPage() {
                             </div>
                         </div>
 
+                        {/* Inventory Configuration */}
+                        <div className="mb-8">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">Inventory Configuration</h3>
+                            <div 
+                                onClick={() => handleModuleToggle('rack_number')}
+                                className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all max-w-2xl ${selectedModules.includes('rack_number')
+                                    ? 'border-purple-500 bg-purple-50 shadow-sm'
+                                    : 'border-gray-200 hover:border-gray-300'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${selectedModules.includes('rack_number') ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-500'}`}>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className={`font-bold ${selectedModules.includes('rack_number') ? 'text-purple-900' : 'text-gray-700'}`}>
+                                            Enable Rack / Shelf Tracking
+                                        </p>
+                                        <p className="text-xs text-gray-500 font-normal">Allow assigning custom physical locations to inventory items</p>
+                                    </div>
+                                </div>
+                                <div className={`w-12 h-6 rounded-full relative transition-colors ${selectedModules.includes('rack_number') ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${selectedModules.includes('rack_number') ? 'left-7' : 'left-1'}`}></div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Admin Limit Configuration */}
                         <div className="mb-8">
                             <h3 className="text-lg font-bold text-gray-900 mb-4">Trial Limits</h3>

@@ -7,6 +7,7 @@ export interface InventoryItem {
   dressName: string
   dressType: string
   dressCode: string
+  rackNumber?: string // Optional custom rack number for locating items
   sizes: string[]
   wholesalePrice: number
   sellingPrice: number

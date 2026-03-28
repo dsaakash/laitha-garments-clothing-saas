@@ -32,7 +32,8 @@ import {
   Sliders,
   Search,
   Palette,
-  Paintbrush
+  Paintbrush,
+  MessageCircle
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -363,6 +364,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       { href: '/admin/sales', label: 'Sales', icon: Banknote, resource: 'sales', module: 'sales' },
       { href: '/admin/invoices', label: 'Invoices', icon: FileText, resource: 'invoices', module: 'invoices' },
       { href: '/admin/enquiries', label: 'Customer Enquiries', icon: MessageSquare, resource: 'enquiries', module: 'enquiries' },
+      { href: '/admin/whatsapp-community', label: 'WhatsApp Community', icon: MessageCircle, resource: 'customers', module: 'whatsapp_community' },
       { href: '/admin/admins', label: 'Admin Management', icon: ShieldCheck, resource: 'admins', module: 'admins' },
       { href: '/admin/users', label: 'User Management', icon: UserCog, resource: 'users', module: 'users' },
       { href: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, resource: 'roles', module: 'roles' },

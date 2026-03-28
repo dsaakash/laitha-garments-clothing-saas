@@ -417,22 +417,23 @@ export default function Dashboard() {
                 <p className={`text-sm mb-3 ${trialInfo.daysRemaining <= 7 ? 'text-gray-700' : 'text-gray-600'}`}>
                   Upgrade now to continue accessing all features and your business data after the trial period.
                 </p>
-                <div className="flex gap-3">
-                  <a
-                    href="tel:9353083597"
-                    className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-md transition-all text-sm"
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href="/admin/subscription"
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg transition-all text-sm group"
                   >
-                    <span>📞</span>
-                    <span>Call: 9353083597</span>
-                  </a>
+                    <span>🚀</span>
+                    <span>Upgrade Now</span>
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
                   <a
                     href="https://wa.me/919353083597?text=Hi, I want to upgrade my account"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-xl font-semibold shadow-md transition-all text-sm"
+                    className="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-green-600 px-5 py-2.5 rounded-xl font-semibold shadow-sm border border-green-100 transition-all text-sm"
                   >
                     <span>💬</span>
-                    <span>WhatsApp</span>
+                    <span>Chat Support</span>
                   </a>
                 </div>
               </div>

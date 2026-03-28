@@ -25,6 +25,7 @@ export default function InventoryPage() {
     dressName: '',
     dressType: '',
     dressCode: '',
+    rackNumber: '',
     sizes: '',
     fabricType: '',
     wholesalePrice: '',
@@ -60,13 +61,50 @@ export default function InventoryPage() {
   const [lightboxImages, setLightboxImages] = useState<string[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
+  const [showRackModal, setShowRackModal] = useState(false)
+  const [rackModalItem, setRackModalItem] = useState<InventoryItem | null>(null)
+  const [rackModalInput, setRackModalInput] = useState('')
+  const [rackModalLoading, setRackModalLoading] = useState(false)
+  const [rackModalSuccess, setRackModalSuccess] = useState(false)
+
   const [apiSuppliers, setApiSuppliers] = useState<any[]>([])
+  const [rackModuleEnabled, setRackModuleEnabled] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/auth/check')
+      .then(res => res.json())
+      .then(data => {
+        if (data.admin && data.admin.tenant_id) {
+          fetch(`/api/tenants/${data.admin.tenant_id}`)
+            .then(res => res.json())
+            .then(tenantData => {
+              if (tenantData.success && tenantData.data?.modules?.includes('rack_number')) {
+                setRackModuleEnabled(true)
+              }
+            })
+            .catch(console.error)
+        } else if (data.admin && data.admin.role === 'superadmin') {
+          setRackModuleEnabled(true)
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   useEffect(() => {
     loadItems()
     loadApiSuppliers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, supplierFilter])
+
+  // Sync selectedItem with the updated items array to avoid stale modal data
+  useEffect(() => {
+    if (selectedItem) {
+      const latestItem = items.find(i => String(i.id) === String(selectedItem.id))
+      if (latestItem && JSON.stringify(latestItem) !== JSON.stringify(selectedItem)) {
+        setSelectedItem(latestItem)
+      }
+    }
+  }, [items, selectedItem])
 
   const loadApiSuppliers = async () => {
     try {
@@ -100,6 +138,7 @@ export default function InventoryPage() {
             dressName: '',
             dressType: '',
             dressCode: '',
+            rackNumber: '',
             sizes: '',
             fabricType: '',
             wholesalePrice: '',
@@ -205,6 +244,7 @@ export default function InventoryPage() {
             dressName: formData.dressName,
             dressType: formData.dressType,
             dressCode: formData.dressCode,
+            rackNumber: formData.rackNumber || undefined,
             sizes: sizesArray,
             fabricType: formData.fabricType || undefined,
             wholesalePrice: parseFloat(formData.wholesalePrice),
@@ -234,6 +274,7 @@ export default function InventoryPage() {
             dressName: formData.dressName,
             dressType: formData.dressType,
             dressCode: formData.dressCode,
+            rackNumber: formData.rackNumber || undefined,
             sizes: sizesArray,
             fabricType: formData.fabricType || undefined,
             wholesalePrice: parseFloat(formData.wholesalePrice),
@@ -369,6 +410,7 @@ export default function InventoryPage() {
       dressName: item.dressName,
       dressType: item.dressType,
       dressCode: item.dressCode,
+      rackNumber: item.rackNumber || '',
       sizes: item.sizes.join(', '),
       fabricType: item.fabricType || '',
       wholesalePrice: item.wholesalePrice.toString(),
@@ -407,11 +449,128 @@ export default function InventoryPage() {
     }
   }
 
+  const handleSetRack = (item: InventoryItem) => {
+    setRackModalItem(item)
+    setRackModalInput(item.rackNumber || '')
+    setShowRackModal(true)
+    setRackModalSuccess(false)
+  }
+
+  const submitRackNumber = async () => {
+    if (!rackModalItem) return
+    const newRack = rackModalInput.trim()
+    if (newRack === (rackModalItem.rackNumber || '')) {
+      setShowRackModal(false)
+      return
+    }
+
+    setRackModalLoading(true)
+    try {
+      const payload = {
+        dressName: rackModalItem.dressName,
+        dressType: rackModalItem.dressType,
+        dressCode: rackModalItem.dressCode,
+        rackNumber: newRack,
+        sizes: rackModalItem.sizes,
+        wholesalePrice: rackModalItem.wholesalePrice,
+        sellingPrice: rackModalItem.sellingPrice,
+        pricingUnit: rackModalItem.pricingUnit,
+        pricePerPiece: rackModalItem.pricePerPiece,
+        pricePerMeter: rackModalItem.pricePerMeter,
+        imageUrl: rackModalItem.imageUrl,
+        productImages: rackModalItem.productImages,
+        fabricType: rackModalItem.fabricType,
+        supplierName: rackModalItem.supplierName,
+        supplierAddress: rackModalItem.supplierAddress,
+        supplierPhone: rackModalItem.supplierPhone,
+        date: rackModalItem.createdAt ? rackModalItem.createdAt.split('T')[0] : format(new Date(), 'yyyy-MM-dd'),
+        isDeadstock: (rackModalItem as any).isDeadstock || false,
+      }
+      
+      const response = await fetch(`/api/inventory/${rackModalItem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+      if (result.success && result.data) {
+        const updatedItem = result.data as InventoryItem
+        setRackModalSuccess(true)
+        
+        // Update the main items list immediately
+        setItems(prevItems => 
+          prevItems.map(listItem => String(listItem.id) === String(rackModalItem.id) ? updatedItem : listItem)
+        )
+
+        // Force selectedItem update immediately with the server's record
+        setSelectedItem(updatedItem)
+        
+        // Refresh anyway to be safe, but the UI is already updated
+        await loadItems()
+        
+        setTimeout(() => {
+          setShowRackModal(false)
+          setRackModalSuccess(false)
+        }, 2000)
+      } else {
+        alert(result.message || 'Failed to update rack number')
+      }
+    } catch (error) {
+      console.error('Failed to update rack number:', error)
+      alert('Error updating rack number')
+    } finally {
+      if (!rackModalSuccess) {
+        setRackModalLoading(false)
+      }
+    }
+  }
+
+  const handleClearRack = async (item: InventoryItem) => {
+    if (!confirm('Are you sure you want to completely remove the rack number for this item?')) return
+
+    try {
+      const payload = {
+        ...item,
+        rackNumber: '',
+        date: item.createdAt ? item.createdAt.split('T')[0] : format(new Date(), 'yyyy-MM-dd'),
+      }
+      
+      const response = await fetch(`/api/inventory/${item.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+      if (result.success && result.data) {
+        const updatedItem = result.data as InventoryItem
+        
+        // Update the main items list immediately
+        setItems(prevItems => 
+          prevItems.map(listItem => String(listItem.id) === String(item.id) ? updatedItem : listItem)
+        )
+
+        // Update selection if open
+        if (selectedItem && String(selectedItem.id) === String(item.id)) {
+          setSelectedItem(updatedItem)
+        }
+        await loadItems()
+      } else {
+        alert(result.message || 'Failed to clear rack number')
+      }
+    } catch (error) {
+      console.error(error)
+      alert('Error clearing rack number')
+    }
+  }
+
   const resetForm = () => {
     setFormData({
       dressName: '',
       dressType: '',
       dressCode: '',
+      rackNumber: '',
       sizes: '',
       fabricType: '',
       wholesalePrice: '',
@@ -793,6 +952,9 @@ export default function InventoryPage() {
                             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '250px' }}>Dress Name</th>
                             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Type</th>
                             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Code</th>
+                            {rackModuleEnabled && (
+                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Rack No.</th>
+                            )}
                             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Sizes</th>
                             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Wholesale</th>
                             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Selling</th>
@@ -879,6 +1041,15 @@ export default function InventoryPage() {
                                 </td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressCode}</td>
+                                {rackModuleEnabled && (
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                                    {item.rackNumber ? (
+                                      <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">{item.rackNumber}</span>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                )}
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.sizes.join(', ')}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.wholesalePrice}</td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{item.sellingPrice}</td>
@@ -936,6 +1107,15 @@ export default function InventoryPage() {
                                 </td>
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                                   <div className="flex items-center space-x-1 sm:space-x-2">
+                                    {rackModuleEnabled && (
+                                      <button
+                                        onClick={() => handleSetRack(item)}
+                                        className="px-2 py-1.5 sm:px-3 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-indigo-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
+                                        title={item.rackNumber ? 'Edit Rack Location' : 'Set Rack Number'}
+                                      >
+                                        <span className="hidden sm:inline">🏷️ </span>{item.rackNumber ? <span className="font-bold">{item.rackNumber}</span> : 'Rack'}
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => handleEdit(item)}
                                       className="px-2 py-1.5 sm:px-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-blue-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
@@ -981,6 +1161,9 @@ export default function InventoryPage() {
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '250px' }}>Dress Name</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Type</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '180px' }}>Code</th>
+                    {rackModuleEnabled && (
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Rack No.</th>
+                    )}
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '150px' }}>Sizes</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '300px' }}>Supplier</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{ minWidth: '120px' }}>Wholesale</th>
@@ -1068,6 +1251,15 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressType}</td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dressCode}</td>
+                        {rackModuleEnabled && (
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                            {item.rackNumber ? (
+                              <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200">{item.rackNumber}</span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.sizes.join(', ')}</td>
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {item.supplierName ? (
@@ -1144,6 +1336,15 @@ export default function InventoryPage() {
                             >
                               <span className="hidden sm:inline">📦 </span>Stock
                             </button>
+                            {rackModuleEnabled && (
+                              <button
+                                onClick={() => handleSetRack(item)}
+                                className="px-2 py-1.5 sm:px-3 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-indigo-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
+                                title={item.rackNumber ? 'Edit Rack Location' : 'Set Rack Number'}
+                              >
+                                <span className="hidden sm:inline">🏷️ </span>{item.rackNumber ? <span className="font-bold">{item.rackNumber}</span> : 'Rack'}
+                              </button>
+                            )}
                             <button
                               onClick={() => handleEdit(item)}
                               className="px-2 py-1.5 sm:px-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-blue-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
@@ -1209,6 +1410,18 @@ export default function InventoryPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
+                {rackModuleEnabled && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Rack Number (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., A1, Rack-B"
+                      value={formData.rackNumber}
+                      onChange={(e) => setFormData({ ...formData, rackNumber: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-purple-50/30"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Fabric Type (optional)</label>
                   <input
@@ -1607,6 +1820,43 @@ export default function InventoryPage() {
                     <p className="text-lg text-gray-900 font-mono">{selectedItem.dressCode}</p>
                   </div>
 
+                  {rackModuleEnabled && (
+                    <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex items-center justify-between shadow-sm">
+                      <div>
+                        <label className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-1 block">Rack / Shelf Selection</label>
+                        <p className="text-xl font-bold text-gray-900">
+                          {selectedItem.rackNumber ? (
+                            <span className="bg-white border border-purple-200 px-3 py-1 rounded inline-block">{selectedItem.rackNumber}</span>
+                          ) : (
+                            <span className="text-gray-400 italic font-medium">Not assigned yet</span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        {selectedItem.rackNumber && (
+                           <button
+                             onClick={() => handleClearRack(selectedItem)}
+                             className="p-2.5 text-red-600 bg-white hover:bg-red-50 rounded-lg transition-colors border border-red-200 shadow-sm"
+                             title="Remove Rack Number"
+                           >
+                              <Trash2 className="w-4 h-4" />
+                           </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            // Don't close the modal, just open the Rack modal over it
+                            handleSetRack(selectedItem)
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 text-purple-700 hover:bg-purple-100 rounded-lg transition-colors border border-purple-200 bg-white shadow-sm font-medium"
+                          title="Edit Rack Location"
+                        >
+                          <Edit className="w-4 h-4" />
+                          <span>{selectedItem.rackNumber ? 'Edit' : 'Set Rack'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {selectedItem.fabricType && (
                     <div>
                       <label className="text-sm font-medium text-gray-500">Fabric Type</label>
@@ -1855,6 +2105,81 @@ export default function InventoryPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Set Rack Modal */}
+        {showRackModal && rackModalItem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl transform transition-all">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Set Rack Number</h3>
+                <button
+                  onClick={() => !rackModalLoading && setShowRackModal(false)}
+                  className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                  disabled={rackModalLoading}
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Update rack placement for <span className="font-semibold">{rackModalItem.dressName}</span>
+              </p>
+              
+              {rackModalSuccess ? (
+                <div className="bg-green-50 text-green-700 py-6 px-4 rounded-lg flex flex-col items-center justify-center border border-green-200">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="font-medium text-center">Rack successfully updated to <br/><span className="font-bold text-lg mt-1 block px-3 py-1 bg-green-200/50 rounded inline-block">{rackModalInput || '(Empty)'}</span></p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Rack / Shelf Identifier</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. A1, Shelf-2"
+                      value={rackModalInput}
+                      onChange={(e) => setRackModalInput(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-purple-50/10 placeholder-gray-400 font-medium"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !rackModalLoading) {
+                          e.preventDefault()
+                          submitRackNumber()
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex gap-3 justify-end pt-3 border-t mt-5">
+                    <button
+                      onClick={() => setShowRackModal(false)}
+                      disabled={rackModalLoading}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={submitRackNumber}
+                      disabled={rackModalLoading}
+                      className="flex items-center gap-2 px-6 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-lg font-medium transition-colors disabled:opacity-50 min-w-[100px] justify-center shadow-md"
+                    >
+                      {rackModalLoading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        'Save'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
