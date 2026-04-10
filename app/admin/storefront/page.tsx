@@ -21,6 +21,7 @@ export default function StorefrontPage() {
   const [businessName, setBusinessName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [host, setHost] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,7 +56,16 @@ export default function StorefrontPage() {
     }, 1000)
   }
 
-  const liveUrl = slug ? `${window.location.protocol}//${window.location.host}/store/${slug}` : ''
+  const [liveUrl, setLiveUrl] = useState('')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setHost(window.location.host)
+      if (slug) {
+        setLiveUrl(`${window.location.protocol}//${window.location.host}/store/${slug}`)
+      }
+    }
+  }, [slug])
 
   return (
     <AdminLayout>
@@ -114,7 +124,7 @@ export default function StorefrontPage() {
                         </label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
-                                {window.location.host}/store/
+                                {host || 'your-domain'}/store/
                             </div>
                             <input 
                                 type="text"

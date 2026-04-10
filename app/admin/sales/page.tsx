@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
@@ -15,7 +15,7 @@ import {
 import StatusBadge from '@/components/StatusBadge'
 import ActionButton from '@/components/ActionButton'
 
-export default function SalesPage() {
+function SalesPageContent() {
   const searchParams = useSearchParams()
   const [sales, setSales] = useState<Sale[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -2237,6 +2237,18 @@ export default function SalesPage() {
         </div>
       </div>
     </AdminLayout>
+  )
+}
+
+export default function SalesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    }>
+      <SalesPageContent />
+    </Suspense>
   )
 }
 

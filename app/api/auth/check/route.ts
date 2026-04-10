@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { decodeBase64 } from '@/lib/utils'
 import { getAdminById, getUserById } from '@/lib/db-auth'
