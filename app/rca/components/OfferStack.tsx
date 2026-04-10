@@ -31,7 +31,7 @@ export default function OfferStack() {
             Everything You Get Inside <span className="text-amber-500 underline underline-offset-8 decoration-amber-500/30">The System</span>
           </h2>
           <p className="text-stone-400 text-lg max-w-2xl mx-auto">
-            You aren't paying for a tool. You're paying to stop the bleeding.
+            You aren&apos;t paying for a tool. You&apos;re paying to stop the bleeding.
           </p>
         </div>
 
@@ -116,7 +116,7 @@ export default function OfferStack() {
                 <strong>Investment Logic:</strong> If your store has 10% mismatch on ₹40L inventory = ₹4L in uncontrolled stock. Recovering even 50% of that stock leakage in Year 1 pays for this system <strong className="text-amber-500">2.3x over.</strong>
               </p>
               <p className="text-stone-500 text-sm italic">
-                💬 If your Hidden Leakage Report shows less than ₹85,000 in annual impact — we tell you honestly and don't ask for your investment.
+                💬 If your Hidden Leakage Report shows less than ₹85,000 in annual impact — we tell you honestly and don&apos;t ask for your investment.
               </p>
           </div>
         </motion.div>

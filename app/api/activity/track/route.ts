@@ -34,10 +34,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { page, action } = body
     
-    const module = getModuleFromPath(page || '')
+    const moduleName = getModuleFromPath(page || '')
     const eventType = action === 'login' ? 'login' : 'page_view'
 
-    await logActivity(tenantId, email, eventType as any, module, {
+    await logActivity(tenantId, email, eventType as any, moduleName, {
       page,
       action: action || 'view',
       userAgent: request.headers.get('user-agent') || 'unknown',

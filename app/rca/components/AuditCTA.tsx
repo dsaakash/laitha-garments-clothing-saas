@@ -39,7 +39,7 @@ export default function AuditCTA() {
           </div>
           
           <p className="text-amber-500/60 font-serif italic text-xl mb-12">
-            "I don't win unless you win."
+            &quot;I don&apos;t win unless you win.&quot;
           </p>
           
           <div className="space-y-6">

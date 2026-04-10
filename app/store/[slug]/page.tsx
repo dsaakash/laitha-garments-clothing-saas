@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -45,11 +45,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
   const [error, setError] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('All')
 
-  useEffect(() => {
-    fetchStoreData()
-  }, [params.slug])
-
-  const fetchStoreData = async () => {
+  const fetchStoreData = useCallback(async () => {
     try {
       const response = await fetch(`/api/store/${params.slug}`)
       const result = await response.json()
@@ -63,7 +59,11 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.slug])
+
+  useEffect(() => {
+    fetchStoreData()
+  }, [fetchStoreData])
 
   const handleWhatsApp = (productName: string) => {
     if (!data) return
@@ -77,7 +77,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-serif">Arriving at ${params.slug.replace(/-/g, ' ')}'s collection...</p>
+          <p className="mt-4 text-gray-600 font-serif">Arriving at {params.slug.replace(/-/g, ' ')}&apos;s collection...</p>
         </div>
       </div>
     )

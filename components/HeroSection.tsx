@@ -286,7 +286,7 @@ export default function HeroSection() {
             👵
           </div>
           <p className="text-sage-800 font-serif italic text-lg leading-relaxed">
-            "I've helped thousands of women find their perfect fit. Whether it's a wedding or a casual day out, I'm here to give you my honest advice."
+            &quot;I&apos;ve helped thousands of women find their perfect fit. Whether it&apos;s a wedding or a casual day out, I&apos;m here to give you my honest advice.&quot;
           </p>
           <div className="mt-4 flex items-center justify-center gap-2 text-primary-600 font-bold text-sm uppercase tracking-widest">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>

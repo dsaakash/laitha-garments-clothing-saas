@@ -104,7 +104,7 @@ export default function LeakageQuiz() {
             <p className="text-4xl font-bold text-red-500">₹{result.annualLeakage.toLocaleString("en-IN")}</p>
           </div>
           <div className="bg-stone-950/50 p-6 rounded-2xl border border-stone-800">
-            <p className="text-stone-400 text-sm mb-1 uppercase tracking-wider">Monthly "Chaos Tax"</p>
+            <p className="text-stone-400 text-sm mb-1 uppercase tracking-wider">Monthly &quot;Chaos Tax&quot;</p>
             <p className="text-4xl font-bold text-orange-500">₹{result.monthlyLeakage.toLocaleString("en-IN")}</p>
           </div>
           <div className="bg-stone-950/50 p-6 rounded-2xl border border-stone-800">

@@ -93,7 +93,7 @@ export default function RCAPage() {
           <div className="text-center mb-16">
             <span className="text-amber-500 text-sm font-semibold uppercase tracking-widest mb-4 block">YOUR FREE DIAGNOSIS</span>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Calculate Your Store's <span className="text-amber-500 underline underline-offset-8 decoration-amber-500/30">Hidden Leakage</span>
+              Calculate Your Store&apos;s <span className="text-amber-500 underline underline-offset-8 decoration-amber-500/30">Hidden Leakage</span>
             </h2>
             <p className="text-stone-400 text-lg max-w-2xl mx-auto leading-relaxed">
               Answer 5 quick questions. Get your estimated annual loss in 60 seconds.
