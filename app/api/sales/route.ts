@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date')
     const customerId = searchParams.get('customer_id')
     const partyName = searchParams.get('partyName')
+    const paymentStatus = searchParams.get('paymentStatus')
 
     // Get tenant context
     const context = getTenantContext(request)
@@ -76,6 +77,12 @@ export async function GET(request: NextRequest) {
     if (date) {
       conditions.push(`s.date = $${paramCount}`)
       params.push(date)
+      paramCount++
+    }
+    
+    if (paymentStatus) {
+      conditions.push(`s.payment_status = $${paramCount}`)
+      params.push(paymentStatus)
       paramCount++
     }
 

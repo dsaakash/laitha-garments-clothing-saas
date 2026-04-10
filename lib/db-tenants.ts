@@ -210,6 +210,7 @@ export async function hardDeleteTenant(id: string): Promise<boolean> {
     // List of all tables that have a tenant_id column
     // Ordered to respect foreign key constraints where possible
     const tables = [
+        'tenant_activity_logs',
         'admins',
         'users',
         'roles',

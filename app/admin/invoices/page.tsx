@@ -7,6 +7,12 @@ import { format } from 'date-fns'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  Search, Calendar, ShoppingBag, Eye, Printer, Download, MessageCircle, Heart, FileText, XCircle, CreditCard
+} from 'lucide-react'
+import ActionButton from '@/components/ActionButton'
+
 // Extend jsPDF type to include autoTable
 declare module 'jspdf' {
   interface jsPDF {
@@ -845,215 +851,221 @@ export default function InvoicesPage() {
 
   return (
     <AdminLayout>
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Invoices</h1>
-
-        {!businessProfile && (
-          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
-            💡 <strong>Tip:</strong> Set up your business profile to customize invoice headers. <a href="/admin/business" className="underline font-semibold">Go to Business Setup</a> (The system will use the latest profile from database)
+      <div className="min-h-screen bg-slate-900 p-4 sm:p-6 lg:p-8 font-sans selection:bg-purple-500/30">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-800/50 p-6 rounded-[2.5rem] border border-slate-700/50 backdrop-blur-xl">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center border border-purple-500/30">
+                <FileText className="w-6 h-6 text-purple-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+                  Invoices Hub
+                </h1>
+                <p className="text-slate-400 mt-1">Manage, generate, and share invoices</p>
+              </div>
+            </div>
           </div>
-        )}
+          
+          {/* Info messages */}
+          {!businessProfile && (
+            <div className="bg-blue-500/10 border border-blue-500/20 text-blue-400 px-6 py-4 rounded-3xl mb-6 backdrop-blur-xl flex items-start gap-4">
+              <span className="text-2xl">💡</span>
+              <div>
+                <strong className="block mb-1">Tip:</strong> 
+                <p>Set up your business profile to customize invoice headers. <a href="/admin/business" className="underline font-semibold hover:text-blue-300">Go to Business Setup</a> (The system will use the latest profile from database)</p>
+              </div>
+            </div>
+          )}
 
-        {businessProfile && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
-            ✅ <strong>Business Profile Active:</strong> All invoices will use the latest business profile from the database. Any updates made in <a href="/admin/business" className="underline font-semibold">Business Setup</a> will be automatically reflected in all future invoices.
-          </div>
-        )}
+          {businessProfile && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-6 py-4 rounded-3xl mb-6 backdrop-blur-xl flex items-start gap-4">
+              <span className="text-2xl">✅</span>
+              <div>
+                <strong className="block mb-1">Business Profile Active:</strong> 
+                <p>All invoices will use the latest business profile from the database. Any updates made in <a href="/admin/business" className="underline font-semibold hover:text-emerald-300">Business Setup</a> will be automatically reflected in all future invoices.</p>
+              </div>
+            </div>
+          )}
 
-        {/* Search Bar */}
-        {sales.length > 0 && (
-          <div className="mb-6">
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <label htmlFor="search-party" className="block text-sm font-medium text-gray-700 mb-2">
-                    Search by Party Name
-                  </label>
+          {/* Search Bar */}
+          {sales.length > 0 && (
+            <div className="bg-slate-800/50 rounded-[2.5rem] border border-slate-700/50 p-4 sm:p-6 backdrop-blur-xl">
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
                     id="search-party"
                     type="text"
                     value={searchPartyName}
                     onChange={(e) => setSearchPartyName(e.target.value)}
-                    placeholder="Enter party name to search..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Search by party name..."
+                    className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-2xl pl-14 pr-4 py-4 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-medium placeholder:text-slate-500"
                   />
                 </div>
                 {searchPartyName && (
                   <button
                     onClick={() => setSearchPartyName('')}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors mt-6"
+                    className="px-6 py-4 bg-slate-700/50 text-slate-300 rounded-2xl hover:bg-slate-700 hover:text-white transition-all font-medium flex items-center gap-2"
                   >
+                    <XCircle className="w-5 h-5" />
                     Clear
                   </button>
                 )}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {(() => {
-          // Filter sales based on search
-          const filteredSales = searchPartyName
-            ? sales.filter(sale => 
-                sale.partyName.toLowerCase().includes(searchPartyName.toLowerCase())
+          {(() => {
+            // Filter sales based on search
+            const filteredSales = searchPartyName
+              ? sales.filter(sale => 
+                  sale.partyName.toLowerCase().includes(searchPartyName.toLowerCase())
+                )
+              : sales
+
+            if (filteredSales.length === 0) {
+              return (
+                <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  className="bg-slate-800/50 rounded-[2rem] border border-slate-700/50 p-12 text-center backdrop-blur-xl"
+                >
+                  <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 border border-slate-700">
+                    <FileText className="w-10 h-10 text-slate-500" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">No Invoices Found</h3>
+                  <p className="text-slate-400">
+                    {searchPartyName 
+                      ? `No invoices found for "${searchPartyName}"` 
+                      : 'No sales recorded yet. Record a sale to generate invoices!'}
+                  </p>
+                </motion.div>
               )
-            : sales
+            }
 
-          if (filteredSales.length === 0) {
             return (
-              <div className="bg-white rounded-lg shadow-md p-12 text-center">
-                <p className="text-gray-500 text-lg">
-                  {searchPartyName 
-                    ? `No invoices found for "${searchPartyName}"` 
-                    : 'No sales recorded yet. Record a sale to generate invoices!'}
-                </p>
+              <div className="bg-slate-800/50 rounded-[2.5rem] border border-slate-700/50 shadow-2xl overflow-hidden backdrop-blur-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-700/50">
+                        <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Date & Bill #</th>
+                        <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Party / Contact</th>
+                        <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Amount</th>
+                        <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Payment Info</th>
+                        <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/50">
+                      <AnimatePresence>
+                        {filteredSales.map((sale) => (
+                          <motion.tr
+                            key={sale.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="group hover:bg-slate-800/50 transition-colors"
+                          >
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center gap-2 text-slate-300 font-medium whitespace-nowrap">
+                                  <Calendar className="w-4 h-4 text-slate-500" />
+                                  <span>{format(new Date(sale.date), 'dd MMM yyyy')}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-slate-400 text-sm">
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-xs font-mono">
+                                    {sale.billNumber}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex flex-col gap-1.5">
+                                <span className="font-bold text-white text-lg max-w-[200px] truncate" title={sale.partyName}>
+                                  {sale.partyName}
+                                </span>
+                                {getCustomer(sale) && (
+                                  <span className="text-sm text-slate-400">
+                                    {getCustomer(sale)?.phone}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="p-4 sm:p-6 align-top">
+                              <span className="text-lg font-bold text-emerald-400">
+                                ₹{sale.totalAmount.toLocaleString()}
+                              </span>
+                            </td>
+
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 rounded-lg border border-indigo-500/20 w-max">
+                                  <CreditCard className="w-4 h-4 text-indigo-400" />
+                                  <span className="text-sm font-medium text-indigo-300">{sale.paymentMode}</span>
+                                </div>
+                                {sale.upiTransactionId && (
+                                  <span className="text-xs text-slate-400 font-mono truncate max-w-[150px]" title={sale.upiTransactionId}>
+                                    TXN: {sale.upiTransactionId}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex flex-wrap gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+                                <ActionButton 
+                                  icon={Eye} 
+                                  onClick={async (e) => { e?.stopPropagation(); await viewPDF(sale); }}
+                                  variant="primary" 
+                                >
+                                  View
+                                </ActionButton>
+                                <ActionButton 
+                                  icon={Printer} 
+                                  onClick={async (e) => { e?.stopPropagation(); await printPDF(sale); }}
+                                  variant="secondary" 
+                                >
+                                  Print
+                                </ActionButton>
+                                <ActionButton 
+                                  icon={Download} 
+                                  onClick={async (e) => { e?.stopPropagation(); await downloadPDF(sale); }}
+                                  variant="secondary" 
+                                >
+                                  Save
+                                </ActionButton>
+                                <ActionButton 
+                                  icon={MessageCircle} 
+                                  onClick={(e) => { e?.stopPropagation(); sendViaWhatsApp(sale); }}
+                                  variant="primary" 
+                                  className="!bg-emerald-600 hover:!bg-emerald-500 !text-white !border-emerald-500"
+                                >
+                                  WhatsApp
+                                </ActionButton>
+                                <ActionButton 
+                                  icon={Heart} 
+                                  onClick={(e) => { e?.stopPropagation(); sendCommunityLink(sale); }}
+                                  variant="secondary" 
+                                  className="!text-pink-400 hover:!text-pink-300 !border-pink-500/30 !bg-pink-500/10 hover:!bg-pink-500/20"
+                                >
+                                  Community
+                                </ActionButton>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )
-          }
-
-          return (
-          <div className="bg-white rounded-lg shadow-md overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Date</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Bill #</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Party Name</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Amount</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Payment</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredSales.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-gray-50">
-                    <td className="px-2 py-3 text-sm text-gray-900">
-                      {format(new Date(sale.date), 'dd MMM yyyy')}
-                    </td>
-                    <td className="px-2 py-3 text-sm text-gray-900 font-medium">
-                      {sale.billNumber}
-                    </td>
-                    <td className="px-2 py-3 text-sm text-gray-900">
-                      <div>
-                        <p className="font-medium truncate max-w-[150px]" title={sale.partyName}>{sale.partyName}</p>
-                        {getCustomer(sale) && (
-                          <p className="text-xs text-gray-500">{getCustomer(sale)?.phone}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 text-sm font-medium text-green-600">
-                      ₹{sale.totalAmount.toLocaleString()}
-                    </td>
-                    <td className="px-2 py-3 text-sm text-gray-500">
-                      <div className="flex flex-col">
-                        <span>{sale.paymentMode}</span>
-                        {sale.upiTransactionId && (
-                          <span className="text-xs text-gray-400 truncate max-w-[100px]" title={sale.upiTransactionId}>{sale.upiTransactionId}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 text-xs">
-                      <div className="flex flex-wrap gap-1">
-                        <button
-                          onClick={async () => {
-                            try {
-                              await viewPDF(sale)
-                            } catch (err) {
-                              console.error('PDF viewing failed:', err)
-                              alert('Failed to view PDF. Please try again.')
-                            }
-                          }}
-                          className="text-blue-600 hover:text-blue-900 px-1 py-0.5 rounded hover:bg-blue-50"
-                          title="View"
-                        >
-                          👁️
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await printPDF(sale)
-                            } catch (err) {
-                              console.error('PDF printing failed:', err)
-                              alert('Failed to print PDF. Please try again.')
-                            }
-                          }}
-                          className="text-purple-600 hover:text-purple-900 px-1 py-0.5 rounded hover:bg-purple-50"
-                          title="Print"
-                        >
-                          🖨️
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await downloadPDF(sale)
-                            } catch (err) {
-                              console.error('PDF download failed:', err)
-                              alert('Failed to download PDF. Please try again.')
-                            }
-                          }}
-                          className="text-green-600 hover:text-green-900 px-1 py-0.5 rounded hover:bg-green-50"
-                          title="Download"
-                        >
-                          📥
-                        </button>
-                        <button
-                          onClick={() => sendViaWhatsApp(sale)}
-                          className="text-green-600 hover:text-green-900 px-1 py-0.5 rounded hover:bg-green-50"
-                          title="WhatsApp"
-                        >
-                          💬
-                        </button>
-                        <button
-                          onClick={() => sendCommunityLink(sale)}
-                          className="text-pink-600 hover:text-pink-900 px-1 py-0.5 rounded hover:bg-pink-50"
-                          title="Community"
-                        >
-                          🌸
-                        </button>
-                        <button
-                          onClick={() => {
-                            window.location.href = `/admin/sales`
-                          }}
-                          className="text-purple-600 hover:text-purple-900 px-1 py-0.5 rounded hover:bg-purple-50"
-                          title="Edit"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (!confirm('Are you sure you want to delete this sale? This will restore inventory stock.')) {
-                              return
-                            }
-                            try {
-                              const response = await fetch(`/api/sales/${sale.id}`, {
-                                method: 'DELETE',
-                              })
-                              const result = await response.json()
-                              if (!result.success) {
-                                alert('Failed to delete sale')
-                                return
-                              }
-                              // Reload the page to refresh the list
-                              window.location.reload()
-                            } catch (error) {
-                              console.error('Failed to delete sale:', error)
-                              alert('Failed to delete sale')
-                            }
-                          }}
-                          className="text-red-600 hover:text-red-900 px-1 py-0.5 rounded hover:bg-red-50"
-                          title="Delete"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          )
-        })()}
+          })()}
+        </div>
       </div>
     </AdminLayout>
   )

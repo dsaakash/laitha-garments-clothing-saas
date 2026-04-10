@@ -1,0 +1,157 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Lalitha Garments Internal Tool API",
+    "description": "API documentation for Lalitha Garments Internal Tool focusing on inventory, sales, and management modules.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "User Login",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/inventory": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "List Inventory Items",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Create Inventory Item",
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    },
+    "/api/inventory/{id}": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Get Inventory Item Details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/sales": {
+      "get": {
+        "tags": ["Sales"],
+        "summary": "List Sales Records",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      },
+      "post": {
+        "tags": ["Sales"],
+        "summary": "Create Sale Record",
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    },
+    "/api/purchase-order": {
+      "get": {
+        "tags": ["Purchase Order"],
+        "summary": "List Purchase Orders",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      },
+      "post": {
+        "tags": ["Purchase Order"],
+        "summary": "Create Purchase Order",
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    },
+    "/api/tenants": {
+      "get": {
+        "tags": ["Tenants"],
+        "summary": "List Tenants (Admin only)",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/customers": {
+       "get": {
+        "tags": ["Customers"],
+        "summary": "List Customers",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/suppliers": {
+       "get": {
+        "tags": ["Suppliers"],
+        "summary": "List Suppliers",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/categories": {
+       "get": {
+        "tags": ["Categories"],
+        "summary": "List Categories",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/catalogues": {
+       "get": {
+        "tags": ["Catalogues"],
+        "summary": "List Catalogues",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/enquiries": {
+       "get": {
+        "tags": ["Enquiries"],
+        "summary": "List Enquiries",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/workflow-config": {
+       "get": {
+        "tags": ["Workflow"],
+        "summary": "Get Workflow Configurations",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/ai/chat": {
+       "post": {
+        "tags": ["AI"],
+        "summary": "AI Chat Interface",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    }
+  }
+}

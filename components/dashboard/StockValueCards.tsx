@@ -37,7 +37,12 @@ export default function StockValueCards({ data, loading }: StockValueCardsProps)
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {/* Retail Value Card */}
-            <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white relative overflow-hidden group">
+            <div 
+                className="rounded-xl shadow-lg p-6 text-white relative overflow-hidden group"
+                style={{ 
+                    background: `linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)`
+                }}
+            >
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                     <TrendingUp className="w-24 h-24" />
                 </div>
@@ -46,13 +51,13 @@ export default function StockValueCards({ data, loading }: StockValueCardsProps)
                         <div className="p-2 bg-white/20 rounded-lg">
                             <Banknote className="w-5 h-5 text-white" />
                         </div>
-                        <h3 className="text-purple-100 font-medium text-sm">Total Retail Value</h3>
+                        <h3 className="text-white/80 font-medium text-sm">Total Retail Value</h3>
                     </div>
                     <div className="mt-2">
                         <h2 className="text-3xl font-bold tracking-tight">
                             {data ? formatCurrency(data.totalRetailValue) : '₹0'}
                         </h2>
-                        <p className="text-purple-200 text-xs mt-1">
+                        <p className="text-white/70 text-xs mt-1">
                             Potential revenue from current stock (Selling Price)
                         </p>
                     </div>
@@ -60,14 +65,16 @@ export default function StockValueCards({ data, loading }: StockValueCardsProps)
             </div>
 
             {/* Wholesale Value Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group hover:border-blue-200 transition-colors">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative overflow-hidden group transition-all"
+                 style={{ borderColor: 'var(--border-color)' } as any}
+            >
                 <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <Package className="w-24 h-24 text-blue-500" />
+                    <Package className="w-24 h-24" style={{ color: 'var(--accent)' }} />
                 </div>
                 <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-2">
-                        <div className="p-2 bg-blue-50 rounded-lg">
-                            <Package className="w-5 h-5 text-blue-600" />
+                        <div className="p-2 rounded-lg" style={{ backgroundColor: `rgba(var(--accent-rgb), 0.1)` }}>
+                            <Package className="w-5 h-5" style={{ color: 'var(--accent)' }} />
                         </div>
                         <h3 className="text-gray-500 font-medium text-sm">Total Stock Value</h3>
                     </div>

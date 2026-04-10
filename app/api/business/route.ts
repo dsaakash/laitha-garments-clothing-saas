@@ -36,6 +36,18 @@ export async function GET(request: NextRequest) {
 
     if (result.rows.length > 0) {
       const profile = result.rows[0]
+      
+      // Also fetch slug and website_builder_enabled from tenants table
+      let slug = ''
+      let websiteBuilderEnabled = false
+      if (context.tenantId) {
+        const tenantResult = await query('SELECT slug, website_builder_enabled FROM tenants WHERE id = $1', [context.tenantId])
+        if (tenantResult.rows.length > 0) {
+          slug = tenantResult.rows[0].slug
+          websiteBuilderEnabled = tenantResult.rows[0].website_builder_enabled
+        }
+      }
+
       return NextResponse.json({
         success: true,
         data: {
@@ -46,6 +58,8 @@ export async function GET(request: NextRequest) {
           address: profile.address,
           gstNumber: profile.gst_number || '',
           whatsappNumber: profile.whatsapp_number,
+          slug: slug,
+          websiteBuilderEnabled: websiteBuilderEnabled
         }
       })
     }
@@ -123,7 +137,40 @@ export async function PUT(request: NextRequest) {
         ]
       )
 
+      // Update tenant-level settings if provided
+      if (context.tenantId && (body.slug !== undefined || body.websiteBuilderEnabled !== undefined)) {
+        let updateTenantText = 'UPDATE tenants SET '
+        const updateParams = []
+        let paramIdx = 1
+        
+        if (body.slug !== undefined) {
+          updateTenantText += `slug = $${paramIdx++}, `
+          updateParams.push(body.slug)
+        }
+        if (body.websiteBuilderEnabled !== undefined) {
+          updateTenantText += `website_builder_enabled = $${paramIdx++}, `
+          updateParams.push(body.websiteBuilderEnabled)
+        }
+        
+        updateTenantText = updateTenantText.slice(0, -2) + ` WHERE id = $${paramIdx}`
+        updateParams.push(context.tenantId)
+        
+        await query(updateTenantText, updateParams)
+      }
+
       const profile = result.rows[0]
+      // Fetch latest tenant info to return complete data
+      let latestSlug = body.slug || ''
+      let latestWebsiteEnabled = body.websiteBuilderEnabled || false
+      
+      if (context.tenantId) {
+        const t = await query('SELECT slug, website_builder_enabled FROM tenants WHERE id = $1', [context.tenantId])
+        if (t.rows.length > 0) {
+          latestSlug = t.rows[0].slug
+          latestWebsiteEnabled = t.rows[0].website_builder_enabled
+        }
+      }
+
       return NextResponse.json({
         success: true,
         data: {
@@ -134,6 +181,8 @@ export async function PUT(request: NextRequest) {
           address: profile.address,
           gstNumber: profile.gst_number || '',
           whatsappNumber: profile.whatsapp_number,
+          slug: latestSlug,
+          websiteBuilderEnabled: latestWebsiteEnabled
         }
       })
     } else {
@@ -175,6 +224,27 @@ export async function PUT(request: NextRequest) {
 
       const result = await query(insertQuery, insertParams)
 
+      // Also handle tenant settings on insert
+      if (context.tenantId && (body.slug !== undefined || body.websiteBuilderEnabled !== undefined)) {
+        let updateTenantText = 'UPDATE tenants SET '
+        const updateParams = []
+        let paramIdx = 1
+        
+        if (body.slug !== undefined) {
+          updateTenantText += `slug = $${paramIdx++}, `
+          updateParams.push(body.slug)
+        }
+        if (body.websiteBuilderEnabled !== undefined) {
+          updateTenantText += `website_builder_enabled = $${paramIdx++}, `
+          updateParams.push(body.websiteBuilderEnabled)
+        }
+        
+        updateTenantText = updateTenantText.slice(0, -2) + ` WHERE id = $${paramIdx}`
+        updateParams.push(context.tenantId)
+        
+        await query(updateTenantText, updateParams)
+      }
+
       const profile = result.rows[0]
       return NextResponse.json({
         success: true,
@@ -186,6 +256,8 @@ export async function PUT(request: NextRequest) {
           address: profile.address,
           gstNumber: profile.gst_number || '',
           whatsappNumber: profile.whatsapp_number,
+          slug: body.slug || '',
+          websiteBuilderEnabled: body.websiteBuilderEnabled || false
         }
       })
     }

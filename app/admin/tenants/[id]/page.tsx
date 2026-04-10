@@ -6,7 +6,7 @@ import AdminLayout from '@/components/AdminLayout'
 import PageHeader from '@/components/PageHeader'
 import ActionButton from '@/components/ActionButton'
 import StatusBadge from '@/components/StatusBadge'
-import { ArrowLeft, Copy, RefreshCw, Key, Mail, Phone, MapPin, Building2, Calendar, TrendingUp, Settings, Check, LayoutGrid, CreditCard, ShoppingBag, ShoppingCart, Users, Truck, Package } from 'lucide-react'
+import { ArrowLeft, Copy, RefreshCw, Key, Mail, Phone, MapPin, Building2, Calendar, TrendingUp, Settings, Check, LayoutGrid, CreditCard, ShoppingBag, ShoppingCart, Users, Truck, Package, BarChart3, Activity, Clock, Flame, AlertTriangle, Eye, LogIn, Unlock } from 'lucide-react'
 import { getPlanPricing } from '@/lib/tenantStorage'
 
 interface Tenant {
@@ -70,6 +70,7 @@ export default function TenantDetailsPage() {
     const [credentials, setCredentials] = useState<Credentials | null>(null)
     const [loading, setLoading] = useState(true)
     const [resetting, setResetting] = useState(false)
+    const [unlocking, setUnlocking] = useState(false)
     const [upgrading, setUpgrading] = useState(false)
     const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
@@ -79,6 +80,9 @@ export default function TenantDetailsPage() {
     const [renewMode, setRenewMode] = useState<'monthly' | 'yearly' | 'custom'>('monthly')
     const [renewCustomDate, setRenewCustomDate] = useState<string>('')
     const [renewPrice, setRenewPrice] = useState<number>(0)
+    const [analytics, setAnalytics] = useState<any>(null)
+    const [analyticsLoading, setAnalyticsLoading] = useState(true)
+    const [analyticsDays, setAnalyticsDays] = useState<number>(30)
 
     // Subscription Form State
     const [selectedPlan, setSelectedPlan] = useState<string>('free')
@@ -143,9 +147,29 @@ export default function TenantDetailsPage() {
         }
     }, [params.id])
 
+    // Fetch analytics data
+    const loadAnalytics = useCallback(async () => {
+        setAnalyticsLoading(true)
+        try {
+            const res = await fetch(`/api/tenants/${params.id}/analytics?days=${analyticsDays}`)
+            const data = await res.json()
+            if (data.success) {
+                setAnalytics(data.analytics)
+            }
+        } catch (e) {
+            console.error('Failed to load analytics:', e)
+        } finally {
+            setAnalyticsLoading(false)
+        }
+    }, [params.id, analyticsDays])
+
     useEffect(() => {
         loadTenantDetails()
     }, [loadTenantDetails])
+
+    useEffect(() => {
+        if (params.id) loadAnalytics()
+    }, [loadAnalytics, params.id])
 
     const handleUpdateProfile = async () => {
         setUpgrading(true)
@@ -714,6 +738,330 @@ export default function TenantDetailsPage() {
                                     <span className="text-gray-400 italic text-sm">No modules enabled</span>
                                 )}
                             </div>
+                        </div>
+
+                        {/* ═══════════════════ TENANT ANALYTICS DASHBOARD ═══════════════════ */}
+                        <div className="bg-white rounded-xl shadow-sm p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl">
+                                        <BarChart3 className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-900">Tenant Analytics</h3>
+                                        <p className="text-xs text-gray-500">Instagram-style activity insights</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {[7, 30, 60, 90].map(d => (
+                                        <button
+                                            key={d}
+                                            onClick={() => setAnalyticsDays(d)}
+                                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                analyticsDays === d
+                                                    ? 'bg-violet-600 text-white shadow-lg shadow-violet-200'
+                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            {d}D
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Inactivity Warning Banner */}
+                            {analytics && analytics.daysSinceActive !== null && analytics.daysSinceActive >= 5 && (
+                                <div className={`mb-6 p-4 rounded-xl border-2 flex items-center gap-3 ${
+                                    analytics.daysSinceActive >= 7
+                                        ? 'bg-red-50 border-red-300 text-red-800'
+                                        : 'bg-amber-50 border-amber-300 text-amber-800'
+                                }`}>
+                                    <AlertTriangle className={`w-5 h-5 flex-shrink-0 ${
+                                        analytics.daysSinceActive >= 7 ? 'text-red-500' : 'text-amber-500'
+                                    }`} />
+                                    <div>
+                                        <p className="font-bold text-sm">
+                                            {analytics.daysSinceActive >= 7
+                                                ? '🔒 ACCOUNT LOCKED — Inactive for ' + analytics.daysSinceActive + ' days'
+                                                : '⚠️ Warning — Inactive for ' + analytics.daysSinceActive + ' days'}
+                                        </p>
+                                        <p className="text-xs mt-0.5 opacity-80">
+                                            {analytics.daysSinceActive >= 7
+                                                ? 'This tenant cannot login. They need to contact support to reactivate.'
+                                                : 'This tenant will be auto-locked in ' + (7 - analytics.daysSinceActive) + ' days if no activity.'}
+                                        </p>
+                                    </div>
+                                    {analytics.daysSinceActive >= 7 && (
+                                        <button
+                                            onClick={async () => {
+                                                if (!confirm('Unlock this tenant account? They will be able to login again.')) return
+                                                setUnlocking(true)
+                                                try {
+                                                    const res = await fetch(`/api/tenants/${params.id}/unlock`, { method: 'POST' })
+                                                    const data = await res.json()
+                                                    if (data.success) {
+                                                        alert('✅ Account unlocked successfully!')
+                                                        loadAnalytics()
+                                                    } else {
+                                                        alert(data.message || 'Failed to unlock')
+                                                    }
+                                                } catch (e) {
+                                                    alert('Failed to unlock account')
+                                                } finally {
+                                                    setUnlocking(false)
+                                                }
+                                            }}
+                                            disabled={unlocking}
+                                            className="ml-auto flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-lg uppercase tracking-wider transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            {unlocking ? (
+                                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                            ) : (
+                                                <Unlock className="w-3 h-3" />
+                                            )}
+                                            {unlocking ? 'Unlocking...' : 'Unlock Account'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {analyticsLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" />
+                                </div>
+                            ) : analytics ? (
+                                <>
+                                    {/* Activity Overview Cards */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <LogIn className="w-4 h-4 text-blue-600" />
+                                                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Total Logins</span>
+                                            </div>
+                                            <p className="text-2xl font-black text-blue-900">{analytics.summary.totalLogins}</p>
+                                            <p className="text-[10px] text-blue-500 mt-1">Last {analyticsDays} days</p>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-4 border border-emerald-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Activity className="w-4 h-4 text-emerald-600" />
+                                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active Days</span>
+                                            </div>
+                                            <p className="text-2xl font-black text-emerald-900">{analytics.summary.uniqueActiveDays}</p>
+                                            <p className="text-[10px] text-emerald-500 mt-1">Out of {analyticsDays} days</p>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-xl p-4 border border-violet-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Flame className="w-4 h-4 text-violet-600" />
+                                                <span className="text-[10px] font-bold text-violet-600 uppercase tracking-wider">Top Module</span>
+                                            </div>
+                                            <p className="text-lg font-black text-violet-900 capitalize truncate">
+                                                {analytics.topModule ? analytics.topModule.name : '—'}
+                                            </p>
+                                            <p className="text-[10px] text-violet-500 mt-1">
+                                                {analytics.topModule ? analytics.topModule.visits + ' visits' : 'No data'}
+                                            </p>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 border border-amber-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Clock className="w-4 h-4 text-amber-600" />
+                                                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Last Active</span>
+                                            </div>
+                                            <p className="text-lg font-black text-amber-900">
+                                                {analytics.lastActive
+                                                    ? (() => {
+                                                        const diff = Date.now() - new Date(analytics.lastActive).getTime()
+                                                        const mins = Math.floor(diff / 60000)
+                                                        const hours = Math.floor(diff / 3600000)
+                                                        const days = Math.floor(diff / 86400000)
+                                                        if (mins < 60) return mins + 'm ago'
+                                                        if (hours < 24) return hours + 'h ago'
+                                                        return days + 'd ago'
+                                                    })()
+                                                    : 'Never'}
+                                            </p>
+                                            <p className="text-[10px] text-amber-500 mt-1">
+                                                {analytics.daysSinceActive !== null ? analytics.daysSinceActive + ' days ago' : 'No activity'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* 30-Day Activity Heatmap */}
+                                    <div className="mb-6">
+                                        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <Activity className="w-4 h-4 text-gray-400" />
+                                            Activity Heatmap
+                                        </h4>
+                                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {(() => {
+                                                    const cells = []
+                                                    const today = new Date()
+                                                    const timelineMap: Record<string, number> = {}
+                                                    if (analytics.timeline) {
+                                                        analytics.timeline.forEach((t: any) => {
+                                                            const dateKey = new Date(t.date).toISOString().split('T')[0]
+                                                            timelineMap[dateKey] = t.count
+                                                        })
+                                                    }
+                                                    for (let i = analyticsDays - 1; i >= 0; i--) {
+                                                        const d = new Date(today)
+                                                        d.setDate(d.getDate() - i)
+                                                        const key = d.toISOString().split('T')[0]
+                                                        const count = timelineMap[key] || 0
+                                                        const maxCount = Math.max(...Object.values(timelineMap), 1)
+                                                        const intensity = count > 0 ? Math.min(count / maxCount, 1) : 0
+
+                                                        let bgColor = 'bg-gray-200'
+                                                        if (intensity > 0) {
+                                                            if (intensity < 0.25) bgColor = 'bg-emerald-200'
+                                                            else if (intensity < 0.5) bgColor = 'bg-emerald-300'
+                                                            else if (intensity < 0.75) bgColor = 'bg-emerald-400'
+                                                            else bgColor = 'bg-emerald-600'
+                                                        }
+
+                                                        cells.push(
+                                                            <div
+                                                                key={key}
+                                                                className={`w-4 h-4 md:w-5 md:h-5 rounded-sm ${bgColor} cursor-pointer transition-transform hover:scale-150 relative group`}
+                                                                title={`${key}: ${count} events`}
+                                                            >
+                                                                <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-md whitespace-nowrap z-50">
+                                                                    {d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}: {count} events
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    }
+                                                    return cells
+                                                })()}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-3 text-[10px] text-gray-500">
+                                                <span>Less</span>
+                                                <div className="w-3 h-3 rounded-sm bg-gray-200" />
+                                                <div className="w-3 h-3 rounded-sm bg-emerald-200" />
+                                                <div className="w-3 h-3 rounded-sm bg-emerald-300" />
+                                                <div className="w-3 h-3 rounded-sm bg-emerald-400" />
+                                                <div className="w-3 h-3 rounded-sm bg-emerald-600" />
+                                                <span>More</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Module Usage Breakdown */}
+                                    <div className="mb-6">
+                                        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <Eye className="w-4 h-4 text-gray-400" />
+                                            Module Usage Breakdown
+                                        </h4>
+                                        {analytics.moduleUsage && analytics.moduleUsage.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {(() => {
+                                                    const totalVisits = analytics.moduleUsage.reduce((sum: number, m: any) => sum + m.visits, 0)
+                                                    const colors = [
+                                                        'from-blue-500 to-blue-600',
+                                                        'from-violet-500 to-violet-600',
+                                                        'from-emerald-500 to-emerald-600',
+                                                        'from-amber-500 to-amber-600',
+                                                        'from-rose-500 to-rose-600',
+                                                        'from-cyan-500 to-cyan-600',
+                                                        'from-pink-500 to-pink-600',
+                                                        'from-indigo-500 to-indigo-600',
+                                                    ]
+                                                    return analytics.moduleUsage.map((m: any, i: number) => {
+                                                        const pct = totalVisits > 0 ? Math.round((m.visits / totalVisits) * 100) : 0
+                                                        return (
+                                                            <div key={m.module} className="flex items-center gap-3">
+                                                                <span className="text-xs font-bold text-gray-700 w-24 truncate capitalize">{m.module}</span>
+                                                                <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full bg-gradient-to-r ${colors[i % colors.length]} rounded-full transition-all duration-500 flex items-center justify-end pr-2`}
+                                                                        style={{ width: `${Math.max(pct, 5)}%` }}
+                                                                    >
+                                                                        <span className="text-[9px] font-black text-white">{pct}%</span>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-xs font-bold text-gray-500 w-16 text-right">{m.visits} visits</span>
+                                                            </div>
+                                                        )
+                                                    })
+                                                })()}
+                                            </div>
+                                        ) : (
+                                            <div className="bg-gray-50 rounded-xl p-6 text-center border border-gray-100">
+                                                <Eye className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                                <p className="text-sm text-gray-400">No module usage data yet</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Login History Table */}
+                                    <div>
+                                        <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <LogIn className="w-4 h-4 text-gray-400" />
+                                            Recent Login History
+                                        </h4>
+                                        {analytics.loginHistory && analytics.loginHistory.length > 0 ? (
+                                            <div className="overflow-x-auto rounded-xl border border-gray-100">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="bg-gray-50 text-left">
+                                                            <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                                            <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                                            <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Method</th>
+                                                            <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Device</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-50">
+                                                        {analytics.loginHistory.slice(0, 20).map((login: any, idx: number) => (
+                                                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                                                <td className="px-4 py-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-2 h-2 bg-green-400 rounded-full" />
+                                                                        <span className="text-xs font-medium text-gray-700">
+                                                                            {new Date(login.timestamp).toLocaleDateString('en-IN', {
+                                                                                day: '2-digit', month: 'short', year: 'numeric'
+                                                                            })}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-gray-400">
+                                                                            {new Date(login.timestamp).toLocaleTimeString('en-IN', {
+                                                                                hour: '2-digit', minute: '2-digit'
+                                                                            })}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-xs text-gray-600 font-medium">{login.email}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md uppercase">
+                                                                        {login.metadata?.loginMethod || 'business'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-[10px] text-gray-400 max-w-[200px] truncate">
+                                                                    {login.metadata?.userAgent
+                                                                        ? (login.metadata.userAgent.includes('Mobile') ? '📱 Mobile' :
+                                                                           login.metadata.userAgent.includes('Mac') ? '💻 macOS' :
+                                                                           login.metadata.userAgent.includes('Windows') ? '🖥️ Windows' :
+                                                                           login.metadata.userAgent.includes('Linux') ? '🐧 Linux' : '🌐 Browser')
+                                                                        : '—'}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-gray-50 rounded-xl p-6 text-center border border-gray-100">
+                                                <LogIn className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                                <p className="text-sm text-gray-400">No login activity recorded yet</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-100">
+                                    <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-sm text-gray-500 font-medium">No analytics data available</p>
+                                    <p className="text-xs text-gray-400 mt-1">Activity tracking will begin when the tenant starts using the platform</p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Business Information */}

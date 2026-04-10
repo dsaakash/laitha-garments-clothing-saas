@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCA Script Builder — Retail Control Architect</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold:#b79141;--gold-l:#e8c96a;--gold-d:#7a6030;
+  --dark:#0d1117;--dark2:#141c26;--dark3:#1a2535;
+  --off-white:#f0e6cc;--text:#e8e0d0;--text-dim:#8a8070;
+  --green:#1a7a3a;--green-bg:#0f3020;--green-text:#6aee9a;
+  --red-bg:#2a1010;--red-text:#e07070;
+  --border:rgba(183,145,65,0.18);--border-dim:rgba(255,255,255,0.06);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a0e14;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px;min-height:100vh;}
+/* LAYOUT */
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100vh;}
+/* SIDEBAR */
+.sidebar{background:var(--dark);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.sb-header{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
+.brand{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--gold);font-weight:600;}
+.brand-sub{font-family:'Space Mono',monospace;font-size:8px;color:var(--gold-d);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.sb-nav{padding:10px 0;flex:1;}
+.nav-sec-label{font-family:'Space Mono',monospace;font-size:8px;color:var(--gold-d);letter-spacing:2px;text-transform:uppercase;padding:8px 14px 4px;}
+.nav-btn{width:100%;text-align:left;background:none;border:none;padding:9px 12px;border-radius:5px;color:var(--text-dim);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:8px;margin:1px 8px;width:calc(100% - 16px);}
+.nav-btn:hover{background:rgba(183,145,65,0.08);color:var(--text);}
+.nav-btn.active{background:rgba(183,145,65,0.14);color:var(--gold);border-left:2px solid var(--gold);border-radius:0 5px 5px 0;}
+.nav-step-btn{width:calc(100% - 16px);text-align:left;background:none;border:none;padding:8px 12px;border-radius:5px;color:var(--text-dim);font-family:'Rajdhani',sans-serif;font-size:12px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:8px;margin:1px 8px;}
+.nav-step-btn:hover{background:rgba(183,145,65,0.06);color:var(--text);}
+.nav-step-btn.active{color:var(--gold);background:rgba(183,145,65,0.1);}
+.nav-step-btn.done{color:var(--green-text);opacity:0.7;}
+.step-num-badge{width:22px;height:22px;border-radius:50%;background:var(--dark3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:9px;color:var(--gold-d);flex-shrink:0;}
+.nav-step-btn.active .step-num-badge{background:var(--gold);color:var(--dark);border-color:var(--gold);}
+.nav-step-btn.done .step-num-badge{background:var(--green);color:white;border-color:var(--green);}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border);}
+/* MAIN */
+.main{overflow-y:auto;}
+.topbar{background:var(--dark);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--off-white);font-weight:600;}
+.topbar-right{display:flex;gap:10px;align-items:center;}
+.btn{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.5px;padding:7px 16px;border-radius:4px;cursor:pointer;border:none;transition:all 0.15s;}
+.btn-gold{background:var(--gold);color:var(--dark);}
+.btn-gold:hover{background:var(--gold-l);}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-dim);}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold);}
+.btn-green{background:transparent;border:1px solid rgba(26,122,58,0.5);color:var(--green-text);}
+.btn-green:hover{background:var(--green-bg);}
+/* PAGES */
+.page{display:none;padding:28px;}
+.page.active{display:block;}
+/* CARDS */
+.card{background:var(--dark);border:1px solid var(--border);border-radius:8px;margin-bottom:18px;}
+.card-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.card-title{font-size:14px;font-weight:600;color:var(--off-white);}
+.card-badge{background:var(--gold);color:var(--dark);font-family:'Space Mono',monospace;font-size:9px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:1px;}
+.card-goal{font-size:11px;color:var(--gold-d);background:rgba(183,145,65,0.1);padding:3px 10px;border-radius:20px;margin-left:auto;}
+.card-body{padding:18px 20px;}
+/* FORM */
+.form-label{display:block;font-family:'Space Mono',monospace;font-size:9px;color:var(--gold-d);letter-spacing:2px;text-transform:uppercase;margin-bottom:7px;}
+.form-input{width:100%;background:var(--dark2);border:1px solid var(--border);border-radius:5px;padding:10px 14px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;transition:border-color 0.15s;}
+.form-input:focus{outline:none;border-color:var(--gold);background:var(--dark3);}
+.form-input::placeholder{color:var(--text-dim);}
+textarea.form-input{resize:vertical;min-height:80px;line-height:1.6;}
+select.form-input option{background:var(--dark2);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.form-full{grid-column:1/-1;}
+.form-group{margin-bottom:14px;}
+/* SCRIPT LINES */
+.script-block{margin-bottom:16px;}
+.script-block-label{font-family:'Space Mono',monospace;font-size:8px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.script-line-display{background:var(--green-bg);border-left:3px solid var(--green);border-radius:0 5px 5px 0;padding:10px 14px;font-size:13px;color:var(--green-text);line-height:1.6;margin-bottom:6px;cursor:pointer;transition:all 0.15s;}
+.script-line-display:hover{border-left-color:var(--gold-l);background:rgba(183,145,65,0.06);color:var(--off-white);}
+.action-line-display{background:var(--dark3);border-left:3px solid var(--gold);border-radius:0 5px 5px 0;padding:10px 14px;font-size:13px;color:var(--off-white);line-height:1.6;margin-bottom:6px;}
+.note-display{background:rgba(183,145,65,0.06);border:1px solid rgba(183,145,65,0.2);border-radius:5px;padding:8px 12px;font-size:11px;color:var(--gold-d);font-style:italic;margin-bottom:6px;}
+.note-display::before{content:'NOTE: ';font-weight:700;color:var(--gold);font-style:normal;}
+/* EDITABLE SCRIPT AREAS */
+.script-editor-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;}
+.script-type-tag{font-family:'Space Mono',monospace;font-size:9px;padding:4px 8px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:4px;}
+.tag-script{background:rgba(26,122,58,0.2);color:var(--green-text);}
+.tag-action{background:rgba(183,145,65,0.2);color:var(--gold);}
+.tag-note{background:rgba(160,140,80,0.2);color:#b0a060;}
+.script-textarea{flex:1;background:var(--dark2);border:1px solid var(--border);border-radius:5px;padding:8px 12px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:vertical;min-height:50px;line-height:1.5;}
+.script-textarea:focus{outline:none;border-color:var(--gold);}
+.del-btn{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0;margin-top:2px;}
+.del-btn:hover{color:var(--red-text);}
+.add-line-row{display:flex;gap:8px;margin-top:8px;}
+.add-type-select{background:var(--dark2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text-dim);font-family:'Rajdhani',sans-serif;font-size:12px;}
+.add-type-select:focus{outline:none;border-color:var(--gold);}
+/* PROGRESS */
+.progress-wrap{background:var(--dark3);border-radius:10px;height:5px;}
+.progress-fill{height:5px;border-radius:10px;background:var(--gold);transition:width 0.3s;}
+/* Q ITEMS */
+.q-item{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border-dim);font-size:13px;color:var(--text);}
+.q-item:last-child{border-bottom:none;}
+.q-num{font-weight:700;color:var(--gold);flex-shrink:0;width:26px;}
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.stat-card{background:var(--dark);border:1px solid var(--border);border-radius:8px;padding:16px 18px;}
+.stat-num{font-family:'Cormorant Garamond',serif;font-size:32px;color:var(--gold);font-weight:600;line-height:1;}
+.stat-label{font-family:'Space Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
+/* PHASE NAV */
+.phase-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.phase-tab{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:7px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-dim);transition:all 0.15s;}
+.phase-tab:hover{border-color:var(--gold);color:var(--text);}
+.phase-tab.active{background:var(--gold);color:var(--dark);border-color:var(--gold);}
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--dark);border:1px solid var(--border);border-radius:10px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-header{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--dark);z-index:1;}
+.modal-title{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--off-white);font-weight:600;}
+.modal-close{background:none;border:none;color:var(--text-dim);font-size:22px;cursor:pointer;}
+.modal-close:hover{color:var(--text);}
+.modal-body{padding:22px;}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;}
+/* TOAST */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--dark3);border:1px solid var(--gold);border-radius:5px;padding:10px 16px;font-size:13px;color:var(--gold);z-index:200;opacity:0;transform:translateY(8px);transition:all 0.2s;}
+.toast.show{opacity:1;transform:translateY(0);}
+/* CALL MODE */
+.call-mode-overlay{display:none;position:fixed;inset:0;background:#060a0e;z-index:50;flex-direction:column;}
+.call-mode-overlay.open{display:flex;}
+.call-top{background:var(--dark);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;}
+.call-timer{font-family:'Space Mono',monospace;font-size:22px;color:var(--gold);min-width:80px;}
+.call-client{font-size:16px;font-weight:600;color:var(--off-white);}
+.call-main{display:grid;grid-template-columns:200px 1fr;flex:1;overflow:hidden;}
+.call-steps-nav{background:var(--dark);border-right:1px solid var(--border);overflow-y:auto;padding:12px 0;}
+.call-step-btn{width:100%;text-align:left;background:none;border:none;padding:10px 14px;cursor:pointer;font-family:'Rajdhani',sans-serif;display:flex;align-items:center;gap:8px;transition:all 0.15s;border-bottom:1px solid var(--border-dim);}
+.call-step-btn:hover{background:rgba(183,145,65,0.06);}
+.call-step-btn.active{background:rgba(183,145,65,0.12);border-left:2px solid var(--gold);}
+.call-step-btn.done{opacity:0.5;}
+.call-circle{width:24px;height:24px;border-radius:50%;background:var(--dark3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:9px;color:var(--gold-d);flex-shrink:0;}
+.call-step-btn.active .call-circle{background:var(--gold);color:var(--dark);}
+.call-step-btn.done .call-circle{background:var(--green);color:white;}
+.call-content{overflow-y:auto;padding:24px;}
+.call-script-card{background:var(--dark2);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:14px;}
+.call-notes-area{background:var(--dark);border:1px solid var(--border);border-radius:8px;padding:16px 20px;}
+.call-notes-label{font-family:'Space Mono',monospace;font-size:9px;color:var(--gold-d);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.call-notes-input{width:100%;background:var(--dark2);border:1px solid var(--border);border-radius:5px;padding:10px 12px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:13px;resize:vertical;min-height:80px;}
+.call-notes-input:focus{outline:none;border-color:var(--gold);}
+.call-footer{background:var(--dark);border-top:1px solid var(--border);padding:12px 24px;display:flex;gap:10px;align-items:center;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+<div class="app">
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-header">
+    <div class="brand">Retail Control</div>
+    <div class="brand-sub">Script Builder CRM</div>
+  </div>
+  <div class="sb-nav">
+    <div class="nav-sec-label">Menu</div>
+    <button class="nav-btn active" onclick="showPage('dashboard')"><span>◈</span> Dashboard</button>
+    <button class="nav-btn" onclick="showPage('builder')"><span>✎</span> Script Builder</button>
+    <button class="nav-btn" onclick="showPage('clients')"><span>≡</span> Clients</button>
+    <button class="nav-btn" onclick="showPage('new-client')"><span>+</span> New Client</button>
+
+    <div class="nav-sec-label" style="margin-top:8px;">Script Steps</div>
+    <div id="stepNavList"></div>
+  </div>
+  <div class="sb-footer">
+    <div style="font-family:'Space Mono',monospace;font-size:8px;color:var(--gold-d);">Aakash Savant · RCA</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="page-title" id="pageTitle">Dashboard</div>
+    <div class="topbar-right">
+      <button class="btn btn-outline" onclick="exportAll()">Export</button>
+      <button class="btn btn-green" onclick="openCallMode()">▶ Start Call</button>
+      <button class="btn btn-gold" onclick="showPage('new-client')">+ New Client</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Recent Clients</div></div>
+      <div class="card-body" id="dashClients"></div>
+    </div>
+  </div>
+
+  <!-- SCRIPT BUILDER -->
+  <div class="page" id="page-builder">
+    <div class="phase-tabs" id="phaseTabs"></div>
+    <div id="builderContent"></div>
+  </div>
+
+  <!-- CLIENTS -->
+  <div class="page" id="page-clients">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">All Clients</div>
+        <select class="form-input" style="width:auto;padding:5px 10px;font-size:12px;margin-left:auto;" onchange="filterClients(this.value)">
+          <option value="all">All Status</option>
+          <option value="new">New</option>
+          <option value="called">Called</option>
+          <option value="closed">Closed</option>
+          <option value="lost">Lost</option>
+        </select>
+      </div>
+      <div class="card-body" id="clientsTableWrap"></div>
+    </div>
+  </div>
+
+  <!-- NEW CLIENT -->
+  <div class="page" id="page-new-client">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Add New Client</div></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Full Name *</label><input class="form-input" id="fn-name" placeholder="Ramesh Kumar"></div>
+          <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="fn-phone" placeholder="+91 98765 43210"></div>
+          <div class="form-group"><label class="form-label">City</label><input class="form-input" id="fn-city" placeholder="Mysore"></div>
+          <div class="form-group"><label class="form-label">Store Name</label><input class="form-input" id="fn-store" placeholder="Sharma Textiles"></div>
+          <div class="form-group"><label class="form-label">Store Type</label><select class="form-input" id="fn-type"><option value="">Select...</option><option>Mens Clothing</option><option>Womens Clothing</option><option>Ethnic Wear</option><option>Western Wear</option><option>Kids Clothing</option><option>Family Store</option><option>Footwear</option><option>Multi-category</option></select></div>
+          <div class="form-group"><label class="form-label">Years Running</label><input class="form-input" id="fn-years" type="number" placeholder="8"></div>
+          <div class="form-group"><label class="form-label">Call Date & Time</label><input class="form-input" id="fn-calldate" type="datetime-local"></div>
+          <div class="form-group"><label class="form-label">Lead Source</label><select class="form-input" id="fn-source"><option value="">Select...</option><option>Instagram Reel</option><option>YouTube</option><option>WhatsApp</option><option>Referral</option><option>Free Training</option><option>DM</option></select></div>
+          <div class="form-group form-full"><label class="form-label">Initial Notes</label><textarea class="form-input" id="fn-notes" placeholder="What problem did they mention when booking?"></textarea></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px;">
+          <button class="btn btn-gold" onclick="saveClient()">Save & Open Script</button>
+          <button class="btn btn-outline" onclick="clearNewClient()">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLIENT DETAIL -->
+  <div class="page" id="page-client-detail"><div id="clientDetailContent"></div></div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- CALL MODE OVERLAY -->
+<div class="call-mode-overlay" id="callMode">
+  <div class="call-top">
+    <div class="call-timer" id="callTimer">00:00</div>
+    <div>
+      <div class="call-client" id="callClientName">Client Name</div>
+      <div style="font-size:11px;color:var(--text-dim);" id="callClientMeta"></div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:10px;">
+      <button class="btn btn-outline" onclick="endCall()">End Call</button>
+    </div>
+  </div>
+  <div class="call-main">
+    <div class="call-steps-nav" id="callStepsNav"></div>
+    <div class="call-content" id="callContent"></div>
+  </div>
+  <div class="call-footer">
+    <button class="btn btn-outline" id="callPrevBtn" onclick="callPrev()">← Prev</button>
+    <div style="flex:1;padding:0 12px;">
+      <div class="progress-wrap"><div class="progress-fill" id="callProgress" style="width:0%"></div></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;" id="callProgressLabel"></div>
+    </div>
+    <button class="btn btn-green" onclick="markCallStepDone()">Mark Done ✓</button>
+    <button class="btn btn-gold" id="callNextBtn" onclick="callNext()">Next →</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Edit</div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────
+const DEFAULT_SCRIPT = [
+  {
+    id:'s1', num:1, name:'Opening + Compliment', goal:'Warm entry in 60 seconds',
+    lines:[
+      {type:'script',text:'Hello bhai — aa gaye! Main Aakash bol raha hoon, Retail Control Architect se.'},
+      {type:'script',text:'Bahut acha laga ki aap aaye. Sacchi bolunga — 100 log free training dekhte hain, 10 call book karte hain, 3 actually aate hain. Aap un 3 mein se ho.'},
+      {type:'script',text:'Kya abhi 35 minute clear hain? Dukaan pe counter pe toh nahi baithe?'},
+      {type:'action',text:'Camera on karwao — "Bhai camera on karo — face dekhke baat karna chahta hoon."'},
+      {type:'note',text:'Genuine compliment dena — unke experience, unki commitment. Fake mat karo.'},
+    ]
+  },
+  {
+    id:'s2', num:2, name:'Rapport + Set Agenda', goal:'They relax — you lead',
+    lines:[
+      {type:'script',text:'Kahan se ho bhai — wahan ka market kaisa chal raha hai aajkal?'},
+      {type:'script',text:'Family ka business hai ya khud shuru kiya?'},
+      {type:'script',text:'Kapde ka kaunsa segment — mens, womens, ethnic, western?'},
+      {type:'action',text:'AGENDA SET — Say this word for word:'},
+      {type:'script',text:'Bhai — is call mein hum ek simple structure follow karenge. Pehle main samjhunga aapki dukaan ki abhi ki situation. Phir samjhunga aap aage kya chahte ho. Phir honestly dekhenge main kaise madad kar sakta hoon. Koi presentation nahi. Seedhi baat. Theek hai?'},
+      {type:'note',text:'Agenda setting = prospect relax ho jaata hai. Trust badhta hai.'},
+    ]
+  },
+  {
+    id:'s3', num:3, name:'Probe — Current Situation (CS)', goal:'Listen 80% — pull exact pain',
+    lines:[
+      {type:'action',text:'STORE BASICS:'},
+      {type:'script',text:'Dukaan kitne saal se chal rahi hai?'},
+      {type:'script',text:'Kitne staff hain? Billing software kaunsa use karte ho?'},
+      {type:'action',text:'PAIN DISCOVERY:'},
+      {type:'script',text:'Stock aur computer ka hisaab milta hai — ya end of month surprise aata hai?'},
+      {type:'script',text:'Mahine ke end mein paise hone chahiye utne hote hain?'},
+      {type:'script',text:'Godown mein aisa maal hai jo kaafi time se nahi bika?'},
+      {type:'script',text:'Staff pe kitna trust hai — kabhi laga cheezein gayab ho rahi hain?'},
+      {type:'script',text:'Ye problem kitne time se chal rahi hai? Roughly har saal kitna loss?'},
+      {type:'script',text:'Matlab bhai — ye sirf stock ka issue nahi hai. Ye silently paisa jaana hai bina pata chale.'},
+      {type:'note',text:'CS ko WORSE dikhao. Confirm karo aur badha ke reflect karo. PAUSE 3 seconds.'},
+    ]
+  },
+  {
+    id:'s4', num:4, name:'Probe — Desired Situation (DS)', goal:'Paint their dream store',
+    lines:[
+      {type:'script',text:'Agar ye sab theek ho jaye — kaisi hogi dukaan 6 mahine mein?'},
+      {type:'script',text:'Monthly kitna profit chahiye agar sab system pe aa jaye?'},
+      {type:'script',text:'Second branch ka plan hai? Ya pehle ye branch strong karni hai?'},
+      {type:'script',text:'Agar roz pata ho exactly kitna paisa dukaan mein hai — kitna sukoon milega?'},
+      {type:'script',text:'Ye goal itna important kyun hai — personally?'},
+      {type:'script',text:'Matlab aap chahte ho — dukaan ek system pe chale. Staff accountable ho. Mahine ka mahina seedha kamai dikhe.'},
+      {type:'note',text:'DS ko PUSH karo. "What else?" 3-4 baar poochho. More they talk = more they sell themselves.'},
+    ]
+  },
+  {
+    id:'s5', num:5, name:'Consult + Provide Value', goal:'Be the expert before you pitch',
+    lines:[
+      {type:'action',text:'Screen share karo — live type karo unke saath:'},
+      {type:'script',text:'Bhai — jo aapne bataya, usme se 3 cheezein nikli hain jo aapke store se silently paisa le jaati hain:'},
+      {type:'action',text:'1. Stock mismatch — computer pe kuch, shelf pe kuch aur.'},
+      {type:'action',text:'2. Dead stock — paise phathe hain maal mein jo nahi bikta.'},
+      {type:'action',text:'3. Uncontrolled buying — andaaze se maal aata hai. No formula.'},
+      {type:'script',text:'Bhai — in teeno mein se kitni cheezein aapke store mein hain?'},
+      {type:'script',text:'Ye akele solve karna bahut mushkil hota hai — main explain karta hoon kyun.'},
+      {type:'note',text:'Consult = free value deliver karo. Jab they feel understood — woh trust karte hain. Trust = sale.'},
+    ]
+  },
+  {
+    id:'s6', num:6, name:'Transition to Close — Unique Solution', goal:'Bridge pain to offer naturally',
+    lines:[
+      {type:'script',text:'Bhai — ye problem aapke paas kitne saal se hai? Software tha — nahi hua. Khud try kiya — nahi hua. Toh is baar kya alag hoga akele?'},
+      {type:'script',text:'Ek cheez hai jo maine kai stores mein implement kiya hai. Kya main dikhau kaise kaam karta hai?'},
+      {type:'action',text:'SCREEN SHARE — Show 5-step journey:'},
+      {type:'action',text:'Week 1-2: Store Diagnosis — exactly kahan se paisa ja raha hai'},
+      {type:'action',text:'Week 2-3: Daily Stock Control System — staff ka daily routine'},
+      {type:'action',text:'Week 3-4: Buying Framework — supplier se sahi maal formula'},
+      {type:'action',text:'Week 4-6: Staff Accountability SOP — written, printed, implemented'},
+      {type:'action',text:'Week 6-12: Monthly P&L Clarity — mahine ka poora picture'},
+      {type:'note',text:'Visualizing the roadmap removes fear. Show the path — they will walk it.'},
+    ]
+  },
+  {
+    id:'s7', num:7, name:'Proof + Urgency + Pre-Handle Objections', goal:'Evidence closes — not enthusiasm',
+    lines:[
+      {type:'script',text:'Ek real store owner ki story — 12 saal ki dukaan. Rs 2.5 lakh ka maal 8 mahine se nahi bika tha. 45 din mein Rs 3.2 lakh recover hua. Stock mismatch 17% se 2% pe aaya. Woh ab second branch soch rahe hain.'},
+      {type:'action',text:'Client WhatsApp screenshot ya result LIVE screen share pe dikhao.'},
+      {type:'script',text:'Main ek time mein 5 stores ke saath kaam karta hoon. Abhi 2 slots hain. Aur jo aaj decide karta hai — current rate milti hai.'},
+      {type:'script',text:'Bhai — bahut log is point pe bolte hain "sochna hai" ya "paisa nahi". Main pehle seedha bolunga — jo bhi concern hai abhi poochho.'},
+      {type:'note',text:'Pre-handling removes awkwardness. They feel you are honest — not hiding anything.'},
+    ]
+  },
+  {
+    id:'s8', num:8, name:'Payment Plan + Grand Slam Offer', goal:'Make it a no-brainer',
+    lines:[
+      {type:'action',text:'RS CALCULATION — Blank notepad LIVE:'},
+      {type:'action',text:'Current monthly loss: Rs _____ | x12 = Rs _____ / year | x2 = Rs _____ total | Investment = Rs [PRICE]'},
+      {type:'script',text:'Bhai — ye Rs [PRICE] ka decision nahi hai. Ye Rs [TOTAL LOSS] ka decision hai.'},
+      {type:'action',text:'THE OFFER: ✔ 30-Day Implementation ✔ Stock Audit Checklist ✔ Buying Framework ✔ Staff SOP ✔ 60-Day Follow-Up ✔ Zero Stock-Shock Guarantee'},
+      {type:'script',text:'Ek baar mein mushkil ho toh payment plan available hai — Rs [X] abhi, Rs [Y] 30 din baad.'},
+      {type:'note',text:'Show numbers LIVE. Calculated numbers close deals — spoken numbers do not.'},
+    ]
+  },
+  {
+    id:'s9', num:9, name:'Close Them', goal:'Ask directly — then silence',
+    lines:[
+      {type:'script',text:'Bhai — mujhe 3 tarah ke log milte hain. YES wale — results lete hain. NO wale — honest hain. MAYBE wale — kal bhi wahin hote hain. Aap kaunse group mein ho?'},
+      {type:'note',text:'STOP. Complete silence. Wait. Do NOT add one word. First to speak — LOSES.'},
+      {type:'script',text:'Bhai — aapne bataya — stock mismatch, paise phathe, end of month surprise, staff unaccountable.'},
+      {type:'script',text:'Aap chahte ho — system wali dukaan, clear cashflow, maybe second branch.'},
+      {type:'script',text:'Ye 30 din mein ho sakta hai. Investment Rs [AMOUNT] — jo aap silently lose kar rahe ho usse kaafi kam.'},
+      {type:'script',text:'Toh bhai — payment kaise karoge — GPay ya bank transfer?'},
+      {type:'note',text:'COMPLETE SILENCE after this. Not one word more. This is the most important moment.'},
+      {type:'script',text:'IF NOT READY: Bhai — koi baat nahi. Rs 500 abhi bhejo slot hold karne ke liye. Baki kal baat karte hain.'},
+    ]
+  }
+];
+
+let scriptData = JSON.parse(localStorage.getItem('rca_script') || JSON.stringify(DEFAULT_SCRIPT));
+let clients = JSON.parse(localStorage.getItem('rca_clients2') || '[]');
+let currentCallClientId = null;
+let callStepIdx = 0;
+let callDoneSteps = [];
+let callTimerInterval = null;
+let callSeconds = 0;
+
+function saveScript(){ localStorage.setItem('rca_script', JSON.stringify(scriptData)); }
+function saveClients(){ localStorage.setItem('rca_clients2', JSON.stringify(clients)); }
+
+// ── UTILS ─────────────────────────────────────────────────────
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+function openModal(){ document.getElementById('modal').classList.add('open'); }
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal')) closeModal(); });
+function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtDT(d){ if(!d) return '—'; const dt=new Date(d); return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+' '+dt.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); }
+function getInitials(n){ return n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+function statusBadge(s){ const m={new:'rgba(183,145,65,0.15)',called:'rgba(26,122,58,0.15)',closed:'rgba(74,154,106,0.15)',lost:'rgba(139,32,32,0.15)'}; const tc={new:'#b79141',called:'#4aaa6a',closed:'#6aee9a',lost:'#e05555'}; const l={new:'New',called:'Called',closed:'Closed',lost:'Lost'}; return `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${m[s]||m.new};color:${tc[s]||tc.new}">${l[s]||s}</span>`; }
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function showPage(page, data){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const titles={dashboard:'Dashboard',builder:'Script Builder',clients:'All Clients','new-client':'New Client','client-detail':'Client Profile'};
+  document.getElementById('pageTitle').textContent=titles[page]||'';
+  if(page==='dashboard') renderDashboard();
+  if(page==='builder') renderBuilder(0);
+  if(page==='clients') renderClientsPage();
+  if(page==='client-detail'&&data) renderClientDetail(data);
+  renderStepNav();
+}
+
+function renderStepNav(){
+  const el=document.getElementById('stepNavList');
+  el.innerHTML=scriptData.map((s,i)=>`<button class="nav-step-btn" onclick="showPage('builder');renderBuilder(${i})"><div class="step-num-badge">${s.num}</div><span style="font-size:11px;">${s.name}</span></button>`).join('');
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+function renderDashboard(){
+  const total=clients.length, called=clients.filter(c=>c.status==='called').length, closed=clients.filter(c=>c.status==='closed').length, rate=total?Math.round(closed/total*100):0;
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Clients</div></div>
+    <div class="stat-card"><div class="stat-num">${called}</div><div class="stat-label">Calls Done</div></div>
+    <div class="stat-card"><div class="stat-num">${closed}</div><div class="stat-label">Closed</div></div>
+    <div class="stat-card"><div class="stat-num">${rate}%</div><div class="stat-label">Close Rate</div></div>`;
+  const recent=[...clients].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,5);
+  document.getElementById('dashClients').innerHTML=recent.length?`<table style="width:100%;border-collapse:collapse;">
+    <tr>${['Name','City','Store','Call Date','Status',''].map(h=>`<th style="padding:8px 12px;text-align:left;font-family:'Space Mono',monospace;font-size:8px;color:var(--gold-d);letter-spacing:2px;border-bottom:1px solid var(--border-dim);">${h}</th>`).join('')}</tr>
+    ${recent.map(c=>`<tr style="cursor:pointer;" onclick="showPage('client-detail','${c.id}')">
+      <td style="padding:10px 12px;font-weight:600;color:var(--off-white);border-bottom:1px solid var(--border-dim);">${c.name}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border-dim);color:var(--text-dim);">${c.city||'—'}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border-dim);color:var(--text-dim);">${c.storeName||'—'}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border-dim);color:var(--text-dim);">${fmtDT(c.callDate)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border-dim);">${statusBadge(c.status||'new')}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border-dim);" onclick="event.stopPropagation()"><button class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="startCallWith('${c.id}')">Call</button></td>
+    </tr>`).join('')}
+  </table>`:'<div style="text-align:center;padding:40px;color:var(--text-dim);">No clients yet. Add your first client.</div>';
+}
+
+// ── SCRIPT BUILDER ────────────────────────────────────────────
+let currentStepIdx=0;
+function renderBuilder(idx){
+  currentStepIdx=idx;
+  const tabs=document.getElementById('phaseTabs');
+  tabs.innerHTML=scriptData.map((s,i)=>`<button class="phase-tab ${i===idx?'active':''}" onclick="renderBuilder(${i})">Step ${s.num}: ${s.name}</button>`).join('');
+  const step=scriptData[idx];
+  document.getElementById('builderContent').innerHTML=`
+    <div class="card">
+      <div class="card-header">
+        <div class="card-badge">STEP ${step.num}</div>
+        <div class="card-title">${step.name}</div>
+        <div class="card-goal">${step.goal}</div>
+        <button class="btn btn-outline" style="margin-left:8px;padding:5px 12px;font-size:11px;" onclick="resetStep(${idx})">Reset</button>
+      </div>
+      <div class="card-body">
+        <div id="linesContainer">${renderLines(idx)}</div>
+        <div class="add-line-row" style="margin-top:14px;">
+          <select class="add-type-select" id="addType">
+            <option value="script">Script Line</option>
+            <option value="action">Action Line</option>
+            <option value="note">Note</option>
+          </select>
+          <button class="btn btn-gold" onclick="addLine(${idx})" style="padding:6px 14px;">+ Add Line</button>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+          ${idx>0?`<button class="btn btn-outline" onclick="renderBuilder(${idx-1})">← Prev Step</button>`:''}
+          <button class="btn btn-gold" onclick="saveBuilderStep(${idx})">Save Step</button>
+          ${idx<scriptData.length-1?`<button class="btn btn-gold" onclick="saveBuilderStep(${idx});renderBuilder(${idx+1})">Save & Next →</button>`:''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderLines(idx){
+  const step=scriptData[idx];
+  return step.lines.map((line,li)=>`
+    <div class="script-editor-row" id="lineRow_${idx}_${li}">
+      <span class="script-type-tag tag-${line.type}">${line.type}</span>
+      <textarea class="script-textarea" id="lineText_${idx}_${li}" onchange="updateLine(${idx},${li},this.value)">${line.text}</textarea>
+      <button class="del-btn" onclick="deleteLine(${idx},${li})" title="Delete">×</button>
+    </div>`).join('');
+}
+
+function updateLine(si,li,val){ scriptData[si].lines[li].text=val; }
+function deleteLine(si,li){ if(!confirm('Delete this line?')) return; scriptData[si].lines.splice(li,1); saveScript(); renderBuilder(si); toast('Line deleted'); }
+function addLine(si){ const type=document.getElementById('addType').value; scriptData[si].lines.push({type,text:''}); saveScript(); renderBuilder(si); toast('Line added'); }
+function resetStep(si){ if(!confirm('Reset this step to default?')) return; scriptData[si]=JSON.parse(JSON.stringify(DEFAULT_SCRIPT[si])); saveScript(); renderBuilder(si); toast('Step reset to default'); }
+function saveBuilderStep(si){ const step=scriptData[si]; step.lines.forEach((line,li)=>{ const el=document.getElementById(`lineText_${si}_${li}`); if(el) line.text=el.value; }); saveScript(); toast('Step '+step.num+' saved!'); }
+
+// ── CLIENTS PAGE ──────────────────────────────────────────────
+function renderClientsPage(filter='all'){
+  const filtered=filter==='all'?clients:clients.filter(c=>c.status===filter);
+  const sorted=[...filtered].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  document.getElementById('clientsTableWrap').innerHTML=sorted.length?`<table style="width:100%;border-collapse:collapse;">
+    <tr>${['Name','Phone','City','Store','Call Date','Status',''].map(h=>`<th style="padding:8px 12px;text-align:left;font-family:'Space Mono',monospace;font-size:8px;color:var(--gold-d);letter-spacing:2px;border-bottom:1px solid var(--border-dim);">${h}</th>`).join('')}</tr>
+    ${sorted.map(c=>`<tr onclick="showPage('client-detail','${c.id}')" style="cursor:pointer;">
+      <td style="padding:10px 12px;font-weight:600;color:var(--off-white);border-bottom:1px solid var(--border-dim);">${c.name}</td>
+      <td style="padding:10px 12px;color:var(--text-dim);border-bottom:1px solid var(--border-dim);">${c.phone||'—'}</td>
+      <td style="padding:10px 12px;color:var(--text-dim);border-bottom:1px solid var(--border-dim);">${c.city||'—'}</td>
+      <td style="padding:10px 12px;color:var(--text-dim);border-bottom:1px solid var(--border-dim);">${c.storeName||'—'}</td>
+      <td style="padding:10px 12px;color:var(--text-dim);border-bottom:1px solid var(--border-dim);">${fmtDT(c.callDate)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border-dim);">${statusBadge(c.status||'new')}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid var(--border-dim);" onclick="event.stopPropagation()">
+        <button class="btn btn-green" style="padding:4px 10px;font-size:11px;" onclick="startCallWith('${c.id}')">▶ Call</button>
+      </td>
+    </tr>`).join('')}
+  </table>`:'<div style="text-align:center;padding:40px;color:var(--text-dim);">No clients found.</div>';
+}
+function filterClients(v){ renderClientsPage(v); }
+
+// ── CLIENT DETAIL ─────────────────────────────────────────────
+function renderClientDetail(id){
+  const c=clients.find(x=>x.id===id);
+  if(!c){ document.getElementById('clientDetailContent').innerHTML='<div style="padding:40px;text-align:center;color:var(--text-dim);">Client not found</div>'; return; }
+  document.getElementById('clientDetailContent').innerHTML=`
+    <div class="card">
+      <div class="card-header" style="gap:16px;">
+        <div style="width:48px;height:48px;border-radius:50%;background:rgba(183,145,65,0.15);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--gold);flex-shrink:0;">${getInitials(c.name)}</div>
+        <div style="flex:1;">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--off-white);font-weight:600;">${c.name}</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:3px;">${c.city||'—'} · ${c.storeName||'—'} · ${c.phone||'—'}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          ${statusBadge(c.status||'new')}
+          <button class="btn btn-green" onclick="startCallWith('${c.id}')">▶ Start Call</button>
+          <button class="btn btn-outline" style="padding:5px 12px;font-size:11px;" onclick="deleteClient('${c.id}')">Delete</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div><div class="form-label">Status</div><select class="form-input" onchange="updateClientField('${c.id}','status',this.value)"><option value="new" ${c.status==='new'?'selected':''}>New</option><option value="called" ${c.status==='called'?'selected':''}>Called</option><option value="closed" ${c.status==='closed'?'selected':''}>Closed</option><option value="lost" ${c.status==='lost'?'selected':''}>Lost</option></select></div>
+          <div><div class="form-label">Deal Value (₹)</div><input class="form-input" value="${c.dealValue||''}" placeholder="25000" onblur="updateClientField('${c.id}','dealValue',this.value)"></div>
+          <div><div class="form-label">Follow Up Date</div><input class="form-input" type="date" value="${c.followUpDate||''}" onchange="updateClientField('${c.id}','followUpDate',this.value)"></div>
+          <div><div class="form-label">Outcome</div><select class="form-input" onchange="updateClientField('${c.id}','outcome',this.value)"><option ${!c.outcome?'selected':''}>Select...</option><option ${c.outcome==='Interested'?'selected':''}>Interested</option><option ${c.outcome==='Closed — Paid'?'selected':''}>Closed — Paid</option><option ${c.outcome==='Thinking'?'selected':''}>Thinking</option><option ${c.outcome==='Not Interested'?'selected':''}>Not Interested</option><option ${c.outcome==='No Show'?'selected':''}>No Show</option></select></div>
+          <div class="form-full"><div class="form-label">Notes</div><textarea class="form-input" onblur="updateClientField('${c.id}','notes',this.value)">${c.notes||''}</textarea></div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+          <div class="form-label" style="margin-bottom:8px;">Script Progress — ${(c.callStepsDone||[]).length}/9 Steps Done</div>
+          <div class="progress-wrap"><div class="progress-fill" style="width:${((c.callStepsDone||[]).length/9*100).toFixed(0)}%"></div></div>
+        </div>
+      </div>
+    </div>`;
+}
+function updateClientField(id,field,val){ const c=clients.find(x=>x.id===id); if(c){ c[field]=val; saveClients(); toast('Saved'); } }
+function deleteClient(id){ if(!confirm('Delete this client?')) return; clients=clients.filter(c=>c.id!==id); saveClients(); toast('Deleted'); showPage('clients'); }
+
+// ── NEW CLIENT ────────────────────────────────────────────────
+function saveClient(){
+  const name=document.getElementById('fn-name').value.trim();
+  if(!name){ toast('Name required!'); return; }
+  const c={id:'c_'+Date.now(),name,phone:document.getElementById('fn-phone').value,city:document.getElementById('fn-city').value,storeName:document.getElementById('fn-store').value,storeType:document.getElementById('fn-type').value,years:document.getElementById('fn-years').value,callDate:document.getElementById('fn-calldate').value,source:document.getElementById('fn-source').value,notes:document.getElementById('fn-notes').value,status:'new',createdAt:new Date().toISOString(),callStepsDone:[],callNotes:{},dealValue:'',followUpDate:'',outcome:''};
+  clients.push(c); saveClients(); clearNewClient(); toast('Client saved!'); startCallWith(c.id);
+}
+function clearNewClient(){ ['fn-name','fn-phone','fn-city','fn-store','fn-years','fn-notes'].forEach(id=>document.getElementById(id).value=''); ['fn-type','fn-source'].forEach(id=>document.getElementById(id).selectedIndex=0); document.getElementById('fn-calldate').value=''; }
+
+// ── CALL MODE ─────────────────────────────────────────────────
+function openCallMode(){
+  if(!clients.length){ document.getElementById('modalTitle').textContent='Select Client'; document.getElementById('modalBody').innerHTML=`<div class="form-group"><label class="form-label">Select a client to start the call</label><select class="form-input" id="callClientSelect"><option value="">Select...</option>${clients.map(c=>`<option value="${c.id}">${c.name} — ${c.city||'—'}`).join('')}</select></div>`; document.getElementById('modalFooter').innerHTML=`<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-gold" onclick="startCallFromModal()">Start Call</button>`; openModal(); return; }
+  document.getElementById('modalTitle').textContent='Select Client For Call';
+  document.getElementById('modalBody').innerHTML=`<div class="form-group"><label class="form-label">Client</label><select class="form-input" id="callClientSelect"><option value="">Select...</option>${clients.map(c=>`<option value="${c.id}">${c.name} — ${c.city||'—'}`).join('')}</select></div>`;
+  document.getElementById('modalFooter').innerHTML=`<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-gold" onclick="startCallFromModal()">Start Call</button>`;
+  openModal();
+}
+function startCallFromModal(){ const id=document.getElementById('callClientSelect').value; if(!id){ toast('Select a client'); return; } closeModal(); startCallWith(id); }
+function startCallWith(id){
+  currentCallClientId=id; callStepIdx=0; callSeconds=0;
+  const c=clients.find(x=>x.id===id);
+  callDoneSteps=c.callStepsDone||[];
+  document.getElementById('callClientName').textContent=c.name;
+  document.getElementById('callClientMeta').textContent=`${c.storeName||'—'} · ${c.city||'—'}`;
+  renderCallStepsNav(); renderCallContent();
+  document.getElementById('callMode').classList.add('open');
+  clearInterval(callTimerInterval);
+  callTimerInterval=setInterval(()=>{ callSeconds++; const m=Math.floor(callSeconds/60),s=callSeconds%60; document.getElementById('callTimer').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; },1000);
+}
+function endCall(){
+  clearInterval(callTimerInterval);
+  document.getElementById('callMode').classList.remove('open');
+  const c=clients.find(x=>x.id===currentCallClientId);
+  if(c){ c.callStepsDone=callDoneSteps; if(c.status==='new') c.status='called'; saveClients(); }
+  toast('Call ended. Client updated.');
+}
+function renderCallStepsNav(){
+  document.getElementById('callStepsNav').innerHTML=scriptData.map((s,i)=>`<button class="call-step-btn ${i===callStepIdx?'active':''} ${callDoneSteps.includes(i)?'done':''}" onclick="goCallStep(${i})"><div class="call-circle">${callDoneSteps.includes(i)?'✓':s.num}</div><div style="flex:1;"><div style="font-size:12px;font-weight:500;color:${i===callStepIdx?'var(--gold)':'var(--text-dim)'};">${s.name}</div><div style="font-size:10px;color:var(--text-dim);">${s.goal}</div></div></button>`).join('');
+}
+function renderCallContent(){
+  const s=scriptData[callStepIdx];
+  const c=clients.find(x=>x.id===currentCallClientId);
+  const clientName=c?c.name.split(' ')[0]:'[Name]';
+  const notes=(c.callNotes||{})[callStepIdx]||'';
+  const progress=((callDoneSteps.length/scriptData.length)*100).toFixed(0);
+  document.getElementById('callProgress').style.width=progress+'%';
+  document.getElementById('callProgressLabel').textContent=`${callDoneSteps.length} of ${scriptData.length} steps done`;
+  const linesHtml=s.lines.map(line=>{
+    const text=line.text.replace(/\[Name\]/g,clientName).replace(/\[NAME\]/g,clientName);
+    if(line.type==='script') return `<div class="script-line-display">${text}</div>`;
+    if(line.type==='action') return `<div class="action-line-display">${text}</div>`;
+    if(line.type==='note') return `<div class="note-display">${text}</div>`;
+    return '';
+  }).join('');
+  document.getElementById('callContent').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <div style="background:var(--gold);color:var(--dark);font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:4px 12px;border-radius:20px;">STEP ${s.num}</div>
+      <div style="font-size:17px;font-weight:700;color:var(--off-white);">${s.name}</div>
+      <div style="margin-left:auto;font-size:11px;color:var(--gold-d);background:rgba(183,145,65,0.1);padding:3px 10px;border-radius:20px;">${s.goal}</div>
+    </div>
+    <div class="call-script-card">${linesHtml}</div>
+    <div class="call-notes-area">
+      <div class="call-notes-label">Your Notes — What They Said</div>
+      <textarea class="call-notes-input" id="callNoteInput" placeholder="Write their answers, pain points, objections raised...">${notes}</textarea>
+    </div>`;
+  renderCallStepsNav();
+}
+function saveCallNotes(){ const el=document.getElementById('callNoteInput'); if(!el) return; const c=clients.find(x=>x.id===currentCallClientId); if(c){ if(!c.callNotes) c.callNotes={}; c.callNotes[callStepIdx]=el.value; saveClients(); } }
+function goCallStep(i){ saveCallNotes(); callStepIdx=i; renderCallContent(); }
+function callNext(){ saveCallNotes(); if(callStepIdx<scriptData.length-1){ callStepIdx++; renderCallContent(); } }
+function callPrev(){ saveCallNotes(); if(callStepIdx>0){ callStepIdx--; renderCallContent(); } }
+function markCallStepDone(){ saveCallNotes(); if(!callDoneSteps.includes(callStepIdx)) callDoneSteps.push(callStepIdx); const c=clients.find(x=>x.id===currentCallClientId); if(c){ c.callStepsDone=callDoneSteps; saveClients(); } renderCallContent(); toast(`Step ${callStepIdx+1} marked done!`); }
+
+// ── EXPORT ────────────────────────────────────────────────────
+function exportAll(){ const data={script:scriptData,clients}; const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='RCA_Data_'+new Date().toISOString().slice(0,10)+'.json'; a.click(); toast('Exported!'); }
+
+// ── INIT ──────────────────────────────────────────────────────
+renderDashboard();
+renderStepNav();
+</script>
+</body>
+</html>

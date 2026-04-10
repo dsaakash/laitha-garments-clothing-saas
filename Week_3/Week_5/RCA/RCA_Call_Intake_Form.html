@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCA — Call Intake Form</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #b79141;
+    --gold-light: #e8c96a;
+    --gold-dim: #7a6030;
+    --dark: #0d1117;
+    --dark2: #111820;
+    --dark3: #161e28;
+    --dark4: #1c2532;
+    --border: rgba(183,145,65,0.18);
+    --border2: rgba(183,145,65,0.35);
+    --text: #e8e0d0;
+    --text-muted: #8a8070;
+    --text-dim: #5a5448;
+    --green: #3a9e6a;
+    --red: #c94040;
+    --amber: #e09020;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(183,145,65,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(183,145,65,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-left { display: flex; flex-direction: column; gap: 4px; }
+
+  .brand {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+  }
+
+  .page-title {
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .header-right { text-align: right; display: flex; flex-direction: column; gap: 6px; }
+
+  .call-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border: 1px solid var(--border2);
+    color: var(--gold);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(183,145,65,0.08);
+  }
+  .status-badge:hover { background: rgba(183,145,65,0.15); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+
+  /* ── OUTCOME SELECTOR ── */
+  .outcome-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .outcome-btn {
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: var(--dark3);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  .outcome-btn .o-label { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; }
+  .outcome-btn .o-desc { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+  .outcome-btn[data-val="yes"] { --c: #3a9e6a; }
+  .outcome-btn[data-val="maybe"] { --c: #e09020; }
+  .outcome-btn[data-val="no"] { --c: #c94040; }
+
+  .outcome-btn:hover { border-color: var(--c); }
+  .outcome-btn.selected { border-color: var(--c); background: rgba(var(--c), 0.08); box-shadow: 0 0 0 1px var(--c) inset; }
+  .outcome-btn[data-val="yes"].selected { background: rgba(58,158,106,0.12); }
+  .outcome-btn[data-val="yes"].selected .o-label { color: var(--green); }
+  .outcome-btn[data-val="maybe"].selected { background: rgba(224,144,32,0.12); }
+  .outcome-btn[data-val="maybe"].selected .o-label { color: var(--amber); }
+  .outcome-btn[data-val="no"].selected { background: rgba(201,64,64,0.12); }
+  .outcome-btn[data-val="no"].selected .o-label { color: var(--red); }
+
+  /* ── SECTIONS ── */
+  .section {
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--dark2);
+  }
+
+  .section-header {
+    padding: 12px 18px;
+    background: var(--dark3);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--gold);
+    color: var(--dark);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+
+  .section-sub { font-size: 11px; color: var(--text-dim); margin-left: auto; }
+
+  .section-body { padding: 18px; }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .span-2 { grid-column: span 2; }
+  .span-3 { grid-column: span 3; }
+
+  /* ── FORM FIELDS ── */
+  .field { display: flex; flex-direction: column; gap: 5px; }
+
+  label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  input[type="text"],
+  input[type="tel"],
+  input[type="date"],
+  input[type="number"],
+  select,
+  textarea {
+    background: var(--dark4);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+    appearance: none;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--border2);
+  }
+
+  textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+
+  select { cursor: pointer; }
+  select option { background: var(--dark3); }
+
+  input::placeholder, textarea::placeholder { color: var(--text-dim); }
+
+  /* ── RANGE ── */
+  .range-group { display: flex; align-items: center; gap: 10px; }
+  .range-group input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    background: var(--dark4);
+    border: none;
+    border-radius: 2px;
+    padding: 0;
+  }
+  .range-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+    border: none;
+  }
+  .range-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--gold);
+    min-width: 28px;
+    text-align: center;
+  }
+
+  /* ── CHECKBOXES ── */
+  .check-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: var(--dark4);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13px;
+  }
+  .check-item:hover { border-color: var(--border); }
+  .check-item input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--gold);
+    cursor: pointer;
+    padding: 0;
+    background: transparent;
+    border: none;
+    flex-shrink: 0;
+  }
+  .check-item.checked { border-color: var(--border2); background: rgba(183,145,65,0.07); }
+
+  /* ── OBJECTIONS ── */
+  .obj-list { display: flex; flex-direction: column; gap: 10px; }
+  .obj-item {
+    display: grid;
+    grid-template-columns: 1fr 1fr 40px;
+    gap: 8px;
+    align-items: start;
+  }
+  .obj-tag {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-weight: 500;
+    padding: 2px 0;
+  }
+  .obj-tag.q { color: var(--red); }
+  .obj-tag.a { color: var(--green); }
+
+  .obj-remove {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    border: 1px solid rgba(201,64,64,0.3);
+    background: transparent;
+    color: var(--red);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    margin-top: 20px;
+  }
+  .obj-remove:hover { background: rgba(201,64,64,0.1); }
+
+  .add-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    transition: all 0.15s;
+    margin-top: 6px;
+  }
+  .add-btn:hover { border-color: var(--border2); color: var(--gold); }
+
+  /* ── DIVIDER ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  /* ── BOTTOM ACTIONS ── */
+  .action-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(13,17,23,0.95);
+    border-top: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  .action-left { display: flex; gap: 10px; }
+  .action-right { display: flex; gap: 10px; align-items: center; }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-muted);
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: var(--text); }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--gold);
+  }
+  .btn-outline:hover { background: rgba(183,145,65,0.1); }
+
+  .btn-primary {
+    background: var(--gold);
+    color: var(--dark);
+    border: 1px solid var(--gold);
+  }
+  .btn-primary:hover { background: var(--gold-light); }
+
+  .saved-notice {
+    font-size: 12px;
+    color: var(--green);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .saved-notice.show { opacity: 1; }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: white; color: black; }
+    body::before { display: none; }
+    .action-bar { display: none; }
+    .section { border: 1px solid #ddd; background: white; }
+    .section-header { background: #f5f5f5; }
+    input, textarea, select { border: 1px solid #ddd; background: white; color: black; }
+    .outcome-btn { border: 1px solid #ddd; background: white; }
+  }
+
+  /* ── TOOLTIP TAG ── */
+  .tip {
+    font-size: 10px;
+    background: rgba(183,145,65,0.12);
+    color: var(--gold-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-style: italic;
+  }
+
+  /* Fade in */
+  .section { animation: fadeUp 0.3s ease both; }
+  .section:nth-child(1) { animation-delay: 0.05s; }
+  .section:nth-child(2) { animation-delay: 0.10s; }
+  .section:nth-child(3) { animation-delay: 0.15s; }
+  .section:nth-child(4) { animation-delay: 0.20s; }
+  .section:nth-child(5) { animation-delay: 0.25s; }
+  .section:nth-child(6) { animation-delay: 0.30s; }
+  .section:nth-child(7) { animation-delay: 0.35s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="brand">Retail Control Architect</div>
+      <div class="page-title">Post-Call Intake Form</div>
+    </div>
+    <div class="header-right">
+      <div class="call-id" id="callIdDisplay">CALL — ...</div>
+      <div class="status-badge" onclick="cycleStatus()" id="statusBadge">
+        <div class="status-dot"></div>
+        <span id="statusText">New Lead</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- OUTCOME -->
+  <div class="outcome-row" id="outcomeRow">
+    <div class="outcome-btn" data-val="yes" onclick="selectOutcome('yes')">
+      <div class="o-label" style="color:#3a9e6a">Yes — Closed</div>
+      <div class="o-desc">Payment taken on call</div>
+    </div>
+    <div class="outcome-btn" data-val="maybe" onclick="selectOutcome('maybe')">
+      <div class="o-label" style="color:#e09020">Maybe — Follow Up</div>
+      <div class="o-desc">Needs more time / info</div>
+    </div>
+    <div class="outcome-btn" data-val="no" onclick="selectOutcome('no')">
+      <div class="o-label" style="color:#c94040">No — Not A Fit</div>
+      <div class="o-desc">Did not proceed</div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: PROSPECT INFO -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <div class="section-title">Prospect Details</div>
+    </div>
+    <div class="section-body">
+      <div class="grid-3" style="margin-bottom:14px;">
+        <div class="field span-2">
+          <label>Full Name</label>
+          <input type="text" id="name" placeholder="Store owner ka naam">
+        </div>
+        <div class="field">
+          <label>Phone Number</label>
+          <input type="tel" id="phone" placeholder="+91 XXXXX XXXXX">
+        </div>
+      </div>
+      <div class="grid-3" style="margin-bottom:14px;">
+        <div class="field span-2">
+          <label>Store Name</label>
+          <input type="text" id="storeName" placeholder="Dukaan ka naam">
+        </div>
+        <div class="field">
+          <label>City</label>
+          <input type="text" id="city" placeholder="City / Town">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label>Call Date</label>
+          <input type="date" id="callDate">
+        </div>
+        <div class="field">
+          <label>Call Duration (min)</label>
+          <input type="number" id="callDuration" placeholder="e.g. 32" min="1" max="120">
+        </div>
+        <div class="field">
+          <label>Lead Source</label>
+          <select id="leadSource">
+            <option value="">Select source</option>
+            <option>Instagram Reel</option>
+            <option>YouTube</option>
+            <option>WhatsApp Group</option>
+            <option>Referral</option>
+            <option>VSL / Landing Page</option>
+            <option>Direct DM</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: STORE PROFILE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <div class="section-title">Store Profile</div>
+    </div>
+    <div class="section-body">
+      <div class="grid-3" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Store Type</label>
+          <select id="storeType">
+            <option value="">Select type</option>
+            <option>Clothing — Mens</option>
+            <option>Clothing — Womens</option>
+            <option>Clothing — Kids</option>
+            <option>Clothing — Mix</option>
+            <option>Ethnic Wear</option>
+            <option>Western Wear</option>
+            <option>Footwear</option>
+            <option>Accessories</option>
+            <option>Multi-category</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Years In Business</label>
+          <input type="number" id="yearsInBiz" placeholder="e.g. 8" min="1" max="50">
+        </div>
+        <div class="field">
+          <label>Number of Staff</label>
+          <input type="number" id="staffCount" placeholder="e.g. 4" min="1">
+        </div>
+      </div>
+      <div class="grid-3" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Monthly Revenue (approx)</label>
+          <select id="revenue">
+            <option value="">Select range</option>
+            <option>Below ₹2 Lakh</option>
+            <option>₹2–5 Lakh</option>
+            <option>₹5–10 Lakh</option>
+            <option>₹10–20 Lakh</option>
+            <option>₹20 Lakh+</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Billing Software</label>
+          <input type="text" id="software" placeholder="e.g. Vyapar, Tally, None">
+        </div>
+        <div class="field">
+          <label>No. of Branches</label>
+          <input type="number" id="branches" placeholder="e.g. 1" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <label>Stock Categories (tick all that apply)</label>
+        <div class="check-grid" style="margin-top:6px;" id="stockCats">
+          <label class="check-item"><input type="checkbox" value="Tops / Shirts"> Tops / Shirts</label>
+          <label class="check-item"><input type="checkbox" value="Bottoms / Trousers"> Bottoms / Trousers</label>
+          <label class="check-item"><input type="checkbox" value="Ethnic / Sarees"> Ethnic / Sarees</label>
+          <label class="check-item"><input type="checkbox" value="Kids Wear"> Kids Wear</label>
+          <label class="check-item"><input type="checkbox" value="Footwear"> Footwear</label>
+          <label class="check-item"><input type="checkbox" value="Accessories"> Accessories</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: CURRENT SITUATION -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <div class="section-title">Current Situation (CS)</div>
+      <span class="tip">Pull the pain — let them speak</span>
+    </div>
+    <div class="section-body">
+      <div class="grid-2" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Primary Pain Point</label>
+          <select id="primaryPain">
+            <option value="">Select main problem</option>
+            <option>Stock mismatch — computer vs physical</option>
+            <option>Dead stock / unsold maal</option>
+            <option>Cash stuck in inventory</option>
+            <option>Staff accountability issues</option>
+            <option>Supplier buying problems</option>
+            <option>No visibility on daily profit/loss</option>
+            <option>Month-end surprise / shock</option>
+            <option>Billing errors</option>
+            <option>Multiple — combination</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Estimated Annual Loss (₹)</label>
+          <select id="annualLoss">
+            <option value="">Approximate</option>
+            <option>Below ₹50,000</option>
+            <option>₹50K – ₹1 Lakh</option>
+            <option>₹1 – ₹2 Lakh</option>
+            <option>₹2 – ₹3 Lakh</option>
+            <option>₹3 – ₹5 Lakh</option>
+            <option>₹5 Lakh+</option>
+            <option>Not sure / doesn't know</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Problem Duration</label>
+        <select id="problemDuration">
+          <option value="">How long has this been going on?</option>
+          <option>Less than 6 months</option>
+          <option>6 months – 1 year</option>
+          <option>1 – 2 years</option>
+          <option>2 – 5 years</option>
+          <option>5+ years — it's always been like this</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>What have they tried before?</label>
+        <div class="check-grid" style="margin-top:6px;">
+          <label class="check-item"><input type="checkbox" value="New billing software"> New billing software</label>
+          <label class="check-item"><input type="checkbox" value="Changed staff"> Changed staff</label>
+          <label class="check-item"><input type="checkbox" value="Hired accountant"> Hired accountant</label>
+          <label class="check-item"><input type="checkbox" value="Manual registers"> Manual registers</label>
+          <label class="check-item"><input type="checkbox" value="CCTV / cameras"> CCTV / cameras</label>
+          <label class="check-item"><input type="checkbox" value="Nothing yet"> Nothing yet</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Their Own Words — Exact Pain (quote them)</label>
+        <textarea id="csQuote" placeholder="Write exactly what they said about their problem — in their own words..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: DESIRED SITUATION -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <div class="section-title">Desired Situation (DS)</div>
+      <span class="tip">Paint their dream store</span>
+    </div>
+    <div class="section-body">
+      <div class="field" style="margin-bottom:14px;">
+        <label>Primary Goal</label>
+        <div class="check-grid" style="margin-top:6px;">
+          <label class="check-item"><input type="checkbox" value="Fix stock system"> Fix stock system</label>
+          <label class="check-item"><input type="checkbox" value="Clear dead stock"> Clear dead stock</label>
+          <label class="check-item"><input type="checkbox" value="Improve cashflow"> Improve cashflow</label>
+          <label class="check-item"><input type="checkbox" value="Staff accountability"> Staff accountability</label>
+          <label class="check-item"><input type="checkbox" value="Open second branch"> Open second branch</label>
+          <label class="check-item"><input type="checkbox" value="Peace of mind"> Peace of mind</label>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Target Monthly Profit (₹)</label>
+          <input type="text" id="targetProfit" placeholder="e.g. ₹80,000 / month">
+        </div>
+        <div class="field">
+          <label>Timeline Expectation</label>
+          <select id="timeline">
+            <option value="">When do they want results?</option>
+            <option>ASAP — 30 days</option>
+            <option>Within 3 months</option>
+            <option>Within 6 months</option>
+            <option>No specific timeline</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Their Dream — Their Own Words</label>
+        <textarea id="dsQuote" placeholder="What did they say they want their store to look/feel like? Quote them..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: OBJECTIONS -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">5</div>
+      <div class="section-title">Objections Raised On This Call</div>
+    </div>
+    <div class="section-body">
+      <div class="obj-list" id="objList">
+        <div class="obj-item">
+          <div class="field">
+            <label class="obj-tag q">Objection</label>
+            <input type="text" placeholder="e.g. Sochna hai, ghar mein baat karni hai...">
+          </div>
+          <div class="field">
+            <label class="obj-tag a">How You Handled It</label>
+            <input type="text" placeholder="Your response / handle...">
+          </div>
+          <button class="obj-remove" onclick="removeObj(this)">✕</button>
+        </div>
+      </div>
+      <button class="add-btn" onclick="addObj()">+ Add Objection</button>
+    </div>
+  </div>
+
+  <!-- SECTION 6: CALL ASSESSMENT -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">6</div>
+      <div class="section-title">Call Assessment</div>
+    </div>
+    <div class="section-body">
+      <div class="grid-2" style="margin-bottom:18px;">
+        <div class="field">
+          <label>Prospect Readiness (1–10)</label>
+          <div class="range-group" style="margin-top:4px;">
+            <input type="range" min="1" max="10" value="5" id="readiness" oninput="document.getElementById('readinessVal').textContent=this.value">
+            <span class="range-val" id="readinessVal">5</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Decision Maker On Call?</label>
+          <select id="decisionMaker">
+            <option value="">Select</option>
+            <option>Yes — owner themselves</option>
+            <option>Partial — needs spouse / partner</option>
+            <option>No — will consult family</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:18px;">
+        <div class="field">
+          <label>Offer Presented?</label>
+          <select id="offerPresented">
+            <option value="">Select</option>
+            <option>Yes — full offer presented</option>
+            <option>Partial — pitch started, objections came</option>
+            <option>No — call ended before pitch</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Investment Discussed (₹)</label>
+          <input type="text" id="investmentAmt" placeholder="e.g. ₹25,000">
+        </div>
+      </div>
+      <div class="field">
+        <label>Aakash's Gut Feeling About This Lead</label>
+        <div style="display:flex;gap:10px;margin-top:6px;" id="gutFeel">
+          <label class="check-item" style="flex:1;justify-content:center;"><input type="radio" name="gut" value="Hot"> Hot Lead</label>
+          <label class="check-item" style="flex:1;justify-content:center;"><input type="radio" name="gut" value="Warm"> Warm</label>
+          <label class="check-item" style="flex:1;justify-content:center;"><input type="radio" name="gut" value="Cold"> Cold</label>
+          <label class="check-item" style="flex:1;justify-content:center;"><input type="radio" name="gut" value="Waste"> Not A Fit</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 7: NEXT STEPS -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-num">7</div>
+      <div class="section-title">Next Steps & Notes</div>
+    </div>
+    <div class="section-body">
+      <div class="grid-2" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Next Action</label>
+          <select id="nextAction">
+            <option value="">Select next step</option>
+            <option>Payment received — onboarding to start</option>
+            <option>Follow-up call scheduled</option>
+            <option>Send WhatsApp follow-up message</option>
+            <option>Send payment link</option>
+            <option>Send case study / proof</option>
+            <option>No action — not a fit</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Follow-Up Date</label>
+          <input type="date" id="followUpDate">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Follow-Up Message (draft / notes)</label>
+        <textarea id="followUpMsg" placeholder="Draft the WhatsApp message or key points to cover in follow-up call..." style="min-height:90px;"></textarea>
+      </div>
+      <div class="field">
+        <label>Additional Notes / Observations</label>
+        <textarea id="extraNotes" placeholder="Anything specific about this prospect, their store, personality, family situation, or anything you want to remember..." style="min-height:90px;"></textarea>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ACTION BAR -->
+<div class="action-bar">
+  <div class="action-left">
+    <button class="btn btn-ghost" onclick="clearForm()">Clear Form</button>
+    <button class="btn btn-ghost" onclick="window.print()">Print / PDF</button>
+  </div>
+  <div class="action-right">
+    <span class="saved-notice" id="savedNotice">Copied to clipboard</span>
+    <button class="btn btn-outline" onclick="exportJSON()">Export Data</button>
+    <button class="btn btn-primary" onclick="saveForm()">Save Record</button>
+  </div>
+</div>
+
+<script>
+  // Generate call ID
+  function genId() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    return `RCA-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${Math.floor(Math.random()*900)+100}`;
+  }
+
+  let callId = genId();
+  document.getElementById('callIdDisplay').textContent = 'CALL — ' + callId;
+
+  // Set today's date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('callDate').value = today;
+
+  // Status cycling
+  const statuses = ['New Lead','In Follow-Up','Deal Closed','Not A Fit','Onboarding'];
+  let statusIdx = 0;
+  function cycleStatus() {
+    statusIdx = (statusIdx + 1) % statuses.length;
+    document.getElementById('statusText').textContent = statuses[statusIdx];
+  }
+
+  // Outcome selection
+  function selectOutcome(val) {
+    document.querySelectorAll('.outcome-btn').forEach(b => {
+      b.classList.toggle('selected', b.dataset.val === val);
+    });
+  }
+
+  // Check items highlight
+  document.querySelectorAll('.check-item input').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cb.closest('.check-item').classList.toggle('checked', cb.checked);
+    });
+  });
+
+  // Add / remove objections
+  function addObj() {
+    const list = document.getElementById('objList');
+    const item = document.createElement('div');
+    item.className = 'obj-item';
+    item.innerHTML = `
+      <div class="field">
+        <label class="obj-tag q">Objection</label>
+        <input type="text" placeholder="What they said...">
+      </div>
+      <div class="field">
+        <label class="obj-tag a">How You Handled It</label>
+        <input type="text" placeholder="Your response...">
+      </div>
+      <button class="obj-remove" onclick="removeObj(this)">✕</button>`;
+    list.appendChild(item);
+  }
+
+  function removeObj(btn) {
+    const items = document.querySelectorAll('.obj-item');
+    if (items.length > 1) btn.closest('.obj-item').remove();
+  }
+
+  // Collect all form data
+  function collectData() {
+    const outcome = document.querySelector('.outcome-btn.selected')?.dataset.val || '';
+    const gut = document.querySelector('input[name="gut"]:checked')?.value || '';
+
+    const tried = [...document.querySelectorAll('#stockCats input:checked, .check-item input[type="checkbox"]:checked')]
+      .map(i => i.value);
+
+    const objs = [...document.querySelectorAll('.obj-item')].map(item => {
+      const inputs = item.querySelectorAll('input[type="text"]');
+      return { objection: inputs[0]?.value, handle: inputs[1]?.value };
+    }).filter(o => o.objection);
+
+    return {
+      callId,
+      callDate: document.getElementById('callDate').value,
+      callDuration: document.getElementById('callDuration').value,
+      status: document.getElementById('statusText').textContent,
+      outcome,
+      prospect: {
+        name: document.getElementById('name').value,
+        phone: document.getElementById('phone').value,
+        storeName: document.getElementById('storeName').value,
+        city: document.getElementById('city').value,
+        leadSource: document.getElementById('leadSource').value,
+      },
+      store: {
+        type: document.getElementById('storeType').value,
+        yearsInBiz: document.getElementById('yearsInBiz').value,
+        staffCount: document.getElementById('staffCount').value,
+        revenue: document.getElementById('revenue').value,
+        software: document.getElementById('software').value,
+        branches: document.getElementById('branches').value,
+      },
+      currentSituation: {
+        primaryPain: document.getElementById('primaryPain').value,
+        annualLoss: document.getElementById('annualLoss').value,
+        problemDuration: document.getElementById('problemDuration').value,
+        csQuote: document.getElementById('csQuote').value,
+      },
+      desiredSituation: {
+        targetProfit: document.getElementById('targetProfit').value,
+        timeline: document.getElementById('timeline').value,
+        dsQuote: document.getElementById('dsQuote').value,
+      },
+      objections: objs,
+      assessment: {
+        readiness: document.getElementById('readiness').value,
+        decisionMaker: document.getElementById('decisionMaker').value,
+        offerPresented: document.getElementById('offerPresented').value,
+        investmentAmt: document.getElementById('investmentAmt').value,
+        gutFeeling: gut,
+      },
+      nextSteps: {
+        nextAction: document.getElementById('nextAction').value,
+        followUpDate: document.getElementById('followUpDate').value,
+        followUpMsg: document.getElementById('followUpMsg').value,
+        extraNotes: document.getElementById('extraNotes').value,
+      }
+    };
+  }
+
+  // Save — copies JSON to clipboard + shows notice
+  function saveForm() {
+    const data = collectData();
+    const json = JSON.stringify(data, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      const n = document.getElementById('savedNotice');
+      n.textContent = 'Record saved to clipboard';
+      n.classList.add('show');
+      setTimeout(() => n.classList.remove('show'), 3000);
+    });
+  }
+
+  // Export as downloadable JSON
+  function exportJSON() {
+    const data = collectData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${callId}_${data.prospect.name || 'call'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    const n = document.getElementById('savedNotice');
+    n.textContent = 'Exported as JSON';
+    n.classList.add('show');
+    setTimeout(() => n.classList.remove('show'), 3000);
+  }
+
+  // Clear
+  function clearForm() {
+    if (!confirm('Clear all fields?')) return;
+    document.querySelectorAll('input[type="text"], input[type="tel"], input[type="number"], textarea').forEach(i => i.value = '');
+    document.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
+    document.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(c => c.checked = false);
+    document.querySelectorAll('.check-item').forEach(c => c.classList.remove('checked'));
+    document.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('readiness').value = 5;
+    document.getElementById('readinessVal').textContent = '5';
+    callId = genId();
+    document.getElementById('callIdDisplay').textContent = 'CALL — ' + callId;
+    document.getElementById('callDate').value = today;
+  }
+</script>
+</body>
+</html>

@@ -21,7 +21,7 @@ export default function ActionButton({
     const baseStyles = 'inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed'
 
     const variants = {
-        primary: 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm hover:shadow-md',
+        primary: 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-sm hover:shadow-md',
         secondary: 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm hover:shadow-md',
         danger: 'bg-red-600 hover:bg-red-700 text-white shadow-sm hover:shadow-md',
         success: 'bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md',

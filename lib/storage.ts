@@ -77,6 +77,8 @@ export interface BusinessProfile {
   address: string
   gstNumber?: string
   whatsappNumber: string
+  slug: string
+  websiteBuilderEnabled: boolean
 }
 
 export interface Customer {

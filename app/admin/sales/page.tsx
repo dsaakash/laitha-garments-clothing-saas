@@ -1,13 +1,22 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
 import ItemSelectionModal from '@/components/ItemSelectionModal'
 import { Sale, InventoryItem, Customer } from '@/lib/storage'
 import { format } from 'date-fns'
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  Plus, Search, Filter, Calendar, TrendingUp, DollarSign, 
+  Users, ShoppingBag, Edit, Trash2, CreditCard, ChevronDown, CheckCircle, XCircle, Link, ScanBarcode
+} from 'lucide-react'
+import StatusBadge from '@/components/StatusBadge'
+import ActionButton from '@/components/ActionButton'
 
 export default function SalesPage() {
+  const searchParams = useSearchParams()
   const [sales, setSales] = useState<Sale[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -28,6 +37,7 @@ export default function SalesPage() {
   const [filterDate, setFilterDate] = useState('')
   const [searchPartyName, setSearchPartyName] = useState<string>('')
   const [selectedParty, setSelectedParty] = useState<string>('All')
+  const [filterStatus, setFilterStatus] = useState<string>('All')
   const [salesSummary, setSalesSummary] = useState<{
     totalSales: number
     totalRevenue: number
@@ -67,6 +77,9 @@ export default function SalesPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [rackModuleEnabled, setRackModuleEnabled] = useState(false)
+  const [barcodeInput, setBarcodeInput] = useState('')
+  const [barcodeError, setBarcodeError] = useState('')
+  const barcodeInputRef = React.useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/auth/check')
@@ -138,6 +151,11 @@ export default function SalesPage() {
 
   useEffect(() => {
     loadData()
+    
+    // Check for action=new in URL
+    if (searchParams.get('action') === 'new') {
+      setShowModal(true)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -186,7 +204,7 @@ export default function SalesPage() {
   useEffect(() => {
     loadSales()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterMonth, filterYear, filterDate, selectedParty])
+  }, [filterMonth, filterYear, filterDate, selectedParty, filterStatus])
 
   useEffect(() => {
     // Extract unique party names from sales
@@ -266,6 +284,9 @@ export default function SalesPage() {
       if (selectedParty && selectedParty !== 'All') {
         params.append('partyName', selectedParty)
       }
+      if (filterStatus && filterStatus !== 'All') {
+        params.append('paymentStatus', filterStatus)
+      }
 
       const response = await fetch(`/api/sales?${params.toString()}`, { credentials: 'include' })
       const result = await response.json()
@@ -277,6 +298,46 @@ export default function SalesPage() {
     }
   }
 
+
+  const handleBarcodeScan = (code: string) => {
+    const trimmedCode = code.trim()
+    if (!trimmedCode) return
+
+    // Find inventory item by dressCode
+    const found = inventory.find(
+      inv => inv.dressCode && inv.dressCode.toLowerCase() === trimmedCode.toLowerCase()
+    )
+
+    if (!found) {
+      setBarcodeError(`No product found for code: "${trimmedCode}"`)
+      setTimeout(() => setBarcodeError(''), 3000)
+      setBarcodeInput('')
+      return
+    }
+
+    const stock = found.currentStock || 0
+    if (stock <= 0) {
+      setBarcodeError(`"${found.dressName}" is out of stock`)
+      setTimeout(() => setBarcodeError(''), 3000)
+      setBarcodeInput('')
+      return
+    }
+
+    // Auto-select first size if only one, otherwise leave blank for user to pick
+    const autoSize = found.sizes && found.sizes.length === 1 ? found.sizes[0] : ''
+
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, {
+        inventoryId: found.id,
+        size: autoSize,
+        quantity: 1,
+        usePerMeter: false,
+      }]
+    }))
+    setBarcodeError('')
+    setBarcodeInput('')
+  }
 
   const handleAddItem = () => {
     const newIndex = formData.items.length
@@ -729,127 +790,232 @@ export default function SalesPage() {
 
   return (
     <AdminLayout>
-      <div>
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Sales Tracking</h1>
-          <button
-            onClick={() => {
-              resetForm()
-              setShowModal(true)
-            }}
-            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Record New Sale
-          </button>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="space-y-4">
-            {/* Party Filter */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Party</label>
-                <select
-                  value={selectedParty}
-                  onChange={(e) => {
-                    setSelectedParty(e.target.value)
-                    setSearchPartyName('') // Clear search when party is selected
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="All">All Parties</option>
-                  {uniqueParties.map(party => (
-                    <option key={party} value={party}>{party}</option>
-                  ))}
-                </select>
-                {selectedParty !== 'All' && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {sales.filter(s => s.partyName === selectedParty).length} sales for this party
-                  </p>
-                )}
+      <div className="min-h-screen bg-slate-900 p-4 sm:p-6 lg:p-8 font-sans selection:bg-purple-500/30">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-800/50 p-6 rounded-[2.5rem] border border-slate-700/50 backdrop-blur-xl">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center border border-purple-500/30">
+                <ShoppingBag className="w-6 h-6 text-purple-400" />
               </div>
-
-              {/* Search by Party Name (for quick search) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quick Search by Party Name</label>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+                  Sales Command Center
+                </h1>
+                <p className="text-slate-400 mt-1">Real-time revenue & transaction tracking</p>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => {
+                resetForm()
+                setShowModal(true)
+              }}
+              className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 font-bold text-white transition-all duration-300 bg-[var(--accent)] rounded-full hover:brightness-110 hover:shadow-[0_0_40px_8px_rgba(var(--accent-rgb),0.3)] hover:-translate-y-0.5"
+            >
+              <div className="absolute inset-0 rounded-full bg-white/20 blur opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Plus className="w-5 h-5 relative z-10" />
+              <span className="relative z-10">Record New Sale</span>
+            </button>
+          </div>
+
+          {/* Stats Row */}
+          {salesSummary && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-800/50 p-6 rounded-[2rem] border border-slate-700/50 hover:bg-slate-800/80 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-500/20 rounded-2xl group-hover:scale-110 transition-transform">
+                    <ShoppingBag className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-sm font-medium">Total Sales</p>
+                    <p className="text-2xl font-bold text-white">{salesSummary.totalSales}</p>
+                  </div>
+                </div>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-slate-800/50 p-6 rounded-[2rem] border border-slate-700/50 hover:bg-slate-800/80 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-emerald-500/20 rounded-2xl group-hover:scale-110 transition-transform">
+                    <DollarSign className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-sm font-medium">Total Revenue</p>
+                    <p className="text-2xl font-bold text-white">₹{salesSummary.totalRevenue.toLocaleString()}</p>
+                  </div>
+                </div>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-slate-800/50 p-6 rounded-[2rem] border border-slate-700/50 hover:bg-slate-800/80 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-[var(--accent)] bg-opacity-20 rounded-2xl group-hover:scale-110 transition-transform">
+                    <TrendingUp className="w-6 h-6 text-[var(--accent)]" style={{ color: 'var(--accent)' }} />
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-sm font-medium">Average Sale</p>
+                    <p className="text-2xl font-bold text-white">₹{Math.round(salesSummary.averageSale).toLocaleString()}</p>
+                  </div>
+                </div>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-slate-800/50 p-6 rounded-[2rem] border border-slate-700/50 hover:bg-slate-800/80 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-orange-500/20 rounded-2xl group-hover:scale-110 transition-transform">
+                    <Calendar className="w-6 h-6 text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-sm font-medium">Date Range</p>
+                    {salesSummary.dateRange ? (
+                      <p className="text-sm font-bold text-white mt-1">
+                        {format(new Date(salesSummary.dateRange.from), 'dd MMM yyyy')} - {format(new Date(salesSummary.dateRange.to), 'dd MMM yyyy')}
+                      </p>
+                    ) : (
+                      <p className="text-sm font-bold text-white mt-1">N/A</p>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* Filters Bar */}
+          <div className="bg-slate-800/50 p-6 rounded-[2rem] border border-slate-700/50 backdrop-blur-xl">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1 min-w-[200px] relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
+                  placeholder="Quick Search by Party Name..."
                   value={searchPartyName}
                   onChange={(e) => {
                     setSearchPartyName(e.target.value)
-                    if (e.target.value) {
-                      setSelectedParty('All') // Reset party filter when searching
-                    }
+                    if (e.target.value) setSelectedParty('All')
                   }}
-                  placeholder="Type to search party name..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all placeholder:text-slate-500"
+                  style={{ '--tw-ring-color': 'rgba(var(--accent-rgb), 0.5)', borderColor: 'rgba(var(--accent-rgb), 0.2)' } as any}
                 />
+              </div>
+
+              <div className="flex flex-wrap gap-4">
+                <div className="relative min-w-[160px]">
+                  <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <select
+                    value={selectedParty}
+                    onChange={(e) => {
+                      setSelectedParty(e.target.value)
+                      setSearchPartyName('')
+                    }}
+                    className="w-full appearance-none bg-slate-900/50 border border-slate-700 text-white rounded-xl pl-11 pr-10 py-3 focus:outline-none focus:ring-2 transition-all font-medium"
+                    style={{ '--tw-ring-color': 'rgba(var(--accent-rgb), 0.3)' } as any}
+                  >
+                    <option value="All">All Parties</option>
+                    {uniqueParties.map(party => (
+                      <option key={party} value={party}>{party}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={filterDate}
+                    onChange={(e) => {
+                      setFilterDate(e.target.value)
+                      if (e.target.value) {
+                        setFilterMonth('')
+                        setFilterYear('')
+                      }
+                    }}
+                    className="bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 transition-all"
+                    style={{ '--tw-ring-color': 'rgba(var(--accent-rgb), 0.3)' } as any}
+                  />
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => {
+                      setFilterMonth(e.target.value)
+                      if (e.target.value) setFilterDate('')
+                    }}
+                    className="appearance-none bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 transition-all"
+                    style={{ '--tw-ring-color': 'rgba(var(--accent-rgb), 0.3)' } as any}
+                  >
+                    <option value="">All Months</option>
+                    <option value="01">Jan</option>
+                    <option value="02">Feb</option>
+                    <option value="03">Mar</option>
+                    <option value="04">Apr</option>
+                    <option value="05">May</option>
+                    <option value="06">Jun</option>
+                    <option value="07">Jul</option>
+                    <option value="08">Aug</option>
+                    <option value="09">Sep</option>
+                    <option value="10">Oct</option>
+                    <option value="11">Nov</option>
+                    <option value="12">Dec</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={filterYear}
+                    onChange={(e) => {
+                      setFilterYear(e.target.value)
+                      if (e.target.value) setFilterDate('')
+                    }}
+                    className="appearance-none bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 transition-all"
+                    style={{ '--tw-ring-color': 'rgba(var(--accent-rgb), 0.3)' } as any}
+                  >
+                    <option value="">All Years</option>
+                    {years.map(year => (
+                      <option key={year} value={year.toString()}>{year}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
+            
+            <div className="mt-4 flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-xl border border-slate-700">
+                {[
+                  { id: 'All', label: 'All' },
+                  { id: 'paid', label: 'Paid' },
+                  { id: 'pending', label: 'Pending' },
+                  { id: 'due', label: 'Not Paid' }
+                ].map((status) => (
+                  <button
+                    key={status.id}
+                    onClick={() => setFilterStatus(status.id)}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                      filterStatus === status.id
+                        ? 'bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                    }`}
+                  >
+                    {status.label}
+                  </button>
+                ))}
+              </div>
 
-            {/* Date Filters */}
-            <div className="flex flex-wrap gap-4 items-end">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Exact Date</label>
-                <input
-                  type="date"
-                  value={filterDate}
-                  onChange={(e) => {
-                    setFilterDate(e.target.value)
-                    if (e.target.value) {
-                      setFilterMonth('')
-                      setFilterYear('')
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Year</label>
-                <select
-                  value={filterYear}
-                  onChange={(e) => {
-                    setFilterYear(e.target.value)
-                    if (e.target.value) setFilterDate('')
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">All Years</option>
-                  {years.map(year => (
-                    <option key={year} value={year.toString()}>{year}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Month</label>
-                <select
-                  value={filterMonth}
-                  onChange={(e) => {
-                    setFilterMonth(e.target.value)
-                    if (e.target.value) setFilterDate('')
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">All Months</option>
-                  <option value="01">January</option>
-                  <option value="02">February</option>
-                  <option value="03">March</option>
-                  <option value="04">April</option>
-                  <option value="05">May</option>
-                  <option value="06">June</option>
-                  <option value="07">July</option>
-                  <option value="08">August</option>
-                  <option value="09">September</option>
-                  <option value="10">October</option>
-                  <option value="11">November</option>
-                  <option value="12">December</option>
-                </select>
-              </div>
-              {(filterMonth || filterYear || searchPartyName || selectedParty !== 'All') && (
+              {(filterMonth || filterYear || searchPartyName || selectedParty !== 'All' || filterStatus !== 'All') && (
                 <button
                   onClick={() => {
                     setFilterDate('')
@@ -857,207 +1023,208 @@ export default function SalesPage() {
                     setFilterYear('')
                     setSearchPartyName('')
                     setSelectedParty('All')
+                    setFilterStatus('All')
                   }}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                  className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-700/50"
                 >
+                  <XCircle className="w-4 h-4" />
                   Clear Filters
                 </button>
               )}
             </div>
           </div>
-        </div>
-
-        {/* Sales Summary Card */}
-        {salesSummary && (
-          <div className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg shadow-lg p-6 mb-6 text-white">
-            <h2 className="text-xl font-bold mb-4">
-              Sales Summary {selectedParty !== 'All' ? `for ${selectedParty}` : 'for All Parties'}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-sm opacity-90 mb-1">Total Sales</p>
-                <p className="text-3xl font-bold">{salesSummary.totalSales}</p>
-              </div>
-              <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-sm opacity-90 mb-1">Total Revenue</p>
-                <p className="text-3xl font-bold">₹{salesSummary.totalRevenue.toLocaleString('en-IN')}</p>
-              </div>
-              <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-sm opacity-90 mb-1">Average Sale</p>
-                <p className="text-3xl font-bold">₹{Math.round(salesSummary.averageSale).toLocaleString('en-IN')}</p>
-              </div>
-              <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
-                <p className="text-sm opacity-90 mb-1">Date Range</p>
-                {salesSummary.dateRange ? (
-                  <p className="text-sm font-medium">
-                    {format(new Date(salesSummary.dateRange.from), 'dd MMM yyyy')} - {format(new Date(salesSummary.dateRange.to), 'dd MMM yyyy')}
-                  </p>
-                ) : (
-                  <p className="text-sm font-medium">N/A</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {(() => {
           // Filter sales based on search and date filters
-          let filteredSales = sales
-
-          // Apply party name search filter (only if party dropdown is not selected)
-          if (searchPartyName && selectedParty === 'All') {
-            filteredSales = filteredSales.filter(sale =>
-              sale.partyName.toLowerCase().includes(searchPartyName.toLowerCase())
-            )
-          }
+          let filteredSales = sales.filter(sale => {
+            // Party Filter
+            if (selectedParty !== 'All' && sale.partyName !== selectedParty) return false
+            
+            // Search Filter
+            if (searchPartyName && !sale.partyName.toLowerCase().includes(searchPartyName.toLowerCase())) return false
+            
+            // Status Filter
+            if (filterStatus !== 'All') {
+              if (sale.paymentStatus !== filterStatus) return false
+            }
+            
+            // Date Filters
+            const saleDate = new Date(sale.date)
+            if (filterDate) {
+              const d = new Date(filterDate)
+              if (saleDate.toDateString() !== d.toDateString()) return false
+            }
+            if (filterMonth) {
+              if (format(saleDate, 'MM') !== filterMonth) return false
+            }
+            if (filterYear) {
+              if (saleDate.getFullYear().toString() !== filterYear) return false
+            }
+            
+            return true
+          })
 
           if (filteredSales.length === 0) {
             return (
-              <div className="bg-white rounded-lg shadow-md p-12 text-center">
-                <p className="text-gray-500 text-lg">
-                  {searchPartyName || filterMonth || filterYear
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                className="bg-slate-800/50 rounded-[2rem] border border-slate-700/50 p-12 text-center backdrop-blur-xl"
+              >
+                <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 border border-slate-700">
+                  <ShoppingBag className="w-10 h-10 text-slate-500" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">No Sales Found</h3>
+                <p className="text-slate-400">
+                  {searchPartyName || filterMonth || filterYear || filterStatus !== 'All'
                     ? `No sales found matching your filters.`
                     : 'No sales recorded yet. Record your first sale!'}
                 </p>
-              </div>
+              </motion.div>
             )
           }
 
           return (
-            <div className="space-y-4">
-              {filteredSales.map((sale) => {
-                const totalProfit = sale.items.reduce((sum, item) => sum + item.profit, 0)
-                return (
-                  <div key={sale.id} className="bg-white rounded-lg shadow-md p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-900">{sale.partyName}</h3>
-                        <p className="text-sm text-gray-500">
-                          {format(new Date(sale.date), 'dd MMM yyyy')} • Bill: {sale.billNumber}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-green-600">₹{sale.totalAmount.toLocaleString()}</p>
-                          <p className="text-sm text-gray-500">Profit: ₹{totalProfit.toLocaleString()}</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit(sale)}
-                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-all border border-blue-200"
-                            title="Edit Sale"
+            <div className="bg-slate-800/50 rounded-[2.5rem] border border-slate-700/50 shadow-2xl overflow-hidden backdrop-blur-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-700/50">
+                      <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Party / Details</th>
+                      <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Items (Qty)</th>
+                      <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Total / Profit</th>
+                      <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Payment</th>
+                      <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300">Status</th>
+                      <th className="p-4 sm:p-6 text-sm font-semibold text-slate-300 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50">
+                    <AnimatePresence>
+                      {filteredSales.map((sale) => {
+                        const totalProfit = sale.items.reduce((sum, item) => sum + item.profit, 0)
+                        return (
+                          <motion.tr
+                            key={sale.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="group hover:bg-slate-800/50 transition-colors"
                           >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(sale.id)}
-                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-md text-sm font-medium transition-all border border-red-200"
-                            title="Delete Sale"
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex flex-col gap-1.5">
+                                <span className="font-bold text-white text-lg">{sale.partyName}</span>
+                                <div className="flex items-center gap-2 text-slate-400 text-sm">
+                                  <Calendar className="w-4 h-4 text-slate-500" />
+                                  <span>{format(new Date(sale.date), 'dd MMM yyyy')}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-slate-400 text-sm">
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-xs font-mono">
+                                    {sale.billNumber}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            
+                            <td className="p-4 sm:p-6 align-top min-w-[250px]">
+                              <div className="space-y-2">
+                                {sale.items.map((item, idx) => (
+                                  <div key={idx} className="flex justify-between items-center text-sm p-2 rounded-lg bg-slate-800/30 border border-slate-700/30">
+                                    <div>
+                                      <p className="font-medium text-slate-200">{item.dressName}</p>
+                                      <p className="text-xs text-slate-500">{item.dressCode} • {item.size}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-xs font-mono">x{item.quantity}</span>
+                                      <p className="text-xs text-slate-400 mt-1">₹{item.sellingPrice}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
 
-                    <div className="px-6 py-4">
-                      <div className="flex flex-wrap items-center gap-3 mb-4">
-                        {/* Payment Mode Badge */}
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
-                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          <span className="text-sm font-medium text-blue-700">{sale.paymentMode}</span>
-                        </div>
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-lg font-bold text-emerald-400">
+                                  ₹{sale.totalAmount.toLocaleString()}
+                                </span>
+                                <span className="text-sm font-medium text-blue-400 opacity-80">
+                                  Profit: ₹{totalProfit.toLocaleString()}
+                                </span>
+                              </div>
+                            </td>
 
-                        {/* Payment Status - Always visible with colored pill */}
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border ${getPaymentStatusStyle(sale.paymentStatus || 'paid')}`}>
-                            {getPaymentStatusIcon(sale.paymentStatus || 'paid')} {(sale.paymentStatus || 'paid').charAt(0).toUpperCase() + (sale.paymentStatus || 'paid').slice(1)}
-                          </span>
-                          <select
-                            value={sale.paymentStatus || 'paid'}
-                            onChange={(e) => handleUpdatePaymentStatus(sale.id, e.target.value as 'paid' | 'pending' | 'due' | 'failed')}
-                            className={`text-xs px-2 py-1.5 rounded-lg border font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer ${getPaymentStatusStyle(sale.paymentStatus || 'paid')}`}
-                            onClick={(e) => e.stopPropagation()}
-                            title="Change payment status"
-                          >
-                            <option value="paid">✅ Paid</option>
-                            <option value="pending">⏳ Pending</option>
-                            <option value="due">📅 Due</option>
-                            <option value="failed">❌ Failed</option>
-                          </select>
-                        </div>
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 rounded-lg border border-indigo-500/20 w-max">
+                                  <CreditCard className="w-4 h-4 text-indigo-400" />
+                                  <span className="text-sm font-medium text-indigo-300">{sale.paymentMode}</span>
+                                </div>
+                                {(sale.upiId || sale.upiTransactionId) && (
+                                  <div className="text-xs text-slate-500 space-y-1 mt-1">
+                                    {sale.upiId && <p>ID: {sale.upiId}</p>}
+                                    {sale.upiTransactionId && <p>TXN: {sale.upiTransactionId}</p>}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
 
-                        {sale.upiId && (
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <span className="px-2 py-1 bg-gray-100 rounded">UPI ID: {sale.upiId}</span>
-                          </div>
-                        )}
-                        {sale.upiTransactionId && (
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <span className="px-2 py-1 bg-gray-100 rounded">TXN: {sale.upiTransactionId}</span>
-                          </div>
-                        )}
-                      </div>
-                      {sale.saleImage && (
-                        <div className="mt-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <p className="text-sm font-semibold text-gray-700">Sale Proof Image</p>
-                          </div>
-                          <div className="relative group max-w-xs aspect-auto rounded-xl border-2 border-gray-200 shadow-md cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 overflow-hidden">
-                            <Image
-                              src={sale.saleImage}
-                              alt="Sale proof"
-                              fill
-                              className="object-contain"
-                              sizes="(max-width: 768px) 100vw, 384px"
-                              onClick={() => window.open(sale.saleImage, '_blank')}
-                            />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-xl transition-all duration-200 flex items-center justify-center">
-                              <span className="opacity-0 group-hover:opacity-100 text-white text-sm font-medium bg-black bg-opacity-50 px-3 py-1 rounded-lg">
-                                Click to view full size
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex items-center gap-2">
+                                <StatusBadge 
+                                  status={(sale.paymentStatus || 'paid').charAt(0).toUpperCase() + (sale.paymentStatus || 'paid').slice(1)}
+                                  variant={sale.paymentStatus === 'paid' ? 'success' : sale.paymentStatus === 'failed' ? 'danger' : sale.paymentStatus === 'due' ? 'warning' : 'info'}
+                                />
+                                <div className="relative group cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                                  <select
+                                    value={sale.paymentStatus || 'paid'}
+                                    onChange={(e) => handleUpdatePaymentStatus(sale.id, e.target.value as any)}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                                  >
+                                    <option value="paid">Paid</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="due">Due</option>
+                                    <option value="failed">Failed</option>
+                                  </select>
+                                  <div className="p-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors text-slate-400">
+                                    <Edit className="w-3 h-3" />
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
 
-                    <div className="border-t pt-4">
-                      <table className="min-w-full">
-                        <thead>
-                          <tr className="text-left text-xs font-medium text-gray-500 uppercase">
-                            <th className="pb-2">Item</th>
-                            <th className="pb-2">Type</th>
-                            <th className="pb-2">Code</th>
-                            <th className="pb-2">Size</th>
-                            <th className="pb-2">Qty</th>
-                            <th className="pb-2">Price</th>
-                            <th className="pb-2">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sale.items.map((item, idx) => (
-                            <tr key={idx} className="border-b">
-                              <td className="py-2 text-sm">{item.dressName}</td>
-                              <td className="py-2 text-sm text-gray-500">{item.dressType}</td>
-                              <td className="py-2 text-sm text-gray-500">{item.dressCode}</td>
-                              <td className="py-2 text-sm text-gray-500">{item.size}</td>
-                              <td className="py-2 text-sm text-gray-500">{item.quantity}</td>
-                              <td className="py-2 text-sm text-gray-500">₹{item.sellingPrice}</td>
-                              <td className="py-2 text-sm font-medium">₹{(item.sellingPrice * item.quantity).toLocaleString()}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )
-              })}
+                            <td className="p-4 sm:p-6 align-top">
+                              <div className="flex flex-wrap gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+                                <ActionButton 
+                                  icon={Edit} 
+                                  onClick={(e) => { e?.stopPropagation(); handleEdit(sale); }}
+                                  variant="ghost" 
+                                >
+                                  Edit
+                                </ActionButton>
+                                <ActionButton 
+                                  icon={Trash2} 
+                                  onClick={(e) => { e?.stopPropagation(); handleDelete(sale.id); }}
+                                  variant="danger" 
+                                >
+                                  Delete
+                                </ActionButton>
+                                {sale.saleImage && (
+                                  <ActionButton 
+                                    icon={Link} 
+                                    onClick={(e) => { e?.stopPropagation(); window.open(sale.saleImage, '_blank'); }}
+                                    variant="secondary" 
+                                  >
+                                    Proof
+                                  </ActionButton>
+                                )}
+                              </div>
+                            </td>
+                          </motion.tr>
+                        )
+                      })}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+              </div>
             </div>
           )
         })()}
@@ -1103,7 +1270,7 @@ export default function SalesPage() {
                         required
                         value={formData.date}
                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       />
                     </div>
                     <div>
@@ -1136,7 +1303,7 @@ export default function SalesPage() {
                             setFormData(prev => ({ ...prev, customerId: '', partyName: '' }))
                           }
                         }}
-                        className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                        className="w-4 h-4 text-[var(--accent)] rounded focus:ring-[var(--accent)]"
                       />
                       <label htmlFor="useCustomer" className="text-sm font-medium text-gray-700">
                         Select from existing customers
@@ -1160,7 +1327,7 @@ export default function SalesPage() {
                         <button
                           type="button"
                           onClick={() => setShowCustomerModal(true)}
-                          className="px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-center"
+                          className="px-3 py-2 bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] flex items-center justify-center"
                           title="Add New Customer"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1175,7 +1342,7 @@ export default function SalesPage() {
                         value={formData.partyName}
                         onChange={(e) => setFormData({ ...formData, partyName: e.target.value })}
                         placeholder="Enter party/customer name"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       />
                     )}
                     {customers.length === 0 && (
@@ -1191,7 +1358,7 @@ export default function SalesPage() {
                         required
                         value={formData.paymentMode}
                         onChange={handlePaymentModeChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       >
                         <option value="Cash">Cash</option>
                         <option value="UPI">UPI</option>
@@ -1256,11 +1423,50 @@ export default function SalesPage() {
                       <button
                         type="button"
                         onClick={handleAddItem}
-                        className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                        className="text-[var(--accent)] hover:text-[var(--accent-hover)] text-sm font-medium"
                       >
                         ➕ Add Item
                       </button>
                     </div>
+
+                    {/* Barcode Quick Scan */}
+                    <div className="mb-4 p-3 rounded-xl border border-indigo-200 bg-indigo-50 flex flex-col gap-2">
+                      <div className="flex items-center gap-2 text-indigo-700 text-xs font-bold uppercase tracking-wider mb-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h1v1h-1z" /><path d="M17 14h1v3h-3v-1h2z" /><path d="M14 18h3v1h-3z" /><path d="M20 17h1v4h-1z" /></svg>
+                        Quick Scan / Type Code
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          ref={barcodeInputRef}
+                          type="text"
+                          value={barcodeInput}
+                          onChange={(e) => { setBarcodeInput(e.target.value); setBarcodeError('') }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleBarcodeScan(barcodeInput)
+                            }
+                          }}
+                          placeholder="Scan barcode or type dress code + Enter..."
+                          className="flex-1 px-3 py-2 text-sm border border-indigo-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          autoComplete="off"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleBarcodeScan(barcodeInput)}
+                          className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {barcodeError && (
+                        <p className="text-red-600 text-xs font-medium">{barcodeError}</p>
+                      )}
+                      <p className="text-indigo-500 text-[10px]">
+                        Connect a USB barcode scanner and scan — it auto-adds the product to the invoice.
+                      </p>
+                    </div>
+
 
                     {formData.items.length === 0 ? (
                       <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50">
@@ -1342,7 +1548,14 @@ export default function SalesPage() {
                                     value={item.quantity}
                                     onChange={(e) => {
                                       const quantity = parseInt(e.target.value) || 0
-                                      const availableStock = selectedItem?.currentStock || 0
+                                      // Special handling for edit mode: stock check should ignore the items already in this sale
+                                      let availableStock = selectedItem?.currentStock || 0
+                                      if (editingSale) {
+                                        const originalItem = editingSale.items.find(i => i.inventoryId === item.inventoryId)
+                                        if (originalItem) {
+                                          availableStock += originalItem.quantity
+                                        }
+                                      }
 
                                       if (quantity > availableStock) {
                                         alert(`Insufficient stock. Available: ${availableStock}, Requested: ${quantity}`)
@@ -2021,6 +2234,7 @@ export default function SalesPage() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </AdminLayout>
   )

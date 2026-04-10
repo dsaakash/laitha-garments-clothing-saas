@@ -62,12 +62,14 @@ function applyThemeToDOM(theme: ThemeSettings) {
     root.style.setProperty('--accent-r', accentRgb.r.toString())
     root.style.setProperty('--accent-g', accentRgb.g.toString())
     root.style.setProperty('--accent-b', accentRgb.b.toString())
+    root.style.setProperty('--accent-rgb', `${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b}`)
 
     // Generate sidebar RGB for opacity-based usages
     const sidebarRgb = hexToRgb(theme.sidebarColor)
     root.style.setProperty('--sidebar-r', sidebarRgb.r.toString())
     root.style.setProperty('--sidebar-g', sidebarRgb.g.toString())
     root.style.setProperty('--sidebar-b', sidebarRgb.b.toString())
+    root.style.setProperty('--sidebar-rgb', `${sidebarRgb.r}, ${sidebarRgb.g}, ${sidebarRgb.b}`)
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

@@ -149,7 +149,7 @@ export default function CustomersPage() {
               resetForm()
               setShowModal(true)
             }}
-            className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            className="bg-[var(--accent)] text-white px-6 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
             ➕ Add New Customer
           </button>
@@ -163,7 +163,7 @@ export default function CustomersPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by party name or phone number..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
           />
           {searchQuery && (
             <p className="text-sm text-gray-500 mt-2">
@@ -177,7 +177,7 @@ export default function CustomersPage() {
             <p className="text-gray-500 text-lg mb-4">No customers yet. Add your first customer!</p>
             <button
               onClick={() => setShowModal(true)}
-              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
+              className="bg-[var(--accent)] text-white px-6 py-2 rounded-lg hover:bg-[var(--accent-hover)]"
             >
               Add Customer
             </button>
@@ -187,7 +187,7 @@ export default function CustomersPage() {
             <p className="text-gray-500 text-lg mb-4">No customers found matching your search.</p>
             <button
               onClick={() => setSearchQuery('')}
-              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
+              className="bg-[var(--accent)] text-white px-6 py-2 rounded-lg hover:bg-[var(--accent-hover)]"
             >
               Clear Search
             </button>
@@ -214,7 +214,7 @@ export default function CustomersPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
                         onClick={() => handleEdit(customer)}
-                        className="text-purple-600 hover:text-purple-900 mr-4"
+                        className="text-[var(--accent)] hover:text-[var(--accent-hover)] mr-4"
                       >
                         Edit
                       </button>
@@ -246,7 +246,7 @@ export default function CustomersPage() {
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
                 <div>
@@ -256,7 +256,7 @@ export default function CustomersPage() {
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
                 <div>
@@ -265,7 +265,7 @@ export default function CustomersPage() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
                 <div>
@@ -274,7 +274,7 @@ export default function CustomersPage() {
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">
@@ -290,7 +290,7 @@ export default function CustomersPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                    className="px-4 py-2 bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)]"
                   >
                     {editingCustomer ? 'Update' : 'Add'} Customer
                   </button>

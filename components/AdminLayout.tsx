@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 import { checkAuth, logout } from '@/lib/auth'
 import { useTrialCheck } from '@/lib/useTrialCheck'
+import { useActivityTracker } from '@/lib/useActivityTracker'
 import SubscriptionRenewalBanner from '@/components/SubscriptionRenewalBanner'
 import {
   LayoutDashboard,
@@ -33,7 +35,8 @@ import {
   Search,
   Palette,
   Paintbrush,
-  MessageCircle
+  MessageCircle,
+  Calendar
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -59,13 +62,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [userName, setUserName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [businessName, setBusinessName] = useState<string>('')
+  const [slug, setSlug] = useState<string>('')
   const [workflowEnabled, setWorkflowEnabled] = useState<boolean>(false)
+  const [websiteBuilderEnabled, setWebsiteBuilderEnabled] = useState<boolean>(false)
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0)
   const [tenantModules, setTenantModules] = useState<string[]>([])
+  const [tenantId, setTenantId] = useState<string | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
 
   // Check trial expiry for tenants
   useTrialCheck()
+
+  // Track tenant page views
+  useActivityTracker(pathname, tenantId, userRole)
 
   useEffect(() => {
     checkAuth().then((auth) => {
@@ -159,11 +168,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
               // Also fetch modules/workflow if tenant_id exists
               if (data.admin.tenant_id) {
+                setTenantId(data.admin.tenant_id)
                 fetch(`/api/tenants/${data.admin.tenant_id}`)
                   .then(res => res.json())
                   .then(tenantData => {
                     if (tenantData.success && tenantData.data) {
                       setWorkflowEnabled(tenantData.data.workflowEnabled || false)
+                      setWebsiteBuilderEnabled(tenantData.data.websiteBuilderEnabled || false)
+                      setSlug(tenantData.data.slug || '')
                       setTenantModules(tenantData.data.modules || [])
                     }
                   })
@@ -300,7 +312,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderBottomColor: 'var(--accent)' }}></div>
           <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
@@ -343,6 +355,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       { href: '/admin/research', label: 'Raw Research', icon: Search, resource: 'research', action: 'read', module: 'research' },
       { href: '/admin/setup', label: 'Setup Wizard', icon: Rocket, resource: 'dashboard', module: 'setup' },
       { href: '/admin/business', label: 'Business Setup', icon: Settings, resource: 'business', module: 'business' },
+      { href: '/admin/billing', label: 'Billing & Pricing', icon: Banknote, resource: 'business', module: 'business' },
       {
         href: '/admin/workflow',
         label: 'Workflow',
@@ -380,16 +393,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
 
     // Superadmin bypass (legacy check fallback)
-    if (userRole === 'superadmin') return navItems
+    let items = navItems
 
-    // Filter based on permissions
-    let items = navItems.filter(item => {
-      // If resource is specified, check permission
-      if (item.resource) {
-        return hasPermission(item.resource, item.action || 'read')
-      }
-      return true // No resource specific requirement? (Should be rare)
-    })
+    // Filter based on permissions for non-superadmins
+    if (userRole !== 'superadmin') {
+      items = items.filter(item => {
+        if (item.resource) {
+          return hasPermission(item.resource, item.action || 'read')
+        }
+        return true
+      })
+    }
 
     // Special handling for legacy 'user' role if permissions are empty
     // This provides backward compatibility if permissions migration failed or delayed
@@ -419,166 +433,147 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       })
     }
 
+    // Hide Billing from non-tenants (Superadmins and other roles)
+    if (userRole !== 'admin') {
+      items = items.filter(item => item.href !== '/admin/billing')
+    }
+
     return items
   })()
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen bg-[#F8FAFD] font-sans selection:bg-[var(--accent)]/10 selection:text-[var(--accent)]">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 text-white shadow-2xl transform transition-all duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-72'} w-72 flex flex-col`}
-        style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)' }}
+        className={`fixed inset-y-0 left-0 z-50 text-white shadow-[0_0_50px_rgba(0,0,0,0.1)] transform transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } ${sidebarCollapsed ? 'lg:w-[88px]' : 'lg:w-[280px]'} w-[280px] flex flex-col border-r border-white/5`}
+        style={{ 
+          background: 'var(--sidebar-bg)',
+          backdropFilter: 'blur(20px)'
+        }}
       >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className={`flex-shrink-0 backdrop-blur border-b ${sidebarCollapsed ? 'p-4 items-center justify-center' : 'p-6'}`} style={{ backgroundColor: 'rgba(0,0,0,0.15)', borderColor: 'rgba(255,255,255,0.1)' }}>
-            <div className="flex items-start justify-between gap-3">
-              {!sidebarCollapsed && (
-                <div className="flex-1 min-w-0">
-                  {isInitializing && !businessName ? (
-                    <div className="animate-pulse space-y-3">
-                      <div className="h-10 bg-white/10 rounded-xl w-3/4"></div>
-                      <div className="h-4 bg-white/5 rounded-lg w-1/2"></div>
+        <div className="flex flex-col h-full relative overflow-hidden">
+          {/* Decorative background glow */}
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-[rgba(var(--accent-rgb),0.2)] rounded-full blur-[80px] pointer-events-none"></div>
+          
+          {/* Header Section */}
+          <div className={`flex-shrink-0 relative z-10 ${sidebarCollapsed ? 'p-5 flex flex-col items-center justify-center' : 'p-6'}`}>
+            {!sidebarCollapsed ? (
+              <div className="space-y-6">
+                <Link href="/admin/dashboard" className="flex items-center gap-3 group">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.1)] group-hover:scale-110 transition-transform duration-500">
+                    <span className="text-2xl drop-shadow-sm">🌸</span>
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Live Portal</span>
+                       <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
                     </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="p-2 rounded-xl bg-purple-500 shadow-[0_0_15px_rgba(147,51,234,0.4)]">
-                          <Store className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex flex-col">
-                          <p className="text-[10px] uppercase tracking-[0.2em] text-purple-200/50 font-black mb-0.5">Your Store</p>
-                          <h1 className="text-xl font-extrabold text-white truncate leading-none tracking-tight drop-shadow-sm">
-                            {businessName || 'Loading...'}
-                          </h1>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-4">
-                        <div className="flex items-center gap-2 text-[9px] font-black py-1.5 px-3 rounded-full shadow-lg border border-white/10" style={{ color: '#ffffff', backgroundColor: 'var(--accent, #9333ea)' }}>
-                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse shadow-[0_0_8px_rgba(255,255,255,0.8)]"></div>
-                          <span className="uppercase tracking-[0.15em]">{userRole === 'user' ? 'Member' : 'Admin Portal'}</span>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                    <h1 className="text-lg font-black text-white truncate leading-tight tracking-tight mt-0.5">
+                      {businessName || 'Command Center'}
+                    </h1>
+                  </div>
+                </Link>
+                
+                <div className="flex items-center gap-2 py-2 px-3 bg-white/5 border border-white/5 rounded-2xl">
+                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent)' }}></div>
+                   <span className="text-[10px] font-black uppercase tracking-widest opacity-80" style={{ color: 'var(--sidebar-text)' }}>
+                     {userRole === 'superadmin' ? 'Super Intelligence' : 'Enterprise Admin'}
+                   </span>
                 </div>
-              )}
-              {sidebarCollapsed && (
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-2xl relative group overflow-hidden" style={{ backgroundColor: 'var(--accent, #9333ea)' }}>
-                  <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent"></div>
-                  <span className="font-black text-xl text-white relative z-10">
-                    {businessName.slice(0, 1).toUpperCase()}
-                  </span>
-                  <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {/* Mobile Close Button */}
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="lg:hidden hover:text-white p-2 rounded-lg transition-colors"
-                  style={{ color: 'var(--sidebar-text, #94a3b8)' }}
-                >
-                  <X className="w-6 h-6" />
-                </button>
               </div>
-            </div>
+            ) : (
+              <Link href="/admin/dashboard" className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl group hover:scale-110 transition-all duration-500 relative">
+                 <span className="text-xl">🌸</span>
+                 <div className="absolute -right-1 -top-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#0F172A]"></div>
+              </Link>
+            )}
           </div>
 
-          {/* Navigation */}
-          <nav className={`flex-1 overflow-y-auto scrollbar-thin ${sidebarCollapsed ? 'px-2 py-4' : 'px-4 py-6'} space-y-1.5`}>
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent mb-4"></div>
+
+          {/* Navigation Section */}
+          <nav className={`flex-1 overflow-y-auto overflow-x-hidden scrollbar-none custom-sidebar-nav ${sidebarCollapsed ? 'px-3' : 'px-4'} space-y-1`}>
             {filteredNavItems.map((item) => {
               const isActive = pathname === item.href || (item.subItems && item.subItems.some(sub => pathname === sub.href))
               const Icon = item.icon
               const hasSubItems = item.subItems && item.subItems.length > 0
-              // State to track if submenu is expanded - defaulting to true if active
               const isExpanded = isActive || (hasSubItems && pathname.startsWith(item.href))
 
               return (
-                <div key={item.href}>
+                <div key={item.href} className="group/nav-item">
                   <Link
                     href={item.href}
-                    className={`relative flex items-center rounded-xl transition-all duration-200 group ${sidebarCollapsed ? 'justify-center p-3' : 'px-4 py-3 gap-3'
-                      } ${isActive && !hasSubItems
-                        ? 'text-white shadow-lg'
-                        : isActive && hasSubItems
-                          ? 'text-white'
-                          : ''
-                      }`}
-                    style={{
-                      backgroundColor: isActive && !hasSubItems
-                        ? 'var(--accent, #9333ea)'
-                        : isActive && hasSubItems
-                          ? 'var(--sidebar-hover, #334155)'
-                          : undefined,
-                      color: isActive
-                        ? '#ffffff'
-                        : 'var(--sidebar-text, #94a3b8)',
-                    }}
-                    title={sidebarCollapsed ? item.label : ''}
+                    className={`relative flex items-center transition-all duration-300 rounded-[1.2rem] ${
+                      sidebarCollapsed ? 'justify-center p-3.5' : 'px-4 py-3 gap-3.5'
+                    } ${isActive ? 'bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]' : 'hover:bg-white/5'}`}
+                    style={{ color: isActive ? 'var(--sidebar-text)' : 'rgba(255,255,255,0.5)' }}
                   >
-                    <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} strokeWidth={2} />
+                    {isActive && (
+                      <motion.div
+                        layoutId="active-nav-pill"
+                        className="absolute inset-0 bg-white/10 rounded-[1.2rem] border border-white/10"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                    
+                    <div 
+                      className={`relative z-10 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover/nav-item:scale-110'}`}
+                      style={{ color: isActive ? 'var(--accent)' : 'inherit' }}
+                    >
+                      <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                    </div>
 
                     {!sidebarCollapsed && (
-                      <span className="font-medium text-sm flex-1">{item.label}</span>
+                      <span 
+                        className={`relative z-10 text-[13px] font-bold tracking-tight flex-1`}
+                        style={{ color: isActive ? 'var(--sidebar-text)' : 'inherit' }}
+                      >
+                        {item.label}
+                      </span>
                     )}
 
                     {!sidebarCollapsed && item.badge !== undefined && item.badge > 0 && (
-                      <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md animate-pulse">
+                      <span className="relative z-10 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center shadow-[0_0_10px_rgba(16,185,129,0.3)]">
                         {item.badge}
                       </span>
                     )}
 
                     {!sidebarCollapsed && hasSubItems && (
-                      <div style={{ color: 'var(--sidebar-text, #64748b)', opacity: 0.6 }}>
-                        {isExpanded ? <ChevronLeft className="w-4 h-4 -rotate-90" /> : <ChevronLeft className="w-4 h-4" />}
-                      </div>
+                      <ChevronRight size={14} className={`relative z-10 transition-transform duration-300 opacity-40 ${isExpanded ? 'rotate-90' : ''}`} />
                     )}
-
-                    {!sidebarCollapsed && isActive && !hasSubItems && (
-                      <span className="w-1.5 h-1.5 bg-white rounded-full shadow-glow"></span>
-                    )}
-
-                    {/* Tooltip for collapsed mode */}
+                    
+                    {/* Collapsed Tooltip */}
                     {sidebarCollapsed && (
-                      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 text-white text-xs font-medium rounded-md shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap" style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                        {item.label}
-                        {hasSubItems && item.subItems?.map(sub => (
-                          <div key={sub.href} className="mt-1 font-normal pl-2" style={{ color: 'var(--sidebar-text, #94a3b8)', opacity: 0.7, borderLeft: '1px solid rgba(255,255,255,0.15)' }}>
-                            {sub.label}
-                          </div>
-                        ))}
-                        <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rotate-45" style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)', borderLeft: '1px solid rgba(255,255,255,0.15)', borderBottom: '1px solid rgba(255,255,255,0.15)' }}></div>
-                      </div>
+                       <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs font-black text-white opacity-0 group-hover/nav-item:opacity-100 pointer-events-none transition-all duration-300 translate-x-2 group-hover/nav-item:translate-x-0 z-[100] whitespace-nowrap shadow-2xl">
+                          {item.label}
+                       </div>
                     )}
                   </Link>
 
-                  {/* Submenu Items */}
-                  {!sidebarCollapsed && hasSubItems && (
-                    <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                  {/* Submenu with animation */}
+                  {!sidebarCollapsed && hasSubItems && isExpanded && (
+                    <div className="mt-1 ml-4 pl-4 border-l border-white/5 space-y-1">
                       {item.subItems?.map((sub) => {
                         const isSubActive = pathname === sub.href
                         return (
                           <Link
                             key={sub.href}
                             href={sub.href}
-                            className="flex items-center pl-12 pr-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200"
-                            style={{
-                              color: isSubActive ? 'var(--accent, #9333ea)' : 'var(--sidebar-text, #94a3b8)',
-                              backgroundColor: isSubActive ? 'rgba(255,255,255,0.05)' : undefined,
-                            }}
+                            className={`block py-2 text-[12px] font-bold transition-all hover:text-white`}
+                            style={{ color: isSubActive ? 'var(--accent)' : 'rgba(255,255,255,0.4)' }}
                           >
-                            <span className="w-1.5 h-1.5 rounded-full mr-3" style={{ backgroundColor: isSubActive ? 'var(--accent, #9333ea)' : 'rgba(255,255,255,0.2)' }}></span>
                             {sub.label}
                           </Link>
                         )
@@ -590,98 +585,116 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             })}
           </nav>
 
-          {/* Footer */}
-          <div className={`flex-shrink-0 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`} style={{ borderTop: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.1)' }}>
-            {/* User & Store ID Section */}
-            <div className={`flex flex-col gap-2 ${sidebarCollapsed ? 'items-center' : 'px-1'}`}>
-              <div className={`flex items-center gap-3 w-full ${sidebarCollapsed ? 'justify-center py-2' : 'px-3 py-3'} rounded-2xl bg-white/5 border border-white/10 relative group hover:bg-white/10 transition-all duration-300`}>
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 flex items-center justify-center border border-white/10 flex-shrink-0 shadow-inner">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                {!sidebarCollapsed && (
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-0.5">Logged in as</p>
-                    <p className="text-sm font-bold text-white truncate leading-tight">{userName || 'User'}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Building2 className="w-3 h-3 text-purple-400" />
-                      <p className="text-[11px] text-purple-200/70 truncate font-semibold">{businessName}</p>
+          {/* Footer Section */}
+          <div className={`flex-shrink-0 ${sidebarCollapsed ? 'p-3' : 'p-6'} space-y-4 relative z-10`}>
+             <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent mb-4"></div>
+             
+             {/* Profile Card */}
+             {!sidebarCollapsed ? (
+               <div className="bg-white/5 border border-white/5 rounded-3xl p-4 group hover:bg-white/10 transition-all duration-500 cursor-pointer overflow-hidden relative">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black shadow-lg"
+                      style={{ background: 'var(--accent)' }}
+                    >
+                      {userName?.charAt(0) || 'U'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 leading-none">Command By</p>
+                      <p className="text-[13px] font-black text-white truncate mt-1">{userName || 'Administrator'}</p>
                     </div>
                   </div>
-                )}
-                {sidebarCollapsed && (
-                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-2 text-white text-xs font-medium rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-50 whitespace-nowrap scale-95 group-hover:scale-100" style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-[9px] uppercase tracking-wider text-white/40 font-bold">User Profile</p>
-                      <p className="font-bold text-sm">{userName || 'User'}</p>
-                      <div className="flex items-center gap-1.5 py-1 px-2 rounded-md bg-white/5 border border-white/5">
-                        <Building2 className="w-3 h-3 text-purple-400" />
-                        <p className="text-[10px] text-white/80">{businessName}</p>
-                      </div>
-                      {userEmail && <p className="text-[9px] text-white/40 opacity-60 italic">{userEmail}</p>}
-                    </div>
-                    <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rotate-45" style={{ backgroundColor: 'var(--sidebar-bg, #1e293b)', borderLeft: '1px solid rgba(255,255,255,0.15)', borderBottom: '1px solid rgba(255,255,255,0.15)' }}></div>
+                  {/* Subtle hover effect light */}
+                  <div className="absolute -right-4 -bottom-4 w-12 h-12 bg-white/5 rounded-full blur-xl group-hover:bg-white/10 transition-all"></div>
+               </div>
+             ) : (
+               <div className="flex justify-center">
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all">
+                     <User size={20} />
                   </div>
-                )}
-              </div>
-            </div>
+               </div>
+             )}
 
-            {/* Collapse/Expand Toggle Button - Bottom */}
-            <button
-              onClick={toggleSidebar}
-              className={`hidden lg:flex w-full items-center hover:text-white p-2.5 rounded-xl transition-all duration-200 border border-transparent ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'}`}
-              style={{ color: 'var(--sidebar-text, #94a3b8)' }}
-              title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            >
-              <div className="rounded-lg p-1" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                {sidebarCollapsed ? (
-                  <ChevronRight className="w-4 h-4" />
-                ) : (
-                  <ChevronLeft className="w-4 h-4" />
-                )}
-              </div>
-              {!sidebarCollapsed && <span className="text-sm font-medium">Collapse Sidebar</span>}
-            </button>
+             <div className="flex flex-col gap-2">
+                <button
+                  onClick={toggleSidebar}
+                  className={`hidden lg:flex items-center text-slate-500 hover:text-white transition-all text-[12px] font-black uppercase tracking-widest py-2 ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-2'}`}
+                >
+                  <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center border border-white/5">
+                     {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                  </div>
+                  {!sidebarCollapsed && <span>Layout Modes</span>}
+                </button>
 
-            <button
-              onClick={handleLogout}
-              className={`w-full flex items-center bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-400 p-2.5 rounded-xl transition-all duration-200 border border-transparent hover:border-red-500/30 ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'
-                }`}
-              title={sidebarCollapsed ? 'Logout' : ''}
-            >
-              <LogOut className="w-5 h-5 flex-shrink-0" />
-              {!sidebarCollapsed && <span className="text-sm font-medium">Logout</span>}
-            </button>
+                <button
+                  onClick={handleLogout}
+                  className={`flex items-center text-red-400/70 hover:text-red-400 transition-all text-[12px] font-black uppercase tracking-widest py-2 rounded-2xl hover:bg-red-400/5 ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-2 border border-transparent hover:border-red-400/10'}`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${sidebarCollapsed ? 'bg-red-400/10' : 'bg-transparent group-hover:bg-red-400/10'}`}>
+                     <LogOut size={16} />
+                  </div>
+                  {!sidebarCollapsed && <span>Terminate Session</span>}
+                </button>
+             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'}`}>
-        {/* Mobile Header */}
-        <div className="lg:hidden bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30 px-4 py-3 flex items-center justify-between border-b border-gray-100">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-gray-600 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🌸</span>
-            <h1 className="text-lg font-bold text-gray-900 tracking-tight">{businessName}</h1>
-          </div>
-          <div className="w-10"></div> {/* Spacer for centering */}
+      <div className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${sidebarCollapsed ? 'lg:ml-[88px]' : 'lg:ml-[280px]'}`}>
+        {/* Top Floating Bar (Search & Mobile Menu) */}
+        <header className="sticky top-0 z-30 px-4 py-4 lg:px-8 pointer-events-none">
+           <div className="max-w-[1600px] mx-auto flex items-center justify-between pointer-events-auto">
+              <div className="lg:hidden flex items-center gap-3 bg-white border border-slate-100 shadow-xl rounded-2xl px-3 py-2">
+                 <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="p-1.5 hover:bg-slate-50 rounded-xl transition-colors"
+                 >
+                    <Menu size={22} className="text-slate-900" />
+                 </button>
+                 <span className="w-px h-6 bg-slate-100"></span>
+                 <span className="text-xl">🌸</span>
+              </div>
+              
+              <div className="hidden lg:flex flex-1 items-center max-w-md">
+                 {/* Desktop Search Placeholder or Breadcrumbs */}
+                 <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-widest">
+                    <span>Admin</span>
+                    <ChevronRight size={12} />
+                    <span className="text-slate-900">{pathname.split('/').pop()?.replace(/-/g, ' ')}</span>
+                 </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                 <div className="hidden md:flex items-center gap-2 bg-white border border-slate-100 rounded-2xl px-4 py-2 shadow-sm">
+                    <Calendar size={14} className="text-indigo-500" style={{ color: 'var(--accent)' }} />
+                    <span className="text-[11px] font-black text-slate-900 uppercase tracking-tight">
+                       {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                 </div>
+                 <div className="w-10 h-10 rounded-2xl bg-white border border-slate-100 shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-all">
+                    <div className="relative">
+                       <MessageCircle size={18} className="text-slate-900" />
+                       <div className="absolute -right-1 -top-1 w-2 h-2 rounded-full border border-white" style={{ backgroundColor: 'var(--accent)' }}></div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </header>
+
+        {/* Global Banner for trial/expiry */}
+        <div className="px-4 lg:px-8 mb-4 max-w-[1600px] mx-auto">
+           {userRole === 'admin' && <SubscriptionRenewalBanner />}
         </div>
 
-        {/* Subscription renewal warning banner — only shown to tenants near expiry */}
-        {(userRole === 'admin') && <SubscriptionRenewalBanner />}
-
-        <div className="p-4 lg:p-8 max-w-[1600px] mx-auto">
+        <main className="p-4 lg:p-8 pt-0 max-w-[1600px] mx-auto min-h-[calc(100vh-100px)]">
           {children}
-        </div>
+        </main>
       </div>
     </div>
   )
 }
+
 
 function X({ className }: { className?: string }) {
   return (

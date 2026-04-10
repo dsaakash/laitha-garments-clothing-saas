@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import AdminLayout from '@/components/AdminLayout'
-import PageHeader from '@/components/PageHeader'
 import ActionButton from '@/components/ActionButton'
 import StatusBadge from '@/components/StatusBadge'
 import { Tenant } from '@/lib/tenantStorage'
-import { Plus, Search, Building2, Users, DollarSign, Clock, Edit2 } from 'lucide-react'
-import Link from 'next/link'
+import { Plus, Search, Building2, Users, DollarSign, Clock, Edit2, LayoutDashboard, MonitorSmartphone, X, Check, Save, User, Trash2, Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function TenantsPage() {
     const router = useRouter()
@@ -41,7 +40,7 @@ export default function TenantsPage() {
     const loadTenants = async () => {
         setLoading(true)
         try {
-            const response = await fetch('/api/tenants')
+            const response = await fetch('/api/tenants', { credentials: 'include' })
             const result = await response.json()
             if (result.success) {
                 setTenants(result.data)
@@ -80,6 +79,7 @@ export default function TenantsPage() {
             const url = `/api/tenants/${id}${isHard ? '?hard=true' : ''}`
             const response = await fetch(url, {
                 method: 'DELETE',
+                credentials: 'include'
             })
             const result = await response.json()
 
@@ -115,6 +115,7 @@ export default function TenantsPage() {
             const response = await fetch(`/api/tenants/${editingTenant.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify(editForm)
             })
             const result = await response.json()
@@ -139,7 +140,7 @@ export default function TenantsPage() {
         tenant.ownerName.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-    const getStatusColor = (status: string) => {
+    const getStatusVariant = (status: string): any => {
         switch (status) {
             case 'active': return 'success'
             case 'trial': return 'warning'
@@ -149,311 +150,340 @@ export default function TenantsPage() {
         }
     }
 
-    const calculateTrialDays = (tenant: Tenant) => {
-        if (tenant.status !== 'trial') return null
-        const endDate = new Date(tenant.trialEndDate)
-        const today = new Date()
-        const diffTime = endDate.getTime() - today.getTime()
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        return Math.max(0, diffDays)
-    }
-
     return (
         <AdminLayout>
-            <div>
-                <PageHeader
-                    title="Tenant Management"
-                    description="Manage your business customers and subscriptions"
-                    action={
-                        <ActionButton
-                            icon={Plus}
-                            variant="primary"
-                            onClick={() => router.push('/admin/tenants/new')}
-                        >
-                            Add Tenant
-                        </ActionButton>
-                    }
-                />
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+                {/* Header Section - Theme-Aware Glassmorphic */}
+                <div 
+                    className="relative overflow-hidden rounded-[2.5rem] p-8 shadow-2xl border border-white/5"
+                    style={{ backgroundColor: 'var(--sidebar-bg)' }}
+                >
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 opacity-20 rounded-full blur-3xl pointer-events-none transition-all" style={{ backgroundColor: 'var(--accent)' }} />
+                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 opacity-10 rounded-full blur-3xl pointer-events-none transition-all" style={{ backgroundColor: 'var(--accent)' }} />
+                    
+                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-2 rounded-xl border transition-all" style={{ backgroundColor: 'rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.2)', borderColor: 'rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.3)' }}>
+                                    <Building2 className="w-6 h-6" style={{ color: 'var(--accent)' }} />
+                                </div>
+                                <h1 className="text-3xl font-black text-white tracking-tight">Tenant Command</h1>
+                            </div>
+                            <p className="font-medium flex items-center gap-2" style={{ color: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.6)', filter: 'brightness(1.5)' }}>
+                                <span className="flex h-2 w-2 rounded-full animate-pulse" style={{ backgroundColor: 'var(--accent)' }} />
+                                Enterprise Subscriber Management
+                            </p>
+                        </div>
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-white rounded-xl shadow-sm p-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-purple-100 rounded-lg">
-                                <Building2 className="w-6 h-6 text-purple-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-500">Total Tenants</p>
-                                <p className="text-2xl font-bold">{stats.totalTenants}</p>
-                            </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => router.push('/admin/tenants/new')}
+                                className="group relative px-6 py-3 text-white font-black rounded-2xl transition-all shadow-lg flex items-center gap-2 ring-1 ring-white/20"
+                                style={{ 
+                                    backgroundColor: 'var(--accent)',
+                                    boxShadow: '0 0 20px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.4)'
+                                }}
+                            >
+                                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                                <span>New Tenant</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-sm p-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-green-100 rounded-lg">
-                                <Users className="w-6 h-6 text-green-600" />
+                    {/* StatsRow */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+                        {[
+                            { label: 'Total Base', count: stats.totalTenants, icon: Building2, color: 'var(--accent)' },
+                            { label: 'Operational', count: stats.activeTenants, icon: Users, color: '#10b981' },
+                            { label: 'In-Trial', count: stats.trialTenants, icon: Clock, color: '#f59e0b' },
+                            { label: 'Active MRR', count: `₹${stats.mrr.toLocaleString()}`, icon: DollarSign, color: '#ec4899' },
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-black/20 backdrop-blur-md rounded-2xl p-4 border border-white/5 flex items-center gap-4 group hover:bg-black/30 transition-all">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-white/10" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                                    <stat.icon size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">{stat.label}</p>
+                                    <p className="text-lg font-black text-white leading-none">{stat.count}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-500">Active</p>
-                                <p className="text-2xl font-bold">{stats.activeTenants}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-xl shadow-sm p-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-orange-100 rounded-lg">
-                                <Clock className="w-6 h-6 text-orange-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-500">On Trial</p>
-                                <p className="text-2xl font-bold">{stats.trialTenants}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-xl shadow-sm p-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-blue-100 rounded-lg">
-                                <DollarSign className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-500">MRR</p>
-                                <p className="text-2xl font-bold">₹{stats.mrr}</p>
-                            </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
 
-                {/* Search */}
-                <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+                {/* Search Bar */}
+                <div 
+                    className="backdrop-blur-sm p-6 rounded-[2rem] border"
+                    style={{ 
+                        backgroundColor: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.5)',
+                        borderColor: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.2)'
+                    }}
+                >
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                         <input
                             type="text"
-                            placeholder="Search tenants by name..."
+                            placeholder="Filter by business or owner identity..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full pl-12 pr-4 py-3 border text-white rounded-xl focus:outline-none transition-all placeholder-slate-600 bg-black/20 font-bold"
+                            style={{ 
+                                borderColor: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.3)',
+                            }}
                         />
                     </div>
                 </div>
 
-                {/* Tenants List */}
-                {loading ? (
-                    <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-200 border-t-purple-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading tenants...</p>
-                    </div>
-                ) : filteredTenants.length === 0 ? (
-                    <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                        <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                            {tenants.length === 0 ? 'No Tenants Yet' : 'No Results Found'}
-                        </h3>
-                        <p className="text-gray-600 mb-6">
-                            {tenants.length === 0
-                                ? 'Get started by creating your first business customer.'
-                                : 'Try adjusting your search query.'}
-                        </p>
-                        {tenants.length === 0 && (
-                            <ActionButton
-                                icon={Plus}
-                                variant="primary"
-                                onClick={() => router.push('/admin/tenants/new')}
-                            >
-                                Create First Tenant
-                            </ActionButton>
-                        )}
-                    </div>
-                ) : (
-                    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                        <div className="divide-y divide-gray-100">
-                            {filteredTenants.map((tenant) => {
-                                const trialDays = calculateTrialDays(tenant)
-
-                                return (
-                                    <div
-                                        key={tenant.id}
-                                        className="p-6 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <h3 className="text-lg font-bold text-gray-900">
-                                                        {tenant.businessName}
-                                                    </h3>
-                                                    <StatusBadge
-                                                        status={tenant.status.toUpperCase()}
-                                                        variant={getStatusColor(tenant.status) as any}
+                {/* Tenants Table */}
+                <div 
+                    className="rounded-[2.5rem] border overflow-hidden backdrop-blur-xl"
+                    style={{ 
+                        backgroundColor: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.3)',
+                        borderColor: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.1)'
+                    }}
+                >
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-black/40">
+                                <tr>
+                                    <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">IDENTIFIER</th>
+                                    <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">ACCESS PRIVILEGES</th>
+                                    <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">REVENUE STREAM</th>
+                                    <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">SYSTEM STATUS</th>
+                                    <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-right">COMMANDS</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-8 py-20 text-center">
+                                            <div className="w-12 h-12 border-4 border-white/5 rounded-full animate-spin mx-auto mb-4" style={{ borderTopColor: 'var(--accent)' }}></div>
+                                            <p className="text-slate-500 font-black tracking-widest uppercase text-sm">Querying Central Relay...</p>
+                                        </td>
+                                    </tr>
+                                ) : filteredTenants.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-8 py-20 text-center">
+                                            <h3 className="text-lg font-black text-slate-500 uppercase tracking-widest">No Signals Found</h3>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <AnimatePresence>
+                                        {filteredTenants.map((tenant, index) => (
+                                            <motion.tr 
+                                                key={tenant.id}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: index * 0.05 }}
+                                                className="group hover:bg-white/5 transition-colors"
+                                            >
+                                                <td className="px-8 py-5">
+                                                    <div className="flex items-center gap-4 cursor-pointer" onClick={() => router.push(`/admin/tenants/${tenant.id}`)}>
+                                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-white font-black border border-white/10 group-hover:scale-110 transition-transform">
+                                                            {tenant.businessName[0].toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-black text-white group-hover:text-cyan-400 transition-colors uppercase tracking-tight hover:underline">{tenant.businessName}</p>
+                                                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{tenant.ownerName}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-5">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {(tenant.modules || []).slice(0, 3).map(m => (
+                                                            <span key={m} className="px-2 py-0.5 bg-black/20 rounded-md text-[9px] font-black text-slate-400 uppercase tracking-tighter border border-white/5">{m}</span>
+                                                        ))}
+                                                        {(tenant.modules?.length || 0) > 3 && (
+                                                            <span className="px-2 py-0.5 bg-black/20 rounded-md text-[9px] font-black text-slate-500 uppercase">+{(tenant.modules?.length || 0) - 3}</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="p-1 rounded bg-black/20">
+                                                            <MonitorSmartphone size={12} className="text-slate-500" />
+                                                        </div>
+                                                        <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest">{tenant.plan} Layer</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-5">
+                                                    <StatusBadge 
+                                                        status={tenant.status.toUpperCase()} 
+                                                        variant={getStatusVariant(tenant.status)} 
                                                     />
-                                                    <StatusBadge
-                                                        status={tenant.plan.toUpperCase()}
-                                                        variant="info"
-                                                        size="sm"
-                                                    />
-                                                </div>
-
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-                                                    <div>
-                                                        <p className="text-xs text-gray-500">Owner</p>
-                                                        <p className="text-sm font-medium">{tenant.ownerName}</p>
+                                                </td>
+                                                <td className="px-8 py-5 text-right">
+                                                    <div className="flex items-center justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => router.push(`/admin/tenants/${tenant.id}`)}
+                                                            className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors border border-emerald-500/20"
+                                                            title="View Details"
+                                                        >
+                                                            <Eye size={16} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleEdit(tenant)}
+                                                            className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors border border-indigo-500/20"
+                                                            title="Quick Edit"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDelete(tenant.id, tenant.businessName)}
+                                                            className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors border border-red-500/20"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-xs text-gray-500">Email</p>
-                                                        <p className="text-sm font-medium">{tenant.ownerEmail}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xs text-gray-500">Revenue</p>
-                                                        <p className="text-sm font-medium">₹{tenant.monthlyRevenue}/mo</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xs text-gray-500">Subdomain</p>
-                                                        <p className="text-sm font-medium text-purple-600">{tenant.subdomain}</p>
-                                                    </div>
-                                                </div>
-
-                                                {trialDays !== null && (
-                                                    <p className="text-sm text-orange-600 font-medium">
-                                                        Trial ends in {trialDays} days
-                                                    </p>
-                                                )}
-
-                                                <div className="flex gap-2 mt-3">
-                                                    {tenant.workflowEnabled && (
-                                                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                                                            Workflow Enabled
-                                                        </span>
-                                                    )}
-                                                    {tenant.websiteBuilderEnabled && (
-                                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                            Website Builder
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex gap-2">
-                                                <ActionButton
-                                                    variant="primary"
-                                                    size="sm"
-                                                    onClick={() => handleEdit(tenant)}
-                                                >
-                                                    <Edit2 className="w-4 h-4 mr-1" />
-                                                    Edit
-                                                </ActionButton>
-                                                <ActionButton
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    onClick={() => router.push(`/admin/tenants/${tenant.id}`)}
-                                                >
-                                                    View Details
-                                                </ActionButton>
-                                                <ActionButton
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => {/* TODO: Implement impersonate */ }}
-                                                >
-                                                    Login As
-                                                </ActionButton>
-                                                <ActionButton
-                                                    variant="danger"
-                                                    size="sm"
-                                                    onClick={() => handleDelete(tenant.id, tenant.businessName)}
-                                                >
-                                                    Delete
-                                                </ActionButton>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Edit Modal */}
-            {isEditModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                        <div className="p-6 border-b border-gray-100">
-                            <h3 className="text-xl font-bold text-gray-900">Edit Tenant</h3>
-                            <p className="text-sm text-gray-500">Update business information</p>
-                        </div>
-
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Business Name</label>
-                                <input
-                                    type="text"
-                                    value={editForm.businessName}
-                                    onChange={(e) => setEditForm({ ...editForm, businessName: e.target.value })}
-                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Owner Name</label>
-                                <input
-                                    type="text"
-                                    value={editForm.ownerName}
-                                    onChange={(e) => setEditForm({ ...editForm, ownerName: e.target.value })}
-                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
-                                    <select
-                                        value={editForm.status}
-                                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    >
-                                        <option value="trial">Trial</option>
-                                        <option value="active">Active</option>
-                                        <option value="suspended">Suspended</option>
-                                        <option value="cancelled">Cancelled</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Plan</label>
-                                    <select
-                                        value={editForm.plan}
-                                        onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
-                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                                    >
-                                        <option value="free">Free</option>
-                                        <option value="basic">Basic</option>
-                                        <option value="premium">Premium</option>
-                                        <option value="enterprise">Enterprise</option>
-                                    </select>
-                                </div>
-                            </div>
-
-
-                        </div>
-
-                        <div className="p-6 bg-gray-50 flex justify-end gap-3">
-                            <button
-                                onClick={() => setIsEditModalOpen(false)}
-                                className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900"
-                            >
-                                Cancel
-                            </button>
-                            <ActionButton
-                                variant="primary"
-                                disabled={saving}
-                                onClick={handleSaveEdit}
-                            >
-                                {saving ? 'Saving...' : 'Save Changes'}
-                            </ActionButton>
-                        </div>
+                                                </td>
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            )}
+            </motion.div>
+
+            {/* Edit Tenant Modal */}
+            <AnimatePresence>
+                {isEditModalOpen && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 backdrop-blur-xl bg-black/60">
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="w-full max-w-xl bg-slate-900 rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden p-10 relative"
+                            style={{ backgroundColor: 'var(--sidebar-bg)' }}
+                        >
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl border transition-all" style={{ backgroundColor: 'rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.2)', borderColor: 'rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.3)' }}>
+                                        <Edit2 className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-white tracking-tight uppercase">Edit Identity</h2>
+                                </div>
+                                <button 
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="p-2 hover:bg-white/5 rounded-full transition-colors text-slate-500"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Business Identifier</label>
+                                        <input 
+                                            type="text" 
+                                            value={editForm.businessName}
+                                            onChange={(e) => setEditForm({ ...editForm, businessName: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-3 px-4 text-white font-bold"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Owner Primary</label>
+                                        <input 
+                                            type="text" 
+                                            value={editForm.ownerName}
+                                            onChange={(e) => setEditForm({ ...editForm, ownerName: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-3 px-4 text-white font-bold"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">System State</label>
+                                        <select 
+                                            value={editForm.status}
+                                            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-3 px-4 text-white font-bold appearance-none"
+                                        >
+                                            <option value="active">ACTIVE</option>
+                                            <option value="trial">TRIAL</option>
+                                            <option value="suspended">SUSPENDED</option>
+                                            <option value="cancelled">CANCELLED</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Plan</label>
+                                        <select 
+                                            value={editForm.plan}
+                                            onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-3 px-4 text-white font-bold appearance-none"
+                                        >
+                                            <option value="Foundation">FOUNDATION</option>
+                                            <option value="Growth">GROWTH</option>
+                                            <option value="Scale">SCALE</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 bg-black/20 rounded-[2rem] border border-white/5">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <LayoutDashboard size={14} className="text-slate-500" />
+                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Modules</h3>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {['Inventory', 'Sales', 'Purchase Order', 'Setup Wizard', 'Research'].map(module => (
+                                            <button
+                                                key={module}
+                                                onClick={() => {
+                                                    const exists = editForm.modules.includes(module)
+                                                    setEditForm({
+                                                        ...editForm,
+                                                        modules: exists 
+                                                            ? editForm.modules.filter(m => m !== module)
+                                                            : [...editForm.modules, module]
+                                                    })
+                                                }}
+                                                className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase transition-all flex items-center justify-between ${
+                                                    editForm.modules.includes(module)
+                                                    ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400'
+                                                    : 'bg-black/40 border-white/5 text-slate-600'
+                                                }`}
+                                            >
+                                                {module}
+                                                {editForm.modules.includes(module) && <Check size={12} />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <button 
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="flex-1 px-8 py-4 bg-slate-800 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-700 transition-all"
+                                >
+                                    Abort
+                                </button>
+                                <button 
+                                    onClick={handleSaveEdit}
+                                    disabled={saving}
+                                    className="flex-1 flex items-center justify-center gap-2 px-8 py-4 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-xl hover:scale-105"
+                                    style={{ backgroundColor: 'var(--accent)', boxShadow: '0 4px 15px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.3)' }}
+                                >
+                                    {saving ? 'UPDATING...' : (
+                                        <>
+                                            <Save size={14} />
+                                            Save Changes
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </AdminLayout>
     )
 }

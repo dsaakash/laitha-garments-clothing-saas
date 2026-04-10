@@ -120,8 +120,7 @@ export async function PUT(
         if (billingCycle) updateData.billing_cycle = billingCycle
         if (monthlyRevenue !== undefined) updateData.monthly_revenue = monthlyRevenue
         if (subdomain) updateData.subdomain = subdomain
-        if (workflowEnabled !== undefined) updateData.workflow_enabled = workflowEnabled
-        if (websiteBuilderEnabled !== undefined) updateData.website_builder_enabled = websiteBuilderEnabled
+        if (body.slug) updateData.slug = body.slug // Added slug support
         if (workflowEnabled !== undefined) updateData.workflow_enabled = workflowEnabled
         if (websiteBuilderEnabled !== undefined) updateData.website_builder_enabled = websiteBuilderEnabled
         if (modules) updateData.modules = modules

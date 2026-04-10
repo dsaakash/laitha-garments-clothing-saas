@@ -21,12 +21,17 @@ import { format } from 'date-fns'
 
 interface TenantData {
   id: string
-  business_name: string
-  subscription_status: string
-  subscription_plan: string
-  trial_ends_at: string
-  subscription_end_date: string | null
-  is_active: boolean
+  businessName: string
+  slug: string
+  subscriptionStatus: string
+  plan: string
+  trialStartDate: string
+  trialEndDate: string
+  subscriptionStartDate: string | null
+  subscriptionEndDate: string | null
+  billingCycle: string
+  nextBillingDate: string | null
+  status: string
 }
 
 const plans = [
@@ -136,8 +141,8 @@ export default function SubscriptionPage() {
     )
   }
 
-  const isExpired = tenant?.subscription_status === 'expired' || 
-    (tenant?.trial_ends_at && new Date(tenant.trial_ends_at) < new Date())
+  const isExpired = tenant?.subscriptionStatus === 'expired' || 
+    (tenant?.trialEndDate && new Date(tenant.trialEndDate) < new Date())
 
   return (
     <AdminLayout>
@@ -170,15 +175,15 @@ export default function SubscriptionPage() {
                   Current Status
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900">
-                  {tenant.business_name} &mdash; <span className="capitalize">{tenant.subscription_plan} Plan</span>
+                  {tenant.businessName} &mdash; <span className="capitalize">{tenant.plan} Plan</span>
                 </h2>
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-gray-500">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-4 h-4" />
                     <span>
-                      {tenant.subscription_status === 'trial' 
-                        ? `Trial ends ${format(new Date(tenant.trial_ends_at), 'MMM dd, yyyy')}`
-                        : `Subscribed until ${tenant.subscription_end_date ? format(new Date(tenant.subscription_end_date), 'MMM dd, yyyy') : 'N/A'}`
+                      {tenant.subscriptionStatus === 'trial' 
+                        ? `Trial ends ${format(new Date(tenant.trialEndDate), 'MMM dd, yyyy')}`
+                        : `Subscribed until ${tenant.subscriptionEndDate ? format(new Date(tenant.subscriptionEndDate), 'MMM dd, yyyy') : 'N/A'}`
                       }
                     </span>
                   </div>
@@ -190,9 +195,12 @@ export default function SubscriptionPage() {
                 </div>
               </div>
               
-              <div className="flex flex-col items-center md:items-end gap-2">
-                 <div className="text-sm text-gray-400 font-medium">Billing Period</div>
-                 <div className="text-xl font-bold text-gray-900">Monthly Billing</div>
+              <div className="flex flex-col items-center md:items-end gap-2 text-right">
+                 <div className="text-sm text-gray-400 font-medium">Billing Details</div>
+                 <div className="text-lg font-bold text-gray-900 capitalize">{tenant.billingCycle} Billing</div>
+                 {tenant.nextBillingDate && (
+                   <div className="text-xs text-purple-600 font-medium">Next: {format(new Date(tenant.nextBillingDate), 'MMM dd, yyyy')}</div>
+                 )}
               </div>
             </div>
           </motion.div>
@@ -201,7 +209,7 @@ export default function SubscriptionPage() {
         {/* Pricing Grid */}
         <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {plans.map((plan) => {
-            const isCurrentPlan = tenant?.subscription_plan === plan.id
+            const isCurrentPlan = tenant?.plan === plan.id
             return (
             <div 
               key={plan.id}
@@ -260,17 +268,17 @@ export default function SubscriptionPage() {
                     window.open('https://pages.razorpay.com/pl_...', '_blank')
                   }
                 }}
-                disabled={tenant?.subscription_plan === plan.id}
+                disabled={tenant?.plan === plan.id}
                 className={`w-full py-4 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 group
-                  ${tenant?.subscription_plan === plan.id
+                  ${tenant?.plan === plan.id
                     ? 'bg-emerald-50 text-emerald-600 cursor-default border border-emerald-100'
                     : plan.popular 
                       ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-200 hover:shadow-purple-300 hover:opacity-90' 
                       : 'bg-gray-50 text-gray-900 hover:bg-purple-50 hover:text-purple-600'
                   }`}
               >
-                {tenant?.subscription_plan === plan.id ? 'Your Active Plan' : plan.buttonText}
-                {tenant?.subscription_plan !== plan.id && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
+                {tenant?.plan === plan.id ? 'Your Active Plan' : plan.buttonText}
+                {tenant?.plan !== plan.id && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
               </button>
             </div>
             )

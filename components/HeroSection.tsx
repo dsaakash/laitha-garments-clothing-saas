@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
-import { ArrowRight, MessageCircle, Video, X, ChevronDown, Star, Users, Award } from 'lucide-react'
+import { ArrowRight, MessageCircle, Video, X, ChevronDown, Star, Users, Award, Sparkles } from 'lucide-react'
 
 export default function HeroSection() {
   const [showBookingModal, setShowBookingModal] = useState(false)
@@ -252,22 +252,46 @@ export default function HeroSection() {
           className="flex flex-col sm:flex-row gap-4 justify-center items-center px-4 mb-12"
         >
           <button
-            onClick={handleGetFreeConsultation}
-            className="group relative bg-primary-500 hover:bg-primary-600 text-white px-8 sm:px-12 py-4 rounded-full font-bold text-lg shadow-xl shadow-primary-500/30 transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 w-full sm:w-auto overflow-hidden"
+            onClick={() => {
+              // Trigger the AI Assistant (this will be handled by the state in Home page)
+              const event = new CustomEvent('open-boutique-assistant')
+              window.dispatchEvent(event)
+            }}
+            className="group relative bg-primary-600 hover:bg-primary-700 text-white px-8 sm:px-12 py-4 rounded-full font-bold text-xl shadow-2xl shadow-primary-500/30 transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 w-full sm:w-auto overflow-hidden border-2 border-white/20"
           >
-            <span className="relative z-10 flex items-center justify-center gap-2">
-              Book Consultation <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <span className="relative z-10 flex items-center justify-center gap-3">
+              <Sparkles className="w-5 h-5 animate-pulse" />
+              Consult Lalitha Aunty <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </span>
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 skew-y-12"></div>
+            <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 skew-y-12"></div>
           </button>
 
           <Link
             href="/catalogue"
-            className="group bg-white hover:bg-gray-50 text-sage-800 px-8 sm:px-12 py-4 rounded-full font-bold text-lg border-2 border-gray-100 hover:border-primary-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 w-full sm:w-auto flex items-center justify-center gap-2"
+            className="group bg-white/40 backdrop-blur-md hover:bg-white/60 text-sage-800 px-8 sm:px-12 py-4 rounded-full font-bold text-xl border-2 border-white/40 hover:border-primary-200 shadow-xl transition-all duration-300 hover:-translate-y-1 w-full sm:w-auto flex items-center justify-center gap-2"
           >
-            Wait! View Collection
+            View Collection
             <span className="group-hover:translate-x-1 transition-transform">→</span>
           </Link>
+        </motion.div>
+
+        {/* AI Assistant Preview Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 20 }}
+          transition={{ delay: 1.2, duration: 1 }}
+          className="max-w-md mx-auto glass-card p-6 rounded-[2rem] border border-white/40 shadow-2xl relative"
+        >
+          <div className="absolute -top-6 -left-6 w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white text-xl border-4 border-white shadow-lg">
+            👵
+          </div>
+          <p className="text-sage-800 font-serif italic text-lg leading-relaxed">
+            "I've helped thousands of women find their perfect fit. Whether it's a wedding or a casual day out, I'm here to give you my honest advice."
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-primary-600 font-bold text-sm uppercase tracking-widest">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            Lalitha is Online
+          </div>
         </motion.div>
 
         {/* Trust Badges Bar */}

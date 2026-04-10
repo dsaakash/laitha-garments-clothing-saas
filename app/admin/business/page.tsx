@@ -13,6 +13,8 @@ export default function BusinessPage() {
     address: '',
     gstNumber: '',
     whatsappNumber: '',
+    slug: '',
+    websiteBuilderEnabled: false,
   })
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -179,6 +181,64 @@ export default function BusinessPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 placeholder="29ABCDE1234F1Z5"
               />
+            </div>
+
+            <div className="pt-6 border-t border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Business Store Settings</h2>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
+                  <div>
+                    <h3 className="font-semibold text-purple-900">Enable Public Store</h3>
+                    <p className="text-sm text-purple-700">Allow customers to view your collection live at your custom URL.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={formData.websiteBuilderEnabled}
+                      onChange={(e) => setFormData({ ...formData, websiteBuilderEnabled: e.target.checked })}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+
+                {formData.websiteBuilderEnabled && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Store URL Slug *</label>
+                    <div className="flex items-center">
+                      <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                        /store/
+                      </span>
+                      <input
+                        type="text"
+                        required={formData.websiteBuilderEnabled}
+                        value={formData.slug}
+                        onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+                        className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-none rounded-r-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="my-business-name"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">This will be your public store link. Only lowercase letters, numbers, and hyphens are allowed.</p>
+                    
+                    {formData.slug && (
+                      <div className="mt-4 p-3 bg-gray-50 rounded-md flex items-center justify-between">
+                        <span className="text-sm text-gray-600 truncate">
+                          Your live URL: <span className="font-mono text-purple-600 font-semibold">{window.location.origin}/store/{formData.slug}</span>
+                        </span>
+                        <a 
+                          href={`/store/${formData.slug}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-purple-600 hover:text-purple-800 font-medium underline px-2"
+                        >
+                          View Store
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end pt-4">

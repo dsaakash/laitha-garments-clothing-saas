@@ -70,7 +70,11 @@ export default function SupplierStockTable({ data, loading }: SupplierStockTable
                                         {supplier.supplierName}
                                     </td>
                                     <td className="px-6 py-4 text-center text-gray-600">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                              style={{ 
+                                                  backgroundColor: `rgba(var(--accent-rgb), 0.1)`,
+                                                  color: 'var(--accent)'
+                                              }}>
                                             {supplier.totalItems}
                                         </span>
                                     </td>

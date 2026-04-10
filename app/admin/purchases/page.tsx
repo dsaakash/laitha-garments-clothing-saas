@@ -7,7 +7,10 @@ import ImageLightbox from '@/components/ImageLightbox'
 import { PurchaseOrder, PurchaseOrderItem, Supplier } from '@/lib/storage'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
-
+import { motion, AnimatePresence } from 'framer-motion'
+import { Plus, Minus, Download, PackageOpen, DownloadCloud, Activity, MapPin, Building2, Link, IndianRupee, Clock, CheckCircle2, XCircle, Search, Filter, ShoppingCart, Layers, AlertCircle, FileText } from 'lucide-react'
+import ActionButton from '@/components/ActionButton'
+import StatusBadge from '@/components/StatusBadge'
 export default function PurchasesPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -1037,303 +1040,247 @@ export default function PurchasesPage() {
 
   return (
     <AdminLayout>
-      <div>
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Purchase Orders</h1>
-          <div className="flex gap-3">
-            <button
-              onClick={exportToExcel}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Export to Excel
-            </button>
-            <button
-              onClick={() => {
-                resetForm()
-                setShowModal(true)
-              }}
-              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-              disabled={suppliers.length === 0}
-            >
-              ➕ Add Purchase Order
-            </button>
-          </div>
-        </div>
-
-        {suppliers.length === 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded mb-6">
-            Please add suppliers first before creating purchase orders. <a href="/admin/suppliers" className="underline">Go to Suppliers</a>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          {/* Search Bar */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search Purchase Orders</label>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by supplier name, PO number, or product name..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="flex gap-4 items-end flex-wrap">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
+        {/* Header Section - Glassmorphic */}
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 shadow-2xl">
+          {/* Background Decorative Elements */}
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Category</label>
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Supplier</label>
-              <select
-                value={filterSupplier}
-                onChange={(e) => setFilterSupplier(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">All Suppliers</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Year</label>
-              <select
-                value={filterYear}
-                onChange={(e) => setFilterYear(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">All Years</option>
-                {years.map(year => (
-                  <option key={year} value={year.toString()}>{year}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Month</label>
-              <select
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">All Months</option>
-                <option value="01">January</option>
-                <option value="02">February</option>
-                <option value="03">March</option>
-                <option value="04">April</option>
-                <option value="05">May</option>
-                <option value="06">June</option>
-                <option value="07">July</option>
-                <option value="08">August</option>
-                <option value="09">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
-            </div>
-            {(filterSupplier || filterCategory !== 'All' || filterMonth || filterYear || searchQuery) && (
-              <button
-                onClick={() => {
-                  setFilterSupplier('')
-                  setFilterCategory('All')
-                  setFilterMonth('')
-                  setFilterYear('')
-                  setSearchQuery('')
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-              >
-                Clear Filters
-              </button>
-            )}
-          </div>
-          {orders.length > 0 && (
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-lg font-bold text-green-600">
-                Total Amount: ₹{totalAmount.toLocaleString()}
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-emerald-500/20 rounded-xl border border-emerald-500/30">
+                  <ShoppingCart className="w-6 h-6 text-emerald-400" />
+                </div>
+                <h1 className="text-3xl font-black text-white tracking-tight">Purchase Command</h1>
+              </div>
+              <p className="text-slate-400 font-medium flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                Live Order Tracking • Supplier Network
               </p>
             </div>
-          )}
-        </div>
 
-        {orders.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <p className="text-gray-500 text-lg">No purchase orders yet. Add your first purchase order!</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-            {orders.map((order) => (
-              <div
-                key={order.id}
-                className="bg-white rounded-lg shadow-md p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all duration-200 border border-gray-100 hover:border-purple-200 relative"
-                onClick={() => handleViewDetails(order)}
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={exportToExcel}
+                className="group relative px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl transition-all border border-slate-700 flex items-center gap-2 shadow-lg"
               >
-                <div className="flex justify-between items-start mb-4 relative">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-bold text-gray-900 truncate">
-                        {order.customPoNumber || `PO-${order.id}`}
-                      </h3>
-                      {order.status === 'open' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                          Approved
-                        </span>
-                      ) : order.status === 'rejected' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-                          Rejected
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                          Pending
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 truncate">{order.supplierName}</p>
-                    {order.items && order.items.length > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        {order.items.length} product{order.items.length > 1 ? 's' : ''}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex space-x-1 flex-shrink-0 z-10 relative" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        downloadOrderAsPDF(order)
-                      }}
-                      className="px-2 py-1.5 sm:px-3 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-red-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
-                      title="Download PDF"
-                    >
-                      <span className="hidden sm:inline">📄 </span>PDF
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        downloadOrderAsExcel(order)
-                      }}
-                      className="px-2 py-1.5 sm:px-3 bg-green-50 hover:bg-green-100 active:bg-green-200 text-green-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-green-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
-                      title="Download Excel"
-                    >
-                      <span className="hidden sm:inline">📊 </span>Excel
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleEdit(order)
-                      }}
-                      className="px-2 py-1.5 sm:px-3 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-blue-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
-                      title="Edit"
-                    >
-                      <span className="hidden sm:inline">✏️ </span>Edit
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDelete(order.id)
-                      }}
-                      className="px-2 py-1.5 sm:px-3 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 rounded-md text-xs sm:text-sm font-medium transition-all shadow-sm hover:shadow-md border border-red-200 min-w-[50px] sm:min-w-[60px] whitespace-nowrap"
-                      title="Delete"
-                    >
-                      <span className="hidden sm:inline">🗑️ </span>Delete
-                    </button>
-                  </div>
-                </div>
+                <Download className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span>Export</span>
+              </button>
+              <button
+                onClick={() => {
+                  resetForm()
+                  setShowModal(true)
+                }}
+                disabled={suppliers.length === 0}
+                className="group relative px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center gap-2 ring-1 ring-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                <span>New Order</span>
+              </button>
+            </div>
+          </div>
 
-                {(() => {
-                  let images: string[] = []
-                  if (order.items && order.items.length > 0 && order.items[0].productImages && order.items[0].productImages.length > 0) {
-                    images = order.items[0].productImages
-                  } else if (order.productImage) {
-                    images = [order.productImage]
-                  }
-
-                  if (images.length === 0) return null
-
-                  return (
-                    <div className="mb-4">
-                      <div className="flex gap-2 flex-wrap">
-                        {images.slice(0, 3).map((img, idx) => (
-                          <div
-                            key={idx}
-                            className="relative w-full h-32 sm:h-40 flex-1 min-w-[100px] cursor-pointer hover:opacity-80 transition-opacity rounded-lg border border-gray-200 overflow-hidden"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setLightboxImages(images)
-                              setLightboxIndex(idx)
-                              setShowImageLightbox(true)
-                            }}
-                            title={`${images.length} image${images.length > 1 ? 's' : ''} - Click to view`}
-                          >
-                            <Image
-                              src={img}
-                              alt={`Product Image ${idx + 1}`}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 50vw, 33vw"
-                            />
-                          </div>
-                        ))}
-                        {images.length > 3 && (
-                          <div
-                            className="relative w-full h-32 sm:h-40 flex-1 min-w-[100px] cursor-pointer hover:opacity-80 transition-opacity rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center text-sm text-gray-600"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setLightboxImages(images)
-                              setLightboxIndex(0)
-                              setShowImageLightbox(true)
-                            }}
-                            title={`+${images.length - 3} more images - Click to view all`}
-                          >
-                            +{images.length - 3} more
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })()}
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Date:</span>
-                    <span className="font-medium">{format(new Date(order.date), 'dd MMM yyyy')}</span>
+          {/* StatsRow */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+            {[
+              { label: 'Total Orders', value: orders.length, icon: ShoppingCart, color: 'emerald' },
+              { label: 'Pending', value: orders.filter(o => o.status === 'pending').length, icon: Clock, color: 'orange' },
+              { label: 'Total Value', value: `₹${totalAmount.toLocaleString()}`, icon: IndianRupee, color: 'blue' },
+              { label: 'Active Suppliers', value: new Set(orders.map(o => o.supplierId)).size, icon: Building2, color: 'purple' }
+            ].map((stat, idx) => (
+              <div key={idx} className="bg-slate-800/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl hover:border-white/10 transition-all group">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 bg-${stat.color}-500/10 rounded-lg group-hover:scale-110 transition-transform`}>
+                     <stat.icon className={`w-4 h-4 text-${stat.color}-400`} />
                   </div>
-                  <div className="flex justify-between pt-2 border-t">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="text-gray-700 font-medium">
-                      ₹{(order.subtotal || order.totalAmount || 0).toLocaleString()}
-                    </span>
-                  </div>
-                  {order.gstAmount != null && order.gstAmount > 0 && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-500">GST:</span>
-                      <span className="text-gray-600">₹{order.gstAmount.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between pt-1 border-t">
-                    <span className="text-gray-900 font-bold">Total Amount:</span>
-                    <span className="text-green-600 font-bold text-lg">
-                      ₹{(order.grandTotal || order.totalAmount || 0).toLocaleString()}
-                    </span>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{stat.label}</p>
+                    <p className="text-xl font-black text-white">{stat.value}</p>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+        </div>
+
+        {suppliers.length === 0 && (
+          <div className="bg-orange-500/10 border border-orange-500/20 text-orange-400 px-6 py-4 rounded-2xl flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p>Please add suppliers first before creating purchase orders. <a href="/admin/suppliers" className="underline font-bold hover:text-orange-300">Go to Suppliers</a></p>
+          </div>
         )}
 
+        {/* Filters and List */}
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-900/50 backdrop-blur-sm p-4 rounded-2xl border border-slate-800">
+            <div className="relative flex-1 w-full max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search orders, suppliers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 text-white rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all placeholder-slate-500"
+              />
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="px-4 py-3 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500"
+              >
+                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+              <select
+                value={filterSupplier}
+                onChange={(e) => setFilterSupplier(e.target.value)}
+                className="px-4 py-3 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">All Suppliers</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <select
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="px-4 py-3 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">All Months</option>
+                <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option>
+                <option value="04">Apr</option><option value="05">May</option><option value="06">Jun</option>
+                <option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option>
+                <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-900/50 uppercase text-[10px] sm:text-xs tracking-wider text-slate-400 border-b border-slate-800">
+                    <th className="p-4 sm:p-6 font-black w-[15%]">PO Details</th>
+                    <th className="p-4 sm:p-6 font-black w-[20%]">Supplier</th>
+                    <th className="p-4 sm:p-6 font-black w-[25%]">Financials</th>
+                    <th className="p-4 sm:p-6 font-black w-[15%]">Status</th>
+                    <th className="p-4 sm:p-6 font-black text-right w-[25%]">Operations</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  <AnimatePresence>
+                    {orders.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-12 text-center text-slate-500">
+                           <div className="flex flex-col items-center gap-3">
+                              <ShoppingCart className="w-8 h-8 opacity-20" />
+                              <p className="text-sm font-medium">No purchase orders found</p>
+                           </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      orders.map((order) => (
+                        <motion.tr
+                          key={order.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          className="hover:bg-slate-800/30 transition-colors group cursor-pointer"
+                          onClick={() => handleViewDetails(order)}
+                        >
+                          <td className="p-4 sm:p-6 align-top">
+                            <div className="flex items-start gap-3">
+                              <div className="hidden sm:flex mt-1 w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 items-center justify-center shrink-0 border border-emerald-500/20">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className="font-bold text-white text-sm sm:text-base truncate">
+                                  {order.customPoNumber || `PO-${order.id}`}
+                                </h3>
+                                <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-1">
+                                  <Clock className="w-3 h-3" />
+                                  {format(new Date(order.date), 'dd MMM yyyy')}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 sm:p-6 align-top">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-200 text-sm truncate">{order.supplierName}</span>
+                              <span className="text-xs text-slate-500 font-medium mt-1">
+                                {order.items?.length || 0} product{(order.items?.length || 0) !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-4 sm:p-6 align-top">
+                             <div className="flex flex-col gap-1">
+                                <div className="flex items-end gap-2">
+                                   <span className="text-lg font-black tracking-tight text-white">
+                                     ₹{(order.grandTotal || order.totalAmount || 0).toLocaleString()}
+                                   </span>
+                                </div>
+                                {(order.gstAmount || 0) > 0 && (
+                                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                    INCL. GST ₹{(order.gstAmount || 0).toLocaleString()}
+                                  </span>
+                                )}
+                             </div>
+                          </td>
+                          <td className="p-4 sm:p-6 align-top">
+                            <StatusBadge 
+                              status={order.status === 'open' ? 'Approved' : order.status === 'rejected' ? 'Rejected' : 'Pending'}
+                              variant={order.status === 'open' ? 'success' : order.status === 'rejected' ? 'danger' : 'warning'}
+                            />
+                          </td>
+                          <td className="p-4 sm:p-6 align-top">
+                            <div className="flex flex-wrap gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+                                <ActionButton 
+                                  icon={DownloadCloud} 
+                                  onClick={(e) => { e?.stopPropagation(); downloadOrderAsPDF(order); }}
+                                  variant="primary" 
+                                >
+                                  PDF
+                                </ActionButton>
+                                <ActionButton 
+                                  icon={Link} 
+                                  onClick={(e) => { e?.stopPropagation(); downloadOrderAsExcel(order); }}
+                                  variant="secondary" 
+                                >
+                                  Excel
+                                </ActionButton>
+                                <ActionButton 
+                                  icon={Activity} 
+                                  onClick={(e) => { e?.stopPropagation(); handleEdit(order); }}
+                                  variant="ghost" 
+                                >
+                                  Edit
+                                </ActionButton>
+                                <ActionButton 
+                                  icon={XCircle} 
+                                  onClick={(e) => { e?.stopPropagation(); handleDelete(order.id); }}
+                                  variant="danger" 
+                                >
+                                  Erase
+                                </ActionButton>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      ))
+                    )}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        
         {/* Modal */}
+{/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-8 max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -2583,7 +2530,7 @@ export default function PurchasesPage() {
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
     </AdminLayout>
   )
 }

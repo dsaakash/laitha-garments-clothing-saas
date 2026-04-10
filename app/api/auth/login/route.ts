@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdmin, verifyUser } from '@/lib/db-auth'
 import { verifyTenant } from '@/lib/db-tenants'
 import { encodeBase64, getNodeEnv } from '@/lib/utils'
+import { isTenantInactive, logActivity } from '@/lib/db-activity'
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,6 +40,20 @@ export async function POST(request: NextRequest) {
         console.log('🏢 Tenant owner found:', tenant ? `Yes (ID: ${tenant.id})` : 'No')
 
         if (tenant) {
+          // Check 7-day inactivity lock
+          const inactive = await isTenantInactive(tenant.id)
+          if (inactive) {
+            console.log('🔒 Tenant locked due to inactivity:', tenant.id)
+            return NextResponse.json(
+              {
+                success: false,
+                message: 'Your account has been suspended due to inactivity. Please contact +919353083597 to reactivate.',
+                locked: true
+              },
+              { status: 403 }
+            )
+          }
+
           authenticated = true
           userData = {
             id: 0, // Tenant owners don't have numeric IDs in admins table
@@ -53,6 +68,20 @@ export async function POST(request: NextRequest) {
           console.log('🏢 Checking sub-admin credentials for:', email)
           const subAdmin = await verifyAdmin(email, password)
           if (subAdmin && subAdmin.tenant_id) {
+            // Also check inactivity for sub-admins of this tenant
+            const inactive = await isTenantInactive(subAdmin.tenant_id)
+            if (inactive) {
+              console.log('🔒 Tenant sub-admin locked due to inactivity:', subAdmin.tenant_id)
+              return NextResponse.json(
+                {
+                  success: false,
+                  message: 'Your account has been suspended due to inactivity. Please contact +919353083597 to reactivate.',
+                  locked: true
+                },
+                { status: 403 }
+              )
+            }
+
             console.log('🏢 Sub-admin found for tenant:', subAdmin.tenant_id)
             authenticated = true
             userData = subAdmin
@@ -112,6 +141,19 @@ export async function POST(request: NextRequest) {
     const sessionToken = encodeBase64(sessionData)
 
     console.log('✅ Login successful:', { email, userType, tenantId })
+
+    // Log login activity for tenants
+    if (tenantId) {
+      try {
+        await logActivity(tenantId, email, 'login', 'auth', {
+          userType,
+          userAgent: request.headers.get('user-agent') || 'unknown',
+          loginMethod: loginType,
+        })
+      } catch (e) {
+        console.error('Failed to log login activity:', e)
+      }
+    }
 
     const response = NextResponse.json({
       success: true,
