@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   '/admin/login',
   '/trial-expired',
   '/subscription-expired',
+  '/boutique',
 ]
 
 // API routes that must also be reachable regardless of subscription
@@ -15,6 +16,7 @@ const PUBLIC_API_PATHS = [
   '/api/auth/logout',
   '/api/auth/check',
   '/api/auth/subscription-status',
+  '/api/leads', // Public POST for landing page lead capture
 ]
 
 export async function middleware(request: NextRequest) {

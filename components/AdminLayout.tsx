@@ -36,7 +36,8 @@ import {
   Palette,
   Paintbrush,
   MessageCircle,
-  Calendar
+  Calendar,
+  Target
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -350,6 +351,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     subItems?: { href: string; label: string }[];
   }[] = [
       { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, resource: 'dashboard' },
+      { href: '/admin/leads', label: 'Trial Leads', icon: Target, resource: 'tenants', action: 'manage' }, // Superadmin only
       { href: '/admin/approvals', label: 'Approvals', icon: ShieldCheck, resource: 'purchases', module: 'purchases', badge: pendingApprovalsCount },
       { href: '/admin/tenants', label: 'Tenants', icon: Building2, resource: 'tenants', action: 'manage' }, // Usually superadmin only
       { href: '/admin/research', label: 'Raw Research', icon: Search, resource: 'research', action: 'read', module: 'research' },

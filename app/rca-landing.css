@@ -1,0 +1,205 @@
+/* ─── RCA Landing Page Styles ─────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Kalam:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+.rca-root {
+  font-family: 'Kalam', cursive;
+  background: #0D1B2E;
+  color: #FDF8EF;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.rca-root * {
+  box-sizing: border-box;
+}
+
+/* ── Scrollbar ── */
+.rca-root ::-webkit-scrollbar { width: 6px; }
+.rca-root ::-webkit-scrollbar-track { background: #0D1B2E; }
+.rca-root ::-webkit-scrollbar-thumb { background: #BA7517; border-radius: 3px; }
+
+/* ── Resets ── */
+.rca-root button { cursor: pointer; border: none; outline: none; font-family: inherit; }
+.rca-root input, .rca-root select, .rca-root textarea { font-family: 'Kalam', cursive; outline: none; }
+.rca-root select { appearance: auto; }
+.rca-root option { background: #132338; color: #FDF8EF; }
+
+/* ── Animations ── */
+@keyframes rcaFadeUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes rcaFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(1deg); }
+}
+@keyframes rcaFloatReverse {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(8px) rotate(-1deg); }
+}
+@keyframes rcaPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.96); }
+}
+@keyframes rcaOrb {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 10px) scale(0.97); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes rcaShimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes rcaRotate3d {
+  0%   { transform: perspective(800px) rotateY(0deg); }
+  100% { transform: perspective(800px) rotateY(360deg); }
+}
+@keyframes rcaGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(186,117,23,0.3), 0 0 60px rgba(186,117,23,0.1); }
+  50% { box-shadow: 0 0 40px rgba(186,117,23,0.5), 0 0 100px rgba(186,117,23,0.2); }
+}
+@keyframes rcaCounterIn {
+  from { opacity: 0; transform: scale(0.7) translateY(16px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes rcaLineGrow {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+/* ── Utility Animation Classes ── */
+.rca-fade-up-1 { animation: rcaFadeUp 0.8s 0.1s ease forwards; opacity: 0; }
+.rca-fade-up-2 { animation: rcaFadeUp 0.8s 0.3s ease forwards; opacity: 0; }
+.rca-fade-up-3 { animation: rcaFadeUp 0.8s 0.5s ease forwards; opacity: 0; }
+.rca-fade-up-4 { animation: rcaFadeUp 0.8s 0.7s ease forwards; opacity: 0; }
+
+.rca-float     { animation: rcaFloat 5s ease-in-out infinite; }
+.rca-float-rev { animation: rcaFloatReverse 6s ease-in-out infinite; }
+.rca-glow      { animation: rcaGlow 3s ease-in-out infinite; }
+
+/* ── 3D Card Hover ── */
+.rca-3d-card {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.rca-3d-card:hover {
+  transform: perspective(800px) rotateX(-4deg) rotateY(4deg) translateY(-6px) scale(1.02);
+  box-shadow: 20px 20px 60px rgba(0,0,0,0.4), -5px -5px 20px rgba(186,117,23,0.08);
+}
+
+/* ── Pain Card Hover ── */
+.rca-pain-card {
+  transition: all 0.3s ease;
+  cursor: default;
+  border: 1px solid rgba(255,255,255,0.07);
+  transform: perspective(600px);
+}
+.rca-pain-card:hover {
+  border-color: rgba(201,77,26,0.45);
+  background: rgba(201,77,26,0.07) !important;
+  transform: perspective(600px) rotateX(-2deg) rotateY(2deg) translateY(-4px);
+  box-shadow: 0 20px 40px rgba(201,77,26,0.15);
+}
+
+/* ── Mesh Background ── */
+.rca-mesh {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(186,117,23,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(186,117,23,0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ── Gradient Orbs ── */
+.rca-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: rcaOrb 12s ease-in-out infinite;
+}
+.rca-orb-1 { width: 600px; height: 600px; background: rgba(59,109,17,0.12); top: -10%; left: -10%; }
+.rca-orb-2 { width: 500px; height: 500px; background: rgba(186,117,23,0.09); bottom: 0; right: -10%; animation-delay: -4s; }
+.rca-orb-3 { width: 400px; height: 400px; background: rgba(201,77,26,0.06); top: 40%; left: 40%; animation-delay: -8s; }
+
+/* ── Gold Shimmer Text ── */
+.rca-shimmer-text {
+  background: linear-gradient(90deg, #BA7517 0%, #F5C842 40%, #BA7517 60%, #9A6010 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rcaShimmer 3s linear infinite;
+}
+
+/* ── Glass Card ── */
+.rca-glass {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ── Floating Badge ── */
+.rca-floating-badge {
+  position: absolute;
+  animation: rcaFloat 4s ease-in-out infinite;
+}
+
+/* ── Number Counter anim ── */
+.rca-counter-in {
+  animation: rcaCounterIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Hero background gradient ── */
+.rca-hero-bg {
+  background: radial-gradient(ellipse at 50% 0%, rgba(59,109,17,0.18) 0%, transparent 60%),
+              radial-gradient(ellipse at 100% 100%, rgba(186,117,23,0.12) 0%, transparent 50%),
+              #0D1B2E;
+}
+
+/* ── Timeline line ── */
+.rca-timeline-line {
+  animation: rcaLineGrow 1s ease forwards;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .rca-hide-mobile { display: none !important; }
+  .rca-floating-badge { display: none !important; }
+  .rca-3d-card:hover { transform: none; }
+}
+
+/* ── Browser Autofill Fix ── */
+.rca-root input:-webkit-autofill,
+.rca-root input:-webkit-autofill:hover,
+.rca-root input:-webkit-autofill:focus,
+.rca-root input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #1A283C inset !important;
+  -webkit-text-fill-color: #FDF8EF !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ── Form Inputs Override ── */
+.rca-input-field {
+  width: 100% !important;
+  background-color: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(186,117,23,0.25) !important;
+  border-radius: 10px !important;
+  color: #FDF8EF !important;
+  font-family: 'Kalam', cursive !important;
+  font-size: 16px !important;
+  padding: 13px 16px !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+
+.rca-input-field:focus {
+  border-color: #BA7517 !important;
+  box-shadow: 0 0 0 3px rgba(186,117,23,0.12) !important;
+  background-color: rgba(255,255,255,0.06) !important;
+}
