@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import AdminLayout from '@/components/AdminLayout'
 import ImageLightbox from '@/components/ImageLightbox'
@@ -96,15 +96,14 @@ export default function PurchasesPage() {
       window.addEventListener('purchaseOrderCreated', handlePORefresh)
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('purchaseOrderCreated', handlePORefresh)
       }
     }
-  }, [])
+  }, [loadData, fetchUserInfo, loadOrders])
 
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/check')
       const data = await res.json()
@@ -121,12 +120,11 @@ export default function PurchasesPage() {
     } catch (err) {
       console.error('Failed to fetch user info:', err)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadOrders()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterSupplier, filterCategory, filterMonth, filterYear])
+  }, [filterSupplier, filterCategory, filterMonth, filterYear, loadOrders])
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -148,7 +146,7 @@ export default function PurchasesPage() {
     }
   }, [showModal, showDetailModal])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [suppliersRes, ordersRes, categoriesRes, inventoryRes] = await Promise.all([
         fetch('/api/suppliers'),
@@ -180,9 +178,9 @@ export default function PurchasesPage() {
     } catch (error) {
       console.error('Failed to load data:', error)
     }
-  }
+  }, [loadOrders])
 
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     try {
       const response = await fetch('/api/suppliers')
       const result = await response.json()
@@ -192,7 +190,7 @@ export default function PurchasesPage() {
     } catch (error) {
       console.error('Failed to load suppliers:', error)
     }
-  }
+  }, [])
 
   const handleQuickSupplierCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -277,7 +275,7 @@ export default function PurchasesPage() {
     return options
   }
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       const url = new URL('/api/purchases', window.location.origin)
       if (filterCategory && filterCategory !== 'All') {
@@ -336,7 +334,7 @@ export default function PurchasesPage() {
       console.error('Failed to load purchase orders:', error)
       alert('Failed to load purchase orders. Please check the console for details.')
     }
-  }
+  }, [filterCategory, filterSupplier, filterYear, filterMonth, searchQuery])
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, itemIndex: number) => {
     const files = e.target.files

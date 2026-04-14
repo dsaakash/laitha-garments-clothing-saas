@@ -86,15 +86,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   useEffect(() => {
     const handleToggleAiAgent = (e: any) => {
       if (typeof e.detail === 'boolean') {
-        setShowAiAgent(e.detail)
-        if (!e.detail) setActiveAgentOverride(null)
+        const isOpen = e.detail
+        setShowAiAgent(isOpen)
+        if (!isOpen) setActiveAgentOverride(null)
       } else if (e.detail && typeof e.detail === 'object') {
-        if (e.detail.open !== undefined) setShowAiAgent(e.detail.open)
+        if (e.detail.open !== undefined) {
+          setShowAiAgent(e.detail.open)
+          if (e.detail.open === false) setActiveAgentOverride(null)
+        }
         if (e.detail.type) setActiveAgentOverride(e.detail.type)
-        if (e.detail.open === false) setActiveAgentOverride(null)
       } else {
-        setShowAiAgent(prev => !prev)
-        if (showAiAgent) setActiveAgentOverride(null)
+        setShowAiAgent(prev => {
+          const next = !prev
+          if (!next) setActiveAgentOverride(null)
+          return next
+        })
       }
     }
 

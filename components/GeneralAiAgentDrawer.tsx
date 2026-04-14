@@ -59,7 +59,7 @@ export default function GeneralAiAgentDrawer({ isOpen, onClose }: GeneralAiAgent
               </div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">Coming Soon!</h3>
               <p className="text-slate-500 font-medium leading-relaxed">
-                We're currently training this agent to help you with **Sales, Analytics, and Customer Support**.
+                We&apos;re currently training this agent to help you with **Sales, Analytics, and Customer Support**.
               </p>
               
               <div className="mt-8 grid grid-cols-1 gap-3 w-full">
