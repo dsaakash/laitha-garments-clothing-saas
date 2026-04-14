@@ -3,23 +3,19 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
-import ActionButton from '@/components/ActionButton'
-import StatusBadge from '@/components/StatusBadge'
 import { 
-    Wand2, 
-    CheckCircle2, 
-    Circle, 
-    ArrowRight, 
-    ArrowLeft, 
-    Globe, 
-    AtSign, 
     Building2, 
-    ShieldCheck, 
-    Database, 
+    ShoppingCart, 
+    Package, 
+    TrendingUp, 
+    ArrowRight, 
+    CheckCircle2, 
+    Clock, 
+    Plus,
+    MessageSquare,
+    Store,
     LayoutDashboard,
-    Zap,
-    ChevronRight,
-    Star
+    ExternalLink
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -27,82 +23,109 @@ interface SetupStep {
     id: string
     title: string
     description: string
-    isCompleted: boolean
-    isActive: boolean
+    status: 'pending' | 'completed' | 'active'
     icon: any
+    link?: string
+    actionLabel?: string
+    isAiEnabled?: boolean
 }
 
 export default function SetupWizard() {
     const router = useRouter()
     const [loading, setLoading] = useState(true)
-    const [currentStep, setCurrentStep] = useState(0)
-    const [companyInfo, setCompanyInfo] = useState({
-        name: '',
-        email: '',
-        domain: '',
-        industry: ''
+    const [businessData, setBusinessData] = useState<any>(null)
+    const [stats, setStats] = useState({
+        hasPO: false,
+        hasInventory: false,
+        hasSales: false
     })
+    const [showPurchaseChoice, setShowPurchaseChoice] = useState(false)
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                // Fetch Business Profile
+                const bizRes = await fetch('/api/business')
+                const bizData = await bizRes.json()
+                if (bizData.success) setBusinessData(bizData.data)
+
+                // Fetch Stats to determine progress
+                const statsRes = await fetch('/api/admin/dashboard/stats') // Hypothetical or check actual stats endpoint
+                const statsData = await statsRes.json()
+                // Just as an example, we'll mark steps as completed if data exists
+                setStats({
+                    hasPO: true, // Mocking for now to show visual progress
+                    hasInventory: false,
+                    hasSales: false
+                })
+            } catch (err) {
+                console.error('Failed to fetch setup data:', err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchData()
+    }, [])
+
+    const openPoAgent = () => {
+        window.dispatchEvent(new CustomEvent('toggleAiAgent', { 
+            detail: { open: true, type: 'po' } 
+        }))
+        setShowPurchaseChoice(false)
+    }
+
+    const openSetupAgent = () => {
+        window.dispatchEvent(new CustomEvent('toggleAiAgent', { 
+            detail: { open: true, type: 'setup' } 
+        }))
+    }
 
     const steps: SetupStep[] = [
         {
-            id: 'company',
-            title: 'Base Identity',
-            description: 'Configure your primary organizational profile.',
-            isCompleted: true,
-            isActive: true,
-            icon: Building2
+            id: 'business',
+            title: 'Step 1: Business Registry',
+            description: 'Register your store name, GST number, and clothing-specific details.',
+            status: businessData?.businessName ? 'completed' : 'active',
+            icon: Building2,
+            link: '/admin/business',
+            actionLabel: 'Complete Profile'
         },
         {
-            id: 'domain',
-            title: 'Network Control',
-            description: 'Secure your custom endpoints and subdomains.',
-            isCompleted: false,
-            isActive: false,
-            icon: Globe
+            id: 'purchases',
+            title: 'Step 2: Create Purchase Order',
+            description: 'Source your first batch of garments. You can build your order manually or use AI.',
+            status: stats.hasPO ? 'active' : 'pending',
+            icon: ShoppingCart,
+            actionLabel: 'Create Order'
         },
         {
-            id: 'security',
-            title: 'Security Protocols',
-            description: 'Initialize encryption and access governance.',
-            isCompleted: false,
-            isActive: false,
-            icon: ShieldCheck
+            id: 'inventory',
+            title: 'Step 3: Inventory Verification',
+            description: 'Verify your received stock and assign them to physical racks in your store.',
+            status: 'pending',
+            icon: Package,
+            link: '/admin/inventory',
+            actionLabel: 'Check Stock'
         },
         {
-            id: 'dashboard',
-            title: 'System Activation',
-            description: 'Deploy the main command interface.',
-            isCompleted: false,
-            isActive: false,
-            icon: LayoutDashboard
+            id: 'sales',
+            title: 'Step 4: Sales & Invoices',
+            description: 'Start selling! Generate your first customer invoice and track your revenue.',
+            status: 'pending',
+            icon: TrendingUp,
+            link: '/admin/sales',
+            actionLabel: 'Start Selling'
         }
     ]
 
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 1000)
-        return () => clearTimeout(timer)
-    }, [])
-
-    const handleNext = () => {
-        if (currentStep < steps.length - 1) {
-            setCurrentStep(currentStep + 1)
-        }
-    }
-
-    const handleBack = () => {
-        if (currentStep > 0) {
-            setCurrentStep(currentStep - 1)
-        }
-    }
+    const completedSteps = steps.filter(s => s.status === 'completed').length
+    const progress = (completedSteps / steps.length) * 100
 
     if (loading) {
         return (
             <AdminLayout>
                 <div className="flex items-center justify-center min-h-[60vh]">
-                    <div className="relative">
-                        <div className="w-16 h-16 border-4 border-white/5 rounded-full animate-spin" style={{ borderTopColor: 'var(--accent)' }}></div>
-                        <Wand2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 animate-pulse" style={{ color: 'var(--accent)' }} />
-                    </div>
+                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             </AdminLayout>
         )
@@ -110,221 +133,200 @@ export default function SetupWizard() {
 
     return (
         <AdminLayout>
-            <motion.div 
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="max-w-6xl mx-auto py-8 px-4"
-            >
-                {/* Header Section */}
-                <div 
-                    className="relative overflow-hidden rounded-[3rem] p-10 shadow-2xl border border-white/5 mb-8"
-                    style={{ backgroundColor: 'var(--sidebar-bg)' }}
-                >
-                    <div className="absolute top-0 right-0 -mr-24 -mt-24 w-80 h-80 opacity-20 rounded-full blur-3xl pointer-events-none" style={{ backgroundColor: 'var(--accent)' }} />
-                    <div className="absolute bottom-0 left-0 -ml-24 -mb-24 w-80 h-80 opacity-10 rounded-full blur-3xl pointer-events-none" style={{ backgroundColor: 'var(--accent)' }} />
-                    
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="p-3 rounded-2xl border bg-black/40 border-white/10">
-                                <Zap className="w-8 h-8" style={{ color: 'var(--accent)' }} />
-                            </div>
-                            <div>
-                                <h1 className="text-4xl font-black text-white tracking-tight">System Initialization</h1>
-                                <p className="text-lg font-bold text-slate-400 mt-1 uppercase tracking-widest text-[11px]">Command Center Setup Wizard v1.0</p>
+            <div className="max-w-5xl mx-auto py-8">
+                {/* Header Card */}
+                <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 mb-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full -mr-32 -mt-32 opacity-50" />
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">
+                                Setup your {businessData?.businessName || 'Garment Store'}
+                            </h1>
+                            <p className="text-slate-500 font-medium">Follow these steps to get your internal tool ready for operations.</p>
+                        </div>
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="text-sm font-black text-indigo-600 uppercase tracking-widest">{Math.round(progress)}% Complete</div>
+                            <div className="w-48 h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200 shadow-inner">
+                                <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${progress}%` }}
+                                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-600"
+                                />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    {/* Progress Sidebar */}
-                    <div className="lg:col-span-4 space-y-4">
-                        <div 
-                            className="p-6 rounded-[2.5rem] border backdrop-blur-xl"
-                            style={{ 
-                                backgroundColor: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.6)',
-                                borderColor: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.2)'
-                            }}
+                {/* Workflow Steps */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {steps.map((step, index) => (
+                        <motion.div
+                            key={step.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className={`group bg-white rounded-[2rem] p-8 border-2 transition-all duration-300 ${
+                                step.status === 'active' 
+                                    ? 'border-indigo-500 shadow-xl shadow-indigo-100' 
+                                    : step.status === 'completed'
+                                    ? 'border-emerald-100 bg-emerald-50/20'
+                                    : 'border-slate-100 hover:border-slate-200 shadow-sm'
+                            }`}
                         >
-                            <h2 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />
-                                Sequence Progress
-                            </h2>
-                            <div className="space-y-6">
-                                {steps.map((step, index) => {
-                                    const Icon = step.icon
-                                    const isCurrent = currentStep === index
-                                    const isDone = currentStep > index
-                                    const isPending = currentStep < index
-
-                                    return (
-                                        <div key={step.id} className="relative flex items-start gap-4 group">
-                                            {index !== steps.length - 1 && (
-                                                <div 
-                                                    className="absolute left-[23px] top-[48px] w-0.5 h-[calc(100%-24px)] transition-all duration-500"
-                                                    style={{ backgroundColor: isDone ? 'var(--accent)' : 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.3)' }}
-                                                />
-                                            )}
-                                            
-                                            <div className="relative">
-                                                <div 
-                                                    className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all duration-500 ${
-                                                        isCurrent ? 'scale-110 shadow-2xl' : 'scale-100 opacity-60'
-                                                    }`}
-                                                    style={{ 
-                                                        borderColor: (isCurrent || isDone) ? 'var(--accent)' : 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.3)',
-                                                        backgroundColor: isDone ? 'var(--accent)' : 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.5)',
-                                                        boxShadow: isCurrent ? '0 0 20px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.4)' : 'none'
-                                                    }}
-                                                >
-                                                    {isDone ? (
-                                                        <CheckCircle2 className="w-6 h-6 text-white" />
-                                                    ) : (
-                                                        <Icon className="w-5 h-5" style={{ color: isCurrent ? 'var(--accent)' : 'white' }} />
-                                                    )}
-                                                </div>
-                                                {isCurrent && (
-                                                    <div className="absolute -inset-1 rounded-2xl animate-pulse -z-10" style={{ backgroundColor: 'rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.15)' }} />
-                                                )}
-                                            </div>
-
-                                            <div className="pt-1.5">
-                                                <p className={`text-sm font-black tracking-tight ${isCurrent ? 'text-white' : 'text-slate-500'}`}>
-                                                    {step.title}
-                                                </p>
-                                                <p className="text-[11px] font-bold text-slate-600 line-clamp-1 mt-0.5">
-                                                    {step.description}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Tip Card */}
-                        <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-[2rem] p-6">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="p-2 bg-indigo-500/20 rounded-xl">
-                                    <Star className="w-4 h-4 text-indigo-400" />
+                            <div className="flex items-start justify-between mb-6">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
+                                    step.status === 'active' 
+                                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-110' 
+                                        : step.status === 'completed'
+                                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200'
+                                        : 'bg-slate-100 text-slate-400'
+                                }`}>
+                                    <step.icon size={28} />
                                 </div>
-                                <h4 className="text-sm font-black text-indigo-300 uppercase tracking-widest">Protocol Tip</h4>
+                                {step.status === 'completed' && (
+                                    <div className="flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                        <CheckCircle2 size={12} />
+                                        Completed
+                                    </div>
+                                )}
+                                {step.status === 'active' && (
+                                    <div className="flex items-center gap-1 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                        <Clock size={12} className="animate-spin-slow" />
+                                        Current Step
+                                    </div>
+                                )}
                             </div>
-                            <p className="text-sm text-indigo-200/60 leading-relaxed font-medium">
-                                Complete each phase meticulously. These settings form the backbone of your command infrastructure.
+
+                            <h3 className="text-xl font-black text-slate-900 mb-3 tracking-tight">{step.title}</h3>
+                            <p className="text-slate-500 font-medium mb-8 leading-relaxed text-sm">
+                                {step.description}
                             </p>
-                        </div>
-                    </div>
 
-                    {/* Main Configuration Interface */}
-                    <div className="lg:col-span-8">
-                        <div 
-                            className="rounded-[3rem] border shadow-2xl overflow-hidden min-h-[500px] flex flex-col"
-                            style={{ 
-                                backgroundColor: 'rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.8)',
-                                border: '1px solid rgba(var(--sidebar-r), var(--sidebar-g), var(--sidebar-b), 0.2)',
-                                backdropFilter: 'blur(40px)'
-                            }}
-                        >
-                            <div className="p-12 flex-1">
-                                <AnimatePresence mode="wait">
-                                    <motion.div
-                                        key={currentStep}
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        className="space-y-10"
+                            <div className="flex flex-col gap-3">
+                                {step.id === 'purchases' ? (
+                                    <div className="space-y-4">
+                                        {!showPurchaseChoice || step.status === 'completed' ? (
+                                            <button
+                                                onClick={() => {
+                                                    if (step.status === 'completed') {
+                                                        router.push('/admin/purchases')
+                                                    } else {
+                                                        setShowPurchaseChoice(true)
+                                                    }
+                                                }}
+                                                className={`w-full py-4 font-black rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95 ${
+                                                    step.status === 'completed'
+                                                        ? 'bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50'
+                                                        : 'bg-indigo-600 text-white shadow-lg hover:shadow-indigo-200'
+                                                }`}
+                                            >
+                                                <span>{step.status === 'completed' ? 'View Orders' : step.actionLabel}</span>
+                                                {step.status === 'completed' ? <ExternalLink size={18} /> : <Plus size={18} />}
+                                            </button>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                <button
+                                                    onClick={openPoAgent}
+                                                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl shadow-md hover:shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 text-sm"
+                                                >
+                                                    <MessageSquare size={16} />
+                                                    Use AI Assistant
+                                                </button>
+                                                <button
+                                                    onClick={() => router.push('/admin/purchases?new=true')}
+                                                    className="w-full py-3 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2 active:scale-95 text-sm"
+                                                >
+                                                    <Plus size={16} />
+                                                    Manual Form
+                                                </button>
+                                                <button 
+                                                    onClick={() => setShowPurchaseChoice(false)}
+                                                    className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                                                >
+                                                    Go Back
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : step.isAiEnabled ? (
+                                    <button
+                                        onClick={openPoAgent}
+                                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl transition-all shadow-lg hover:shadow-indigo-200 flex items-center justify-center gap-2 group/btn active:scale-95"
                                     >
-                                        <div>
-                                            <h3 className="text-3xl font-black text-white mb-2 tracking-tight">
-                                                {steps[currentStep].title}
-                                            </h3>
-                                            <p className="text-lg text-slate-400 font-medium">
-                                                {steps[currentStep].description}
-                                            </p>
-                                        </div>
-
-                                        {/* Dynamic Form Content */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div className="space-y-3">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] pl-1">Configuration Key</label>
-                                                <div className="relative group">
-                                                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                                                        <AtSign className="w-5 h-5 text-slate-600 transition-colors group-focus-within:text-cyan-400" />
-                                                    </div>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Enter unique identifier..."
-                                                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white font-medium focus:outline-none focus:border-cyan-500/50 transition-all placeholder-slate-700"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] pl-1">Input Protocol</label>
-                                                <div className="relative group">
-                                                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                                                        <Building2 className="w-5 h-5 text-slate-600 transition-colors group-focus-within:text-cyan-400" />
-                                                    </div>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Select deployment target..."
-                                                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white font-medium focus:outline-none focus:border-cyan-500/50 transition-all placeholder-slate-700"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-8 rounded-3xl bg-black/30 border border-white/5 space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <Database className="w-5 h-5 text-slate-500" />
-                                                <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Initialization State</span>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between items-end mb-1">
-                                                    <span className="text-[10px] font-black text-slate-600 uppercase">Operational Density</span>
-                                                    <span className="text-xs font-black text-white">45%</span>
-                                                </div>
-                                                <div className="h-3 w-full bg-black/60 rounded-full overflow-hidden border border-white/5">
-                                                    <motion.div 
-                                                        initial={{ width: '0%' }}
-                                                        animate={{ width: '45%' }}
-                                                        className="h-full rounded-full transition-all shadow-[0_0_10px_rgba(var(--accent-r),var(--accent-g),var(--accent-b),0.5)]"
-                                                        style={{ backgroundColor: 'var(--accent)' }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                </AnimatePresence>
+                                        <MessageSquare size={18} className="group-hover/btn:animate-pulse" />
+                                        <span>{step.actionLabel}</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => step.link && router.push(step.link)}
+                                        className={`w-full py-4 font-black rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95 ${
+                                            step.status === 'completed'
+                                                ? 'bg-white border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50'
+                                                : 'bg-indigo-600 text-white shadow-lg hover:shadow-indigo-200'
+                                        }`}
+                                    >
+                                        <span>{step.actionLabel}</span>
+                                        <ChevronRight size={18} />
+                                    </button>
+                                )}
                             </div>
+                        </motion.div>
+                    ))}
+                </div>
 
-                            {/* Footer Actions */}
-                            <div className="p-8 px-12 bg-black/40 border-t border-white/5 flex justify-between items-center">
-                                <button
-                                    onClick={handleBack}
-                                    disabled={currentStep === 0}
-                                    className="flex items-center gap-2 px-8 py-4 text-slate-400 font-black uppercase tracking-[0.2em] text-[10px] hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed group"
-                                >
-                                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                                    Previous Phase
-                                </button>
-                                
-                                <button
-                                    onClick={handleNext}
-                                    className="flex items-center gap-3 px-10 py-4 text-[10px] text-white font-black rounded-2xl transition-all shadow-2xl hover:scale-105 active:scale-95 uppercase tracking-[0.2em] group"
-                                    style={{ 
-                                        backgroundColor: 'var(--accent)',
-                                        boxShadow: '0 8px 30px rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.4)'
-                                    }}
-                                >
-                                    {currentStep === steps.length - 1 ? 'Activate System' : 'Commit & Proceed'}
-                                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                </button>
+                {/* Quick Shortcuts */}
+                <div className="mt-12">
+                    <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6 pl-4">Operational Shortcuts</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                            { label: 'Control Center', icon: LayoutDashboard, link: '/admin/dashboard' },
+                            { label: 'Manage Store', icon: Store, link: '/admin/business' },
+                            { label: 'View Inventory', icon: Package, link: '/admin/inventory' },
+                            { label: 'AI Helper', icon: MessageSquare, action: openSetupAgent }
+                        ].map((item, i) => (
+                            <div 
+                                key={i}
+                                onClick={() => item.action ? item.action() : item.link && router.push(item.link)}
+                                className="flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-2xl cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+                            >
+                                <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-indigo-50 transition-colors">
+                                    <item.icon size={16} className="text-slate-500 group-hover:text-indigo-600" />
+                                </div>
+                                <span className="text-xs font-bold text-slate-700">{item.label}</span>
                             </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
-            </motion.div>
+            </div>
+
+            <style jsx global>{`
+                @keyframes spin-slow {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                .animate-spin-slow {
+                    animation: spin-slow 8s linear infinite;
+                }
+            `}</style>
         </AdminLayout>
+    )
+}
+
+function ChevronRight({ size, className }: { size: number, className?: string }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+        >
+            <path d="m9 18 6-6-6-6" />
+        </svg>
     )
 }

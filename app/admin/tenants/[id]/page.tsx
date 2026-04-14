@@ -8,6 +8,7 @@ import ActionButton from '@/components/ActionButton'
 import StatusBadge from '@/components/StatusBadge'
 import { ArrowLeft, Copy, RefreshCw, Key, Mail, Phone, MapPin, Building2, Calendar, TrendingUp, Settings, Check, LayoutGrid, CreditCard, ShoppingBag, ShoppingCart, Users, Truck, Package, BarChart3, Activity, Clock, Flame, AlertTriangle, Eye, LogIn, Unlock } from 'lucide-react'
 import { getPlanPricing } from '@/lib/tenantStorage'
+import { AVAILABLE_MODULES } from '@/lib/modules'
 
 interface Tenant {
     id: string
@@ -39,28 +40,6 @@ interface Credentials {
     loginUrl: string
 }
 
-const AVAILABLE_MODULES = [
-    { id: 'ai_setup_assistant', label: 'AI Setup Assistant (Groq)' },
-    { id: 'pos', label: 'POS System' },
-    { id: 'inventory', label: 'Inventory Management' },
-    { id: 'products', label: 'Products' },
-    { id: 'catalogues', label: 'Catalogues' },
-    { id: 'purchases', label: 'Purchase Orders' },
-    { id: 'sales', label: 'Sales & Billing' },
-    { id: 'invoices', label: 'Invoicing' },
-    { id: 'customers', label: 'CRM / Customers' },
-    { id: 'enquiries', label: 'Customer Enquiries' },
-    { id: 'suppliers', label: 'Supplier Management' },
-    { id: 'workflow', label: 'Workflow Engine' },
-    { id: 'website', label: 'Website Builder' },
-    { id: 'accounting', label: 'Accounting' },
-    { id: 'research', label: 'Raw Research' },
-    { id: 'setup', label: 'Setup Wizard' },
-    { id: 'business', label: 'Business Profile' },
-    { id: 'admins', label: 'Admin Management' },
-    { id: 'roles', label: 'Roles & Permissions' },
-    { id: 'whatsapp_community', label: 'WhatsApp Community' },
-]
 
 export default function TenantDetailsPage() {
     const router = useRouter()

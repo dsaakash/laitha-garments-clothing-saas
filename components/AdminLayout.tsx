@@ -8,6 +8,10 @@ import { checkAuth, logout } from '@/lib/auth'
 import { useTrialCheck } from '@/lib/useTrialCheck'
 import { useActivityTracker } from '@/lib/useActivityTracker'
 import SubscriptionRenewalBanner from '@/components/SubscriptionRenewalBanner'
+import AgenticPurchaseOrderDrawer from '@/components/AgenticPurchaseOrderDrawer'
+import GeneralAiAgentDrawer from '@/components/GeneralAiAgentDrawer'
+import AIChatSetupDrawer from '@/components/AIChatSetupDrawer'
+import { AVAILABLE_MODULES } from '@/lib/modules'
 import {
   LayoutDashboard,
   Rocket,
@@ -70,12 +74,33 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [tenantModules, setTenantModules] = useState<string[]>([])
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [showAiAgent, setShowAiAgent] = useState(false)
+  const [activeAgentOverride, setActiveAgentOverride] = useState<'po' | 'setup' | 'general' | null>(null)
 
   // Check trial expiry for tenants
   useTrialCheck()
 
   // Track tenant page views
   useActivityTracker(pathname, tenantId, userRole)
+
+  useEffect(() => {
+    const handleToggleAiAgent = (e: any) => {
+      if (typeof e.detail === 'boolean') {
+        setShowAiAgent(e.detail)
+        if (!e.detail) setActiveAgentOverride(null)
+      } else if (e.detail && typeof e.detail === 'object') {
+        if (e.detail.open !== undefined) setShowAiAgent(e.detail.open)
+        if (e.detail.type) setActiveAgentOverride(e.detail.type)
+        if (e.detail.open === false) setActiveAgentOverride(null)
+      } else {
+        setShowAiAgent(prev => !prev)
+        if (showAiAgent) setActiveAgentOverride(null)
+      }
+    }
+
+    window.addEventListener('toggleAiAgent', handleToggleAiAgent)
+    return () => window.removeEventListener('toggleAiAgent', handleToggleAiAgent)
+  }, [])
 
   useEffect(() => {
     checkAuth().then((auth) => {
@@ -674,17 +699,50 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                        {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                  </div>
-                 <div className="w-10 h-10 rounded-2xl bg-white border border-slate-100 shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-all">
-                    <div className="relative">
-                       <MessageCircle size={18} className="text-slate-900" />
-                       <div className="absolute -right-1 -top-1 w-2 h-2 rounded-full border border-white" style={{ backgroundColor: 'var(--accent)' }}></div>
-                    </div>
-                 </div>
+                 {/* Context-Aware AI Agent Button */}
+                 {(userRole === 'superadmin' || userRole === 'admin') && (
+                   <button
+                     onClick={() => setShowAiAgent(true)}
+                     title={
+                       pathname.includes('/admin/purchases') 
+                        ? "AI Purchase Order Agent" 
+                        : (pathname.includes('/admin/setup') || pathname.includes('/admin/business'))
+                        ? "AI Setup Assistant"
+                        : "AI General Assistant"
+                     }
+                     className={`w-10 h-10 rounded-2xl bg-white border shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-all group ${
+                       pathname.includes('/admin/purchases') 
+                        ? 'border-indigo-100 hover:border-indigo-300' 
+                        : (pathname.includes('/admin/setup') || pathname.includes('/admin/business'))
+                        ? 'border-purple-100 hover:border-purple-300'
+                        : 'border-slate-100 hover:border-slate-300'
+                     }`}
+                   >
+                     <div className="relative">
+                       <MessageCircle 
+                        size={18} 
+                        className={`transition-colors ${
+                          pathname.includes('/admin/purchases') 
+                            ? 'text-indigo-600 group-hover:text-indigo-700' 
+                            : 'text-slate-600 group-hover:text-slate-900'
+                        }`} 
+                       />
+                       {/* Pulsant dot only for active agents */}
+                       {(pathname.includes('/admin/purchases') && tenantModules.includes('ai-purchase-order')) || 
+                        (pathname.includes('/admin/setup') || pathname.includes('/admin/business')) ? (
+                         <div className={`absolute -right-1 -top-1 w-2.5 h-2.5 rounded-full border-2 border-white animate-pulse ${
+                            pathname.includes('/admin/purchases') ? 'bg-indigo-500' : 'bg-purple-500'
+                         }`} />
+                       ) : (
+                         <div className="absolute -right-1 -top-1 w-2 h-2 rounded-full border border-white bg-slate-300" />
+                       )}
+                     </div>
+                   </button>
+                 )}
               </div>
            </div>
         </header>
 
-        {/* Global Banner for trial/expiry */}
         <div className="px-4 lg:px-8 mb-4 max-w-[1600px] mx-auto">
            {userRole === 'admin' && <SubscriptionRenewalBanner />}
         </div>
@@ -692,6 +750,25 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <main className="p-4 lg:p-8 pt-0 max-w-[1600px] mx-auto min-h-[calc(100vh-100px)]">
           {children}
         </main>
+
+      {/* Global Context-Aware AI Agent Drawers */}
+      {(activeAgentOverride === 'po' || (!activeAgentOverride && pathname.includes('/admin/purchases'))) ? (
+        <AgenticPurchaseOrderDrawer
+          isOpen={showAiAgent}
+          onClose={() => { setShowAiAgent(false); setActiveAgentOverride(null); }}
+          onSuccess={() => { setShowAiAgent(false); setActiveAgentOverride(null); }}
+        />
+      ) : (activeAgentOverride === 'setup' || (!activeAgentOverride && (pathname.includes('/admin/setup') || pathname.includes('/admin/business')))) ? (
+        <AIChatSetupDrawer
+          isOpen={showAiAgent}
+          onClose={() => { setShowAiAgent(false); setActiveAgentOverride(null); }}
+        />
+      ) : (
+        <GeneralAiAgentDrawer
+          isOpen={showAiAgent}
+          onClose={() => { setShowAiAgent(false); setActiveAgentOverride(null); }}
+        />
+      )}
       </div>
     </div>
   )

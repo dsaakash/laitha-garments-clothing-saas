@@ -8,7 +8,7 @@ import { PurchaseOrder, PurchaseOrderItem, Supplier } from '@/lib/storage'
 import { format } from 'date-fns'
 import * as XLSX from 'xlsx'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Minus, Download, PackageOpen, DownloadCloud, Activity, MapPin, Building2, Link, IndianRupee, Clock, CheckCircle2, XCircle, Search, Filter, ShoppingCart, Layers, AlertCircle, FileText } from 'lucide-react'
+import { Plus, Minus, Download, PackageOpen, DownloadCloud, Activity, MapPin, Building2, Link, IndianRupee, Clock, CheckCircle2, XCircle, Search, Filter, ShoppingCart, Layers, AlertCircle, FileText, Sparkles } from 'lucide-react'
 import ActionButton from '@/components/ActionButton'
 import StatusBadge from '@/components/StatusBadge'
 export default function PurchasesPage() {
@@ -79,11 +79,49 @@ export default function PurchasesPage() {
   const [showImageLightbox, setShowImageLightbox] = useState(false)
   const [lightboxImages, setLightboxImages] = useState<string[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [userRole, setUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
+  const [tenantModules, setTenantModules] = useState<string[]>([])
 
   useEffect(() => {
     loadData()
+    fetchUserInfo()
+
+    // Listen for AI Purchase Order creation to refresh data
+    const handlePORefresh = () => {
+      console.log('🔄 AI Purchase Order created, refreshing list...')
+      loadOrders()
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('purchaseOrderCreated', handlePORefresh)
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('purchaseOrderCreated', handlePORefresh)
+      }
+    }
   }, [])
+
+  const fetchUserInfo = async () => {
+    try {
+      const res = await fetch('/api/auth/check')
+      const data = await res.json()
+      if (data.authenticated && data.admin) {
+        setUserRole(data.admin.type === 'tenant' ? 'admin' : data.admin.type)
+        if (data.admin.tenant_id) {
+          const tenantRes = await fetch(`/api/tenants/${data.admin.tenant_id}`)
+          const tenantData = await tenantRes.json()
+          if (tenantData.success) {
+            setTenantModules(tenantData.data.modules || [])
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch user info:', err)
+    }
+  }
 
   useEffect(() => {
     loadOrders()
@@ -2531,6 +2569,7 @@ export default function PurchasesPage() {
           </div>
         )}
       </motion.div>
+
     </AdminLayout>
   )
 }
