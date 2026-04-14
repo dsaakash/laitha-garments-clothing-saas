@@ -82,69 +82,66 @@ export default function PurchasesPage() {
   const [userRole, setUserRole] = useState<'superadmin' | 'admin' | 'user' | null>(null)
   const [tenantModules, setTenantModules] = useState<string[]>([])
 
-  useEffect(() => {
-    loadData()
-    fetchUserInfo()
-
-    // Listen for AI Purchase Order creation to refresh data
-    const handlePORefresh = () => {
-      console.log('🔄 AI Purchase Order created, refreshing list...')
-      loadOrders()
-    }
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('purchaseOrderCreated', handlePORefresh)
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('purchaseOrderCreated', handlePORefresh)
-      }
-    }
-  }, [loadData, fetchUserInfo, loadOrders])
-
-  const fetchUserInfo = useCallback(async () => {
+  const loadOrders = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/check')
-      const data = await res.json()
-      if (data.authenticated && data.admin) {
-        setUserRole(data.admin.type === 'tenant' ? 'admin' : data.admin.type)
-        if (data.admin.tenant_id) {
-          const tenantRes = await fetch(`/api/tenants/${data.admin.tenant_id}`)
-          const tenantData = await tenantRes.json()
-          if (tenantData.success) {
-            setTenantModules(tenantData.data.modules || [])
-          }
-        }
+      const url = new URL('/api/purchases', window.location.origin)
+      if (filterCategory && filterCategory !== 'All') {
+        url.searchParams.set('category', filterCategory)
       }
-    } catch (err) {
-      console.error('Failed to fetch user info:', err)
-    }
-  }, [])
 
-  useEffect(() => {
-    loadOrders()
-  }, [filterSupplier, filterCategory, filterMonth, filterYear, loadOrders])
+      const response = await fetch(url.toString())
+      const result = await response.json()
 
-  // Handle ESC key to close modals
-  useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (showDetailModal) {
-          setShowDetailModal(false)
-          setSelectedOrder(null)
-        } else if (showModal) {
-          setShowModal(false)
-          resetForm()
-        }
+      if (!result.success) {
+        console.error('API error:', result.message || result.error)
+        alert(`Failed to load purchase orders: ${result.message || 'Unknown error'}`)
+        return
       }
-    }
 
-    if (showModal || showDetailModal) {
-      window.addEventListener('keydown', handleEsc)
-      return () => window.removeEventListener('keydown', handleEsc)
+      if (result.data && Array.isArray(result.data)) {
+        let allOrders = result.data
+
+        if (filterSupplier) {
+          allOrders = allOrders.filter((order: PurchaseOrder) => order.supplierId === filterSupplier)
+        }
+
+        if (filterYear) {
+          allOrders = allOrders.filter((order: PurchaseOrder) => {
+            const orderYear = new Date(order.date).getFullYear().toString()
+            return orderYear === filterYear
+          })
+        }
+
+        if (filterMonth) {
+          allOrders = allOrders.filter((order: PurchaseOrder) => {
+            const orderMonth = (new Date(order.date).getMonth() + 1).toString().padStart(2, '0')
+            return orderMonth === filterMonth
+          })
+        }
+
+        // Search by supplier name
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase().trim()
+          allOrders = allOrders.filter((order: PurchaseOrder) =>
+            order.supplierName.toLowerCase().includes(query) ||
+            (order.customPoNumber && order.customPoNumber.toLowerCase().includes(query)) ||
+            (order.items && order.items.some(item => item.productName.toLowerCase().includes(query))) ||
+            (order.productName && order.productName.toLowerCase().includes(query))
+          )
+        }
+
+        allOrders.sort((a: PurchaseOrder, b: PurchaseOrder) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        setOrders(allOrders)
+        console.log(`Loaded ${allOrders.length} purchase orders`)
+      } else {
+        console.error('Invalid data format:', result)
+        setOrders([])
+      }
+    } catch (error) {
+      console.error('Failed to load purchase orders:', error)
+      alert('Failed to load purchase orders. Please check the console for details.')
     }
-  }, [showModal, showDetailModal])
+  }, [filterCategory, filterSupplier, filterYear, filterMonth, searchQuery])
 
   const loadData = useCallback(async () => {
     try {
@@ -191,6 +188,71 @@ export default function PurchasesPage() {
       console.error('Failed to load suppliers:', error)
     }
   }, [])
+
+  const fetchUserInfo = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/check')
+      const data = await res.json()
+      if (data.authenticated && data.admin) {
+        setUserRole(data.admin.type === 'tenant' ? 'admin' : data.admin.type)
+        if (data.admin.tenant_id) {
+          const tenantRes = await fetch(`/api/tenants/${data.admin.tenant_id}`)
+          const tenantData = await tenantRes.json()
+          if (tenantData.success) {
+            setTenantModules(tenantData.data.modules || [])
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch user info:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+    fetchUserInfo()
+
+    // Listen for AI Purchase Order creation to refresh data
+    const handlePORefresh = () => {
+      console.log('🔄 AI Purchase Order created, refreshing list...')
+      loadOrders()
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('purchaseOrderCreated', handlePORefresh)
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('purchaseOrderCreated', handlePORefresh)
+      }
+    }
+  }, [loadData, fetchUserInfo, loadOrders])
+
+  useEffect(() => {
+    loadOrders()
+  }, [filterSupplier, filterCategory, filterMonth, filterYear, loadOrders])
+
+  // Handle ESC key to close modals
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (showDetailModal) {
+          setShowDetailModal(false)
+          setSelectedOrder(null)
+        } else if (showModal) {
+          setShowModal(false)
+          resetForm()
+        }
+      }
+    }
+
+    if (showModal || showDetailModal) {
+      window.addEventListener('keydown', handleEsc)
+      return () => window.removeEventListener('keydown', handleEsc)
+    }
+  }, [showModal, showDetailModal])
+
 
   const handleQuickSupplierCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -275,66 +337,6 @@ export default function PurchasesPage() {
     return options
   }
 
-  const loadOrders = useCallback(async () => {
-    try {
-      const url = new URL('/api/purchases', window.location.origin)
-      if (filterCategory && filterCategory !== 'All') {
-        url.searchParams.set('category', filterCategory)
-      }
-
-      const response = await fetch(url.toString())
-      const result = await response.json()
-
-      if (!result.success) {
-        console.error('API error:', result.message || result.error)
-        alert(`Failed to load purchase orders: ${result.message || 'Unknown error'}`)
-        return
-      }
-
-      if (result.data && Array.isArray(result.data)) {
-        let allOrders = result.data
-
-        if (filterSupplier) {
-          allOrders = allOrders.filter((order: PurchaseOrder) => order.supplierId === filterSupplier)
-        }
-
-        if (filterYear) {
-          allOrders = allOrders.filter((order: PurchaseOrder) => {
-            const orderYear = new Date(order.date).getFullYear().toString()
-            return orderYear === filterYear
-          })
-        }
-
-        if (filterMonth) {
-          allOrders = allOrders.filter((order: PurchaseOrder) => {
-            const orderMonth = (new Date(order.date).getMonth() + 1).toString().padStart(2, '0')
-            return orderMonth === filterMonth
-          })
-        }
-
-        // Search by supplier name
-        if (searchQuery.trim()) {
-          const query = searchQuery.toLowerCase().trim()
-          allOrders = allOrders.filter((order: PurchaseOrder) =>
-            order.supplierName.toLowerCase().includes(query) ||
-            (order.customPoNumber && order.customPoNumber.toLowerCase().includes(query)) ||
-            (order.items && order.items.some(item => item.productName.toLowerCase().includes(query))) ||
-            (order.productName && order.productName.toLowerCase().includes(query))
-          )
-        }
-
-        allOrders.sort((a: PurchaseOrder, b: PurchaseOrder) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        setOrders(allOrders)
-        console.log(`Loaded ${allOrders.length} purchase orders`)
-      } else {
-        console.error('Invalid data format:', result)
-        setOrders([])
-      }
-    } catch (error) {
-      console.error('Failed to load purchase orders:', error)
-      alert('Failed to load purchase orders. Please check the console for details.')
-    }
-  }, [filterCategory, filterSupplier, filterYear, filterMonth, searchQuery])
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, itemIndex: number) => {
     const files = e.target.files
