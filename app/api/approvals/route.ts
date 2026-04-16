@@ -90,15 +90,32 @@ export async function GET(request: NextRequest) {
             approvals = await getPendingApprovals(role.id)
         }
 
-        // Fetch statistics for the user (can fetch total system stats or stats related to this approver)
-        const totalResult = await query(`SELECT COUNT(*) as count FROM approval_requests`)
-        const approvedResult = await query(`SELECT COUNT(*) as count FROM approval_requests WHERE status = 'approved'`)
-        const pendingResult = await query(`SELECT COUNT(*) as count FROM approval_requests WHERE status = 'pending'`)
+        // Fetch statistics contextually (filtered for this user/tenant)
+        let statsSql = ` WHERE 1=1`
+        const statsParams: any[] = []
+        if ((userType === 'tenant' || userType === 'admin') && tenantId) {
+            statsSql += ` AND (tenant_id = $1 OR tenant_id IS NULL)`
+            statsParams.push(tenantId)
+        }
+
+        const statsTotal = await query(`SELECT COUNT(*) as count FROM approval_requests ${statsSql}`, statsParams)
+        const statsApproved = await query(`SELECT COUNT(*) as count FROM approval_requests ${statsSql} AND status = 'approved'`, statsParams)
+        const statsRejected = await query(`SELECT COUNT(*) as count FROM approval_requests ${statsSql} AND status = 'rejected'`, statsParams)
+        
+        // Pending count should specifically reflect what the user CAN actually approve (matching the sidebar badge)
+        let pendingStatsSql = statsSql + ` AND status = 'pending'`
+        const pendingStatsParams = [...statsParams]
+        if (role && role.id) {
+            pendingStatsSql += ` AND approver_role_id = $${pendingStatsParams.length + 1}`
+            pendingStatsParams.push(role.id)
+        }
+        const statsPendingQuery = await query(`SELECT COUNT(*) as count FROM approval_requests ${pendingStatsSql}`, pendingStatsParams)
         
         const stats = {
-            total: parseInt(totalResult.rows[0].count) || 0,
-            approved: parseInt(approvedResult.rows[0].count) || 0,
-            pending: parseInt(pendingResult.rows[0].count) || 0
+            total: parseInt(statsTotal.rows[0].count) || 0,
+            approved: parseInt(statsApproved.rows[0].count) || 0,
+            rejected: parseInt(statsRejected.rows[0].count) || 0,
+            pending: parseInt(statsPendingQuery.rows[0].count) || 0
         }
 
         // Enrich approvals with exact payload details from Purchase orders mapping the legacy fields accurately
@@ -117,6 +134,20 @@ export async function GET(request: NextRequest) {
                     } else {
                         const itemsResult = await query(`SELECT product_name, fabric_type, quantity, price_per_piece FROM purchase_order_items WHERE purchase_order_id = $1`, [poId])
                         appr.payload = { type: 'New Purchase Order Creation', supplier: po.supplier_name, requestValue: po.grand_total, items: itemsResult.rows }
+                    }
+                }
+            } else if (appr.entity_type === 'inventory_stock_update') {
+                const invId = parseInt(appr.entity_id)
+                const invResult = await query(`SELECT dress_name, dress_code, fabric_type, category FROM inventory WHERE id = $1`, [invId])
+                if (invResult.rows.length > 0) {
+                    const inv = invResult.rows[0]
+                    const currentPayload = typeof appr.payload === 'string' ? JSON.parse(appr.payload) : (appr.payload || {})
+                    appr.payload = { 
+                        ...currentPayload, 
+                        productName: inv.dress_name, 
+                        dressCode: inv.dress_code, 
+                        category: inv.category,
+                        fabricTypeEnriched: inv.fabric_type 
                     }
                 }
             }

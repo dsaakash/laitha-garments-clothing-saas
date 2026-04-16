@@ -271,6 +271,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       }
     }
 
+    // New: Listen for pending approvals updates
+    const handleApprovalsUpdate = () => {
+      if (userRole === 'admin' || userRole === 'superadmin') {
+        fetch('/api/approvals', { credentials: 'include' })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.stats) {
+              setPendingApprovalsCount(data.stats.pending || 0)
+            }
+          })
+          .catch(err => console.error('Failed to sync approvals badge:', err))
+      }
+    }
+
     // Check localStorage for updates (backup mechanism)
     const checkForUpdates = () => {
       if (typeof window !== 'undefined') {
@@ -297,6 +311,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
     // Add event listener for immediate updates
     window.addEventListener('businessProfileUpdated', handleBusinessProfileUpdate as EventListener)
+    window.addEventListener('pendingApprovalsUpdated', handleApprovalsUpdate as EventListener)
 
     // Check for updates on window focus (in case user switches tabs or windows)
     window.addEventListener('focus', checkForUpdates)
@@ -319,6 +334,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // Cleanup
     return () => {
       window.removeEventListener('businessProfileUpdated', handleBusinessProfileUpdate as EventListener)
+      window.removeEventListener('pendingApprovalsUpdated', handleApprovalsUpdate as EventListener)
       window.removeEventListener('focus', checkForUpdates)
       clearInterval(intervalId)
     }
