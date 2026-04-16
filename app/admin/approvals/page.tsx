@@ -510,7 +510,7 @@ export default function ApprovalsPage() {
                                             <div className="flex items-center gap-2 mb-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">
                                                 <FileText size={14} /> Evaluation Comments
                                             </div>
-                                            <p className="text-sm font-medium text-slate-300 italic">"{selectedRequest.comments}"</p>
+                                            <p className="text-sm font-medium text-slate-300 italic">&quot;{selectedRequest.comments}&quot;</p>
                                         </div>
                                     )}
                                 </div>

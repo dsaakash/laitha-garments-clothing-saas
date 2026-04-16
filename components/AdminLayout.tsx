@@ -338,7 +338,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       window.removeEventListener('focus', checkForUpdates)
       clearInterval(intervalId)
     }
-  }, [])
+  }, [userRole])
 
   // Persist sidebar collapsed state
   useEffect(() => {
