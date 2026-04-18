@@ -6,36 +6,76 @@ import { motion } from 'framer-motion'
 import { 
   CreditCard, 
   CheckCircle2, 
-  TrendingUp, 
   Package, 
   ShoppingBag,
-  Zap,
   ShieldCheck,
   Clock
 } from 'lucide-react'
 
+interface SubscriptionInfo {
+  status: string
+  plan: string | null
+  billingCycle: string | null
+  subscriptionEndDate: string | null
+  trialEndDate: string | null
+  daysRemaining: number | null
+  isActive: boolean
+}
+
+const PLAN_DISPLAY: Record<string, { name: string; price: string }> = {
+  // DB values (Title-case)
+  foundation: { name: 'Starter Intelligence', price: '₹599' },
+  growth: { name: 'Growth Command', price: '₹2,499' },
+  scale: { name: 'Enterprise Matrix', price: '₹5,999' },
+  // Legacy / alternate keys
+  starter: { name: 'Starter Intelligence', price: '₹599' },
+  enterprise: { name: 'Enterprise Matrix', price: '₹5,999' },
+  free: { name: 'Free Trial', price: '₹0' },
+}
+
+function formatDate(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 export default function BillingPage() {
+  const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null)
   const [stats, setStats] = useState({
     totalInventory: 0,
     totalSales: 0,
-    currentUsage: 0
   })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [invRes, salesRes] = await Promise.all([
+        const [subRes, invRes, salesRes] = await Promise.all([
+          fetch('/api/auth/subscription-status'),
           fetch('/api/inventory'),
-          fetch('/api/sales')
+          fetch('/api/sales'),
         ])
+        const sub = await subRes.json()
         const inv = await invRes.json()
         const sales = await salesRes.json()
-        
+
+        if (sub.success) {
+          setSubInfo({
+            status: sub.status,
+            plan: sub.plan,
+            billingCycle: sub.billingCycle,
+            subscriptionEndDate: sub.subscriptionEndDate,
+            trialEndDate: sub.trialEndDate,
+            daysRemaining: sub.daysRemaining,
+            isActive: sub.isActive,
+          })
+        }
         setStats({
           totalInventory: inv.data?.length || 0,
           totalSales: sales.data?.length || 0,
-          currentUsage: (inv.data?.length || 0) + (sales.data?.length || 0)
         })
       } catch (err) {
         console.error(err)
@@ -46,18 +86,40 @@ export default function BillingPage() {
     fetchData()
   }, [])
 
+  // Resolve display values
+  const planKey = subInfo?.plan?.toLowerCase() || ''
+  const planDisplay = PLAN_DISPLAY[planKey] ?? { name: subInfo?.plan || 'Active Plan', price: '—' }
+
+  // For this client — 3-month subscription, show subscription end date as renewal
+  const renewalDate =
+    subInfo?.subscriptionEndDate
+      ? formatDate(subInfo.subscriptionEndDate)
+      : subInfo?.trialEndDate
+      ? formatDate(subInfo.trialEndDate)
+      : '—'
+
+  // Days remaining — cap display at total subscription length context
+  const daysLeft = subInfo?.daysRemaining ?? 0
+  // 3-month subscription ≈ 90 days total
+  const totalDays = 90
+  const daysProgress = Math.min(Math.max((daysLeft / totalDays) * 100, 2), 100)
+
+  // Inventory usage progress (max 5000 for Growth tier)
+  const inventoryLimit = 5000
+  const inventoryProgress = Math.min((stats.totalInventory / inventoryLimit) * 100, 100)
+
   const plans = [
     {
       name: 'Starter Intelligence',
-      price: '₹2,499',
+      price: '₹599',
       period: '/month',
-      description: 'Perfect for established boutiques looking to digitize their workflow.',
+      description: 'Perfect for small boutiques looking to digitize their day-to-day workflow.',
       features: ['Up to 500 Inventory Items', 'Unlimited Sales Recording', 'Basic Analytics', 'WhatsApp Sharing'],
       recommended: false
     },
     {
       name: 'Growth Command',
-      price: '₹4,999',
+      price: '₹2,499',
       period: '/month',
       description: 'Scale your operations with advanced intelligence and storefronts.',
       features: ['Unlimited Inventory', 'Custom Digital Storefront', 'Advanced Revenue Pulse', 'Multi-user Access', 'Priority Support'],
@@ -65,8 +127,8 @@ export default function BillingPage() {
     },
     {
       name: 'Enterprise Matrix',
-      price: 'Custom',
-      period: '',
+      price: '₹5,999',
+      period: '/month',
       description: 'Full-scale solution for high-volume manufacturers and distributors.',
       features: ['Custom Workflow Rules', 'Dedicated Account Manager', 'API Access', 'White-labeling Options'],
       recommended: false
@@ -80,7 +142,7 @@ export default function BillingPage() {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent)' }}></div>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Subscription & Billing</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Subscription &amp; Billing</span>
           </div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Billing Center</h1>
           <p className="text-slate-500 font-medium">Manage your subscription, view usage, and upgrade your intelligence.</p>
@@ -98,16 +160,30 @@ export default function BillingPage() {
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-[10px] font-black uppercase tracking-widest text-emerald-400">
                 <ShieldCheck className="w-3 h-3" />
-                Active Subscription
+                {subInfo?.status === 'trial' ? 'Trial Active' : 'Active Subscription'}
               </div>
-              <h2 className="text-3xl font-black">Growth Command</h2>
-              <p className="text-slate-400 text-sm">Your next renewal is on <span className="text-white">May 24, 2026</span></p>
+              <h2 className="text-3xl font-black">
+                {loading ? <span className="opacity-40">Loading…</span> : planDisplay.name}
+              </h2>
+              <p className="text-slate-400 text-sm">
+                {subInfo?.status === 'trial'
+                  ? <>Your trial ends on <span className="text-white">{renewalDate}</span></>
+                  : <>Your next renewal is on <span className="text-white">{renewalDate}</span></>
+                }
+              </p>
             </div>
             
             <div className="flex md:justify-center">
                 <div className="text-center md:text-left space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Monthly Investment</p>
-                    <p className="text-4xl font-black">₹4,999<span className="text-lg text-slate-500 font-bold">/mo</span></p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      {subInfo?.status === 'trial' ? 'Trial Plan' : 'Monthly Investment'}
+                    </p>
+                    <p className="text-4xl font-black">
+                      {loading ? '—' : planDisplay.price}
+                      {planDisplay.price !== 'Custom' && planDisplay.price !== '—' && (
+                        <span className="text-lg text-slate-500 font-bold">/mo</span>
+                      )}
+                    </p>
                 </div>
             </div>
 
@@ -130,9 +206,9 @@ export default function BillingPage() {
                  <Package className="w-6 h-6" />
               </div>
               <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Stock Usage</p>
-              <h3 className="text-2xl font-black text-slate-900">{stats.totalInventory} <span className="text-xs font-bold text-slate-400">/ 5000</span></h3>
+              <h3 className="text-2xl font-black text-slate-900">{stats.totalInventory} <span className="text-xs font-bold text-slate-400">/ {inventoryLimit.toLocaleString()}</span></h3>
               <div className="mt-4 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                 <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(stats.totalInventory / 5000) * 100}%` }}></div>
+                 <div className="h-full bg-blue-500 rounded-full transition-all duration-700" style={{ width: `${inventoryProgress}%` }}></div>
               </div>
            </div>
 
@@ -143,7 +219,7 @@ export default function BillingPage() {
               <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Monthly Orders</p>
               <h3 className="text-2xl font-black text-slate-900">{stats.totalSales} <span className="text-xs font-bold text-slate-400">/ Unlimited</span></h3>
               <div className="mt-4 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                 <div className="h-full bg-emerald-500 rounded-full" style={{ width: '15%' }}></div>
+                 <div className="h-full bg-emerald-500 rounded-full" style={{ width: stats.totalSales > 0 ? '15%' : '2%' }}></div>
               </div>
            </div>
 
@@ -151,10 +227,17 @@ export default function BillingPage() {
               <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 mb-4">
                  <Clock className="w-6 h-6" />
               </div>
-              <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Trial Days Left</p>
-              <h3 className="text-2xl font-black text-slate-900">365 <span className="text-xs font-bold text-slate-400">Remaining</span></h3>
+              <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">
+                {subInfo?.status === 'trial' ? 'Trial Days Left' : 'Subscription Days Left'}
+              </p>
+              <h3 className="text-2xl font-black text-slate-900">
+                {loading ? '—' : daysLeft} <span className="text-xs font-bold text-slate-400">Remaining</span>
+              </h3>
               <div className="mt-4 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                 <div className="h-full bg-orange-500 rounded-full" style={{ width: '100%' }}></div>
+                 <div
+                   className="h-full bg-orange-500 rounded-full transition-all duration-700"
+                   style={{ width: `${daysProgress}%` }}
+                 ></div>
               </div>
            </div>
         </div>

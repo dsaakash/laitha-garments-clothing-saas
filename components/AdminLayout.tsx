@@ -463,8 +463,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // For tenants, conditionally show items based on enabled modules and subscription
     if (userRole === 'admin') {
       items = items.filter(item => {
-        // Explicitly hide Tenants list and Platform Theme from non-superadmins
-        if (item.href === '/admin/tenants' || item.href === '/admin/theme') {
+        // Explicitly hide Tenants list, Trial Leads, and Platform Theme from non-superadmins
+        if (item.href === '/admin/tenants' || item.href === '/admin/theme' || item.href === '/admin/leads') {
           return false
         }
 
