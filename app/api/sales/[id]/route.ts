@@ -125,8 +125,8 @@ export async function PUT(
            gst_type = $8, gst_percentage = $9, gst_amount = $10, 
            total_amount = $11, final_total = $12, payment_mode = $13, 
            upi_transaction_id = $14, upi_id = $15, payment_status = $16,
-           sale_image = $17
-       WHERE id = $18`,
+           sale_image = $17, loyalty_discount = $18, loyalty_points_earned = $19
+       WHERE id = $20`,
       [
         body.date,
         body.partyName,
@@ -145,6 +145,8 @@ export async function PUT(
         body.upiId || null,
         body.paymentStatus || null,
         body.saleImage || null,
+        body.loyaltyDiscount || 0,
+        body.loyaltyPointsEarned || 10,
         saleId
       ]
     )

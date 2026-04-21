@@ -110,6 +110,8 @@ export async function GET(request: NextRequest) {
       gstAmount: row.gst_amount ? parseFloat(row.gst_amount) : undefined,
       totalAmount: parseFloat(row.total_amount),
       finalTotal: row.final_total ? parseFloat(row.final_total) : parseFloat(row.total_amount),
+      loyaltyDiscount: row.loyalty_discount ? parseFloat(row.loyalty_discount) : undefined,
+      loyaltyPointsEarned: row.loyalty_points_earned ? parseInt(row.loyalty_points_earned) : 10,
       paymentMode: row.payment_mode,
       upiTransactionId: row.upi_transaction_id || undefined,
       upiId: row.upi_id || undefined,
@@ -185,8 +187,8 @@ export async function POST(request: NextRequest) {
     const saleResult = await query(
       `INSERT INTO sales 
        (date, party_name, customer_id, bill_number, subtotal, discount_type, discount_percentage, discount_amount,
-        gst_type, gst_percentage, gst_amount, total_amount, final_total, payment_mode, upi_transaction_id, upi_id, payment_status, sale_image, tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        gst_type, gst_percentage, gst_amount, total_amount, final_total, payment_mode, upi_transaction_id, upi_id, payment_status, sale_image, tenant_id, loyalty_discount, loyalty_points_earned)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
        RETURNING *`,
       [
         body.date,
@@ -207,7 +209,9 @@ export async function POST(request: NextRequest) {
         body.upiId || null,
         body.paymentStatus || (body.paymentMode === 'UPI' ? 'pending' : null),
         body.saleImage || null,
-        tenantId
+        tenantId,
+        body.loyaltyDiscount || 0,
+        body.loyaltyPointsEarned || 10
       ]
     )
 

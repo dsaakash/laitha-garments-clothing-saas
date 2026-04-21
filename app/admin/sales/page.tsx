@@ -81,6 +81,24 @@ function SalesPageContent() {
   const [barcodeError, setBarcodeError] = useState('')
   const barcodeInputRef = React.useRef<HTMLInputElement>(null)
 
+  // ── Loyalty Points ────────────────────────────────────────
+  const [loyaltyData, setLoyaltyData] = useState<{
+    purchaseCount: number
+    totalPoints: number
+    redeemedPoints: number
+    availablePoints: number
+    pointsValue: number
+    isRepeatBuyer: boolean
+    partyName: string
+    recentPurchases: Array<{ billNumber: string; date: string; totalAmount: number; pointsEarned: number }>
+  } | null>(null)
+  const [loyaltyLoading, setLoyaltyLoading] = useState(false)
+  const [loyaltyError, setLoyaltyError] = useState('')
+  const [applyLoyalty, setApplyLoyalty] = useState(false)
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0)
+  const [manualPtsInput, setManualPtsInput] = useState('')
+  const [isAddingPts, setIsAddingPts] = useState(false)
+
   useEffect(() => {
     fetch('/api/auth/check')
       .then(res => res.json())
@@ -146,8 +164,46 @@ function SalesPageContent() {
     setCapturedImage(null)
     setShowCamera(false)
     setSelectedSticker(null)
+    setLoyaltyData(null)
+    setLoyaltyError('')
+    setApplyLoyalty(false)
+    setLoyaltyDiscount(0)
     stopCamera()
   }, [stopCamera])
+
+  // ── Loyalty: Check purchase history ───────────────────────
+  const checkLoyalty = async () => {
+    const cid  = formData.customerId
+    const name = formData.partyName?.trim()
+    if (!cid && !name) {
+      setLoyaltyError('Enter a customer name or select a customer first.')
+      return
+    }
+    setLoyaltyLoading(true)
+    setLoyaltyError('')
+    setLoyaltyData(null)
+    setApplyLoyalty(false)
+    setLoyaltyDiscount(0)
+    try {
+      const params = new URLSearchParams()
+      if (cid)  params.append('customerId', cid)
+      else       params.append('partyName',  name)
+      const res    = await fetch(`/api/loyalty/check?${params}`, { credentials: 'include' })
+      const result = await res.json()
+      if (result.success) {
+        setLoyaltyData(result.data)
+        if (result.data.purchaseCount === 0) {
+          setLoyaltyError('No previous purchases found for this customer.')
+        }
+      } else {
+        setLoyaltyError(result.message || 'Failed to check loyalty')
+      }
+    } catch {
+      setLoyaltyError('Network error. Please try again.')
+    } finally {
+      setLoyaltyLoading(false)
+    }
+  }
 
   useEffect(() => {
     loadData()
@@ -602,8 +658,9 @@ function SalesPageContent() {
         gstAmount = formData.gstAmount
       }
 
-      // Calculate final total
-      const finalTotal = amountAfterDiscount + gstAmount
+      // Calculate final total (including loyalty discount)
+      const loyaltyDeduction = applyLoyalty ? loyaltyDiscount : 0
+      const finalTotal = amountAfterDiscount + gstAmount - loyaltyDeduction
 
       const url = editingSale ? `/api/sales/${editingSale.id}` : '/api/sales'
       const method = editingSale ? 'PUT' : 'POST'
@@ -626,6 +683,8 @@ function SalesPageContent() {
           gstAmount: gstAmount || undefined,
           totalAmount: finalTotal,
           finalTotal,
+          loyaltyDiscount: loyaltyDeduction || undefined,
+          loyaltyPointsEarned: 10,
           paymentMode: formData.paymentMode,
           upiTransactionId: formData.upiTransactionId || undefined,
           upiId: formData.upiId || undefined,
@@ -640,6 +699,20 @@ function SalesPageContent() {
         console.error('Sale update error:', result)
         alert(`Failed to ${editingSale ? 'update' : 'add'} sale: ${errorMsg}`)
         return
+      }
+
+      // If loyalty discount was applied, record the redemption
+      if (applyLoyalty && loyaltyDiscount > 0 && loyaltyData) {
+        const pointsUsed = loyaltyDiscount * 10  // ₹1 = 10 pts
+        const redeemBody: Record<string, any> = { pointsToRedeem: pointsUsed }
+        if (formData.customerId) redeemBody.customerId = formData.customerId
+        else if (formData.partyName) redeemBody.partyName = formData.partyName
+        await fetch('/api/loyalty/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(redeemBody),
+        }).catch(console.error)
       }
 
       resetForm()
@@ -1149,6 +1222,16 @@ function SalesPageContent() {
                                 <span className="text-sm font-medium text-blue-400 opacity-80">
                                   Profit: ₹{totalProfit.toLocaleString()}
                                 </span>
+                                {(sale as any).loyaltyDiscount > 0 && (
+                                  <span className="mt-1 inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 w-max">
+                                    🏆 ₹{(sale as any).loyaltyDiscount} Loyalty Off
+                                  </span>
+                                )}
+                                {!(sale as any).loyaltyDiscount && (
+                                  <span className="mt-1 inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-400 border border-green-500/30 w-max">
+                                    +{(sale as any).loyaltyPointsEarned || 10} pts earned
+                                  </span>
+                                )}
                               </div>
                             </td>
 
@@ -1351,6 +1434,265 @@ function SalesPageContent() {
                       </p>
                     )}
                   </div>
+
+                  {/* ── Check Loyalty Button ───────────────────── */}
+                  {(formData.customerId || formData.partyName) && (
+                    <div>
+                      <button
+                        type="button"
+                        id="check-loyalty-btn"
+                        onClick={checkLoyalty}
+                        disabled={loyaltyLoading}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 border-2"
+                        style={{
+                          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                          color: '#fff',
+                          borderColor: '#f59e0b',
+                          boxShadow: '0 0 12px rgba(245,158,11,0.3)',
+                        }}
+                      >
+                        {loyaltyLoading ? (
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                          </svg>
+                        ) : (
+                          <span>🏆</span>
+                        )}
+                        {loyaltyLoading ? 'Checking...' : 'Check Loyalty'}
+                      </button>
+
+                      {loyaltyError && (
+                        <p className="text-red-500 text-xs mt-2 font-medium">{loyaltyError}</p>
+                      )}
+
+                      {/* Loyalty Panel */}
+                      {loyaltyData && loyaltyData.purchaseCount > 0 && (
+                        <div
+                          className="mt-3 rounded-2xl border-2 overflow-hidden"
+                          style={{ borderColor: '#f59e0b', background: 'linear-gradient(135deg, #fffbeb, #fef3c7)' }}
+                        >
+                          {/* Panel Header */}
+                          <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">🏆</span>
+                              <div>
+                                <p className="text-white font-bold text-sm">{loyaltyData.partyName}</p>
+                                <p className="text-yellow-100 text-xs">{loyaltyData.isRepeatBuyer ? 'Repeat Customer' : 'First Purchase'}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-white text-2xl font-black">{loyaltyData.availablePoints}</p>
+                              <p className="text-yellow-100 text-xs">pts available</p>
+                            </div>
+                          </div>
+
+                          {/* Stats row */}
+                          <div className="grid grid-cols-3 divide-x divide-amber-200 border-b border-amber-200">
+                            <div className="px-3 py-2 text-center">
+                              <p className="text-amber-900 text-xs font-medium">Purchases</p>
+                              <p className="text-amber-800 text-lg font-black">{loyaltyData.purchaseCount}</p>
+                            </div>
+                            <div className="px-3 py-2 text-center">
+                              <p className="text-amber-900 text-xs font-medium">Total Earned</p>
+                              <p className="text-amber-800 text-lg font-black">{loyaltyData.totalPoints} pts</p>
+                            </div>
+                            <div className="px-3 py-2 text-center relative group">
+                              <p className="text-amber-900 text-xs font-medium">₹ Value</p>
+                              <p className="text-green-700 text-lg font-black">₹{loyaltyData.pointsValue}</p>
+                            </div>
+                          </div>
+
+                          {/* Quick Add Manual Points */}
+                          <div className="px-4 py-2 border-b border-amber-200 bg-amber-50">
+                             <div className="flex items-center gap-2">
+                               <input 
+                                 type="number" 
+                                 placeholder="+ Pts" 
+                                 value={manualPtsInput} 
+                                 onChange={e => setManualPtsInput(e.target.value)} 
+                                 className="w-16 px-2 py-1 text-xs border border-amber-300 rounded bg-white text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500" 
+                               />
+                               <button 
+                                 type="button"
+                                 disabled={isAddingPts || !manualPtsInput} 
+                                 onClick={async () => {
+                                   if (!manualPtsInput || isNaN(Number(manualPtsInput))) return;
+                                   setIsAddingPts(true);
+                                   try {
+                                     const body: any = { pointsToAdd: Number(manualPtsInput) };
+                                     if (formData.customerId) body.customerId = formData.customerId;
+                                     else body.partyName = formData.partyName;
+                                     await fetch('/api/loyalty/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                                     setManualPtsInput('');
+                                     await checkLoyalty();
+                                   } catch (e) {
+                                     console.error(e);
+                                   } finally {
+                                     setIsAddingPts(false);
+                                   }
+                                 }}
+                                 className="px-3 py-1 text-xs font-bold text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
+                               >
+                                 {isAddingPts ? 'Adding...' : 'Add Bonus'}
+                               </button>
+                             </div>
+                          </div>
+
+                          {/* Recent purchases */}
+                          {loyaltyData.recentPurchases.length > 0 && (
+                            <div className="px-4 py-2">
+                              <p className="text-amber-800 text-xs font-bold uppercase tracking-wider mb-2">Recent Visits</p>
+                              <div className="space-y-1 max-h-24 overflow-y-auto">
+                                {loyaltyData.recentPurchases.map((p, i) => (
+                                  <div key={i} className="flex justify-between items-center text-xs">
+                                    <span className="font-mono text-amber-700">{p.billNumber}</span>
+                                    <span className="text-amber-600">{new Date(p.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                    <span className="font-bold text-green-700">+{p.pointsEarned} pts</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* ── Redemption Options ── */}
+                          {loyaltyData.pointsValue > 0 && (() => {
+                            // Build item redemption options from current cart
+                            const cartItems = formData.items
+                              .map((item, idx) => {
+                                const inv = inventory.find(i => i.id === item.inventoryId)
+                                if (!inv) return null
+                                const itemTotal = item.usePerMeter && item.meters && inv.pricePerMeter
+                                  ? inv.pricePerMeter * item.meters
+                                  : inv.sellingPrice * item.quantity
+                                const discount     = Math.min(itemTotal, loyaltyData.pointsValue)
+                                const ptsNeeded    = discount * 10
+                                const isFree       = itemTotal <= loyaltyData.pointsValue
+                                return { idx, inv, item, itemTotal, discount, ptsNeeded, isFree }
+                              })
+                              .filter(Boolean) as Array<{
+                                idx: number; inv: any; item: any; itemTotal: number
+                                discount: number; ptsNeeded: number; isFree: boolean
+                              }>
+
+                            return (
+                              <div className="border-t border-amber-200">
+                                <p className="px-4 pt-3 pb-1 text-xs font-black text-amber-900 uppercase tracking-widest">
+                                  How to Redeem?
+                                </p>
+
+                                {/* Option A — Apply to total */}
+                                <div className="px-4 py-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setApplyLoyalty(true)
+                                      setLoyaltyDiscount(loyaltyData.pointsValue)
+                                    }}
+                                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                                      applyLoyalty && loyaltyDiscount === loyaltyData.pointsValue
+                                        ? 'border-amber-500 bg-amber-50'
+                                        : 'border-amber-200 bg-white hover:border-amber-400'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-2xl">💰</span>
+                                      <div>
+                                        <p className="text-sm font-bold text-amber-900">Apply to total bill</p>
+                                        <p className="text-xs text-amber-700">
+                                          -₹{loyaltyData.pointsValue} off • {loyaltyData.availablePoints} pts used
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {applyLoyalty && loyaltyDiscount === loyaltyData.pointsValue && (
+                                      <span className="text-green-600 font-black text-lg">✓</span>
+                                    )}
+                                  </button>
+                                </div>
+
+                                {/* Option B — Redeem for specific item */}
+                                {cartItems.length > 0 && (
+                                  <div className="px-4 pb-3">
+                                    <p className="text-xs font-bold text-amber-800 mb-2 flex items-center gap-1">
+                                      <span>👗</span> Or redeem for a specific item:
+                                    </p>
+                                    <div className="space-y-2">
+                                      {cartItems.map(({ idx, inv, item, itemTotal, discount, ptsNeeded, isFree }) => (
+                                        <div
+                                          key={idx}
+                                          className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${
+                                            applyLoyalty && loyaltyDiscount === discount && !(loyaltyDiscount === loyaltyData.pointsValue)
+                                              ? 'border-green-400 bg-green-50'
+                                              : 'border-amber-100 bg-white hover:border-amber-300'
+                                          }`}
+                                        >
+                                          {/* Item info */}
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-gray-800 truncate">{inv.dressName}</p>
+                                            <p className="text-xs text-gray-500">
+                                              {inv.dressCode} · {item.size} · ₹{itemTotal.toLocaleString()}
+                                            </p>
+                                            <div className="mt-0.5">
+                                              {isFree ? (
+                                                <span className="inline-flex items-center gap-1 text-xs font-black text-green-700">
+                                                  ✅ FREE — fully covered ({ptsNeeded} pts)
+                                                </span>
+                                              ) : (
+                                                <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-700">
+                                                  ⚡ ₹{discount} off, pay ₹{(itemTotal - discount).toLocaleString()} ({ptsNeeded} pts)
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* Redeem button */}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setApplyLoyalty(true)
+                                              setLoyaltyDiscount(discount)
+                                            }}
+                                            className="ml-3 shrink-0 px-4 py-2 rounded-xl text-xs font-black text-white transition-all hover:opacity-90 active:scale-95"
+                                            style={{
+                                              background: isFree
+                                                ? 'linear-gradient(135deg, #16a34a, #15803d)'
+                                                : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                              boxShadow: isFree
+                                                ? '0 4px 12px rgba(22,163,74,0.3)'
+                                                : '0 4px 12px rgba(245,158,11,0.3)',
+                                            }}
+                                          >
+                                            {isFree ? '🎁 Get FREE' : '⚡ Apply'}
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Active discount indicator + clear */}
+                                {applyLoyalty && loyaltyDiscount > 0 && (
+                                  <div className="mx-4 mb-3 flex items-center justify-between px-4 py-2 rounded-xl"
+                                    style={{ background: '#dcfce7', border: '2px solid #16a34a' }}>
+                                    <span className="text-sm font-black text-green-800">
+                                      🏆 ₹{loyaltyDiscount} loyalty discount applied!
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setApplyLoyalty(false); setLoyaltyDiscount(0) }}
+                                      className="text-xs text-red-500 hover:text-red-700 font-bold"
+                                    >
+                                      ✕ Remove
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode *</label>
@@ -1853,9 +2195,15 @@ function SalesPageContent() {
                                 <span className="font-medium text-blue-600">+₹{gst.toLocaleString()}</span>
                               </div>
                             )}
+                            {applyLoyalty && loyaltyDiscount > 0 && (
+                              <div className="flex justify-between text-sm py-1 px-2 rounded-lg" style={{ background: '#fef3c7', border: '1px solid #f59e0b' }}>
+                                <span className="font-bold" style={{ color: '#92400e' }}>🏆 Loyalty Discount:</span>
+                                <span className="font-bold" style={{ color: '#16a34a' }}>-₹{loyaltyDiscount.toLocaleString()}</span>
+                              </div>
+                            )}
                             <div className="flex justify-between text-xl font-bold border-t pt-3 mt-3">
                               <span>Total Amount:</span>
-                              <span className="text-green-600">₹{finalTotal.toLocaleString()}</span>
+                              <span className="text-green-600">₹{(finalTotal - (applyLoyalty ? loyaltyDiscount : 0)).toLocaleString()}</span>
                             </div>
                           </div>
                         </div>
