@@ -12,7 +12,7 @@
  * - Selection count display
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X, CheckSquare, Square, Lock, Image as ImageIcon } from 'lucide-react'
 import { PurchaseOrderItem } from '@/lib/storage'
@@ -36,22 +36,7 @@ export default function ProductSelector({
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // Fetch locked products and all products on mount
-    useEffect(() => {
-        fetchLockedProducts()
-        performSearch('') // Load all products initially
-    }, [purchaseOrderId])
-
-    // Debounced search
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            performSearch(searchQuery)
-        }, 300)
-
-        return () => clearTimeout(timer)
-    }, [searchQuery])
-
-    const fetchLockedProducts = async () => {
+    const fetchLockedProducts = useCallback(async () => {
         try {
             const response = await fetch(`/api/purchases/${purchaseOrderId}/locks`)
             const data = await response.json()
@@ -61,9 +46,9 @@ export default function ProductSelector({
         } catch (err) {
             console.error('Failed to fetch locked products:', err)
         }
-    }
+    }, [purchaseOrderId])
 
-    const performSearch = async (query: string) => {
+    const performSearch = useCallback(async (query: string) => {
         setLoading(true)
         setError(null)
         try {
@@ -89,7 +74,22 @@ export default function ProductSelector({
         } finally {
             setLoading(false)
         }
-    }
+    }, [purchaseOrderId])
+
+    // Fetch locked products and all products on mount
+    useEffect(() => {
+        fetchLockedProducts()
+        performSearch('') // Load all products initially
+    }, [fetchLockedProducts, performSearch])
+
+    // Debounced search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            performSearch(searchQuery)
+        }, 300)
+
+        return () => clearTimeout(timer)
+    }, [searchQuery, performSearch])
 
     const handleSelectAll = () => {
         const selectableIds = searchResults
@@ -176,7 +176,7 @@ export default function ProductSelector({
                     {!loading && searchQuery && searchResults.length === 0 && (
                         <div className="text-center py-12">
                             <Search className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                            <p className="text-slate-400">No products found matching "{searchQuery}"</p>
+                            <p className="text-slate-400">No products found matching &quot;{searchQuery}&quot;</p>
                         </div>
                     )}
 
