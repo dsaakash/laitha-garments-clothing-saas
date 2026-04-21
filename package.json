@@ -41,7 +41,8 @@
     "migrate-dress-codes": "node scripts/run-dress-codes-migration.js",
     "fix-dress-codes": "node scripts/fix-missing-dress-codes.js",
     "migrate-bill-numbers": "node scripts/run-bill-number-migration.js",
-    "migrate-upi-payment": "node scripts/run-upi-payment-migration.js"
+    "migrate-upi-payment": "node scripts/run-upi-payment-migration.js",
+    "migrate:selective-update": "node scripts/run-selective-update-migration.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

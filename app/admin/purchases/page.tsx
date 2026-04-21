@@ -11,6 +11,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Minus, Download, PackageOpen, DownloadCloud, Activity, MapPin, Building2, Link, IndianRupee, Clock, CheckCircle2, XCircle, Search, Filter, ShoppingCart, Layers, AlertCircle, FileText, Sparkles } from 'lucide-react'
 import ActionButton from '@/components/ActionButton'
 import StatusBadge from '@/components/StatusBadge'
+import EditWorkflowModal from './components/EditWorkflowModal'
+import ProductSelector from './components/ProductSelector'
+import SelectiveEditForm from './components/SelectiveEditForm'
+
 export default function PurchasesPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -30,6 +34,14 @@ export default function PurchasesPage() {
     address: '',
   })
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null)
+
+  // Selective update workflow states
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false)
+  const [showProductSelector, setShowProductSelector] = useState(false)
+  const [showSelectiveEditForm, setShowSelectiveEditForm] = useState(false)
+  const [selectedProducts, setSelectedProducts] = useState<PurchaseOrderItem[]>([])
+  const [orderForEdit, setOrderForEdit] = useState<PurchaseOrder | null>(null)
+
   const [filterSupplier, setFilterSupplier] = useState('')
   const [filterCategory, setFilterCategory] = useState('All')
   const [filterMonth, setFilterMonth] = useState('')
@@ -624,6 +636,93 @@ export default function PurchasesPage() {
   }
 
   const handleEdit = (order: PurchaseOrder) => {
+    // Show workflow modal instead of directly opening edit form
+    setOrderForEdit(order)
+    setShowWorkflowModal(true)
+  }
+
+  const handleWorkflowSelection = (workflow: 'selective' | 'full') => {
+    setShowWorkflowModal(false)
+
+    if (workflow === 'selective') {
+      // Open product selector
+      setShowProductSelector(true)
+    } else {
+      // Open traditional full edit form
+      setEditingOrder(orderForEdit)
+      setFormData({
+        date: orderForEdit!.date,
+        supplierId: orderForEdit!.supplierId,
+        customPoNumber: orderForEdit!.customPoNumber || '',
+        useCustomPo: !!orderForEdit!.customPoNumber,
+        invoiceImage: orderForEdit!.invoiceImage || '',
+        notes: orderForEdit!.notes || '',
+        gstType: orderForEdit!.gstType || 'percentage',
+        gstPercentage: orderForEdit!.gstPercentage !== undefined && orderForEdit!.gstPercentage !== null ? orderForEdit!.gstPercentage : 0,
+        gstAmountRupees: orderForEdit!.gstAmountRupees !== undefined && orderForEdit!.gstAmountRupees !== null ? orderForEdit!.gstAmountRupees : 0,
+        logisticsName: (orderForEdit as any).logisticsName || '',
+        logisticsMobile: (orderForEdit as any).logisticsMobile || '',
+        transportAddress: (orderForEdit as any).transportAddress || '',
+        transportImage: (orderForEdit as any).transportImage || '',
+        invoiceNumber: (orderForEdit as any).invoiceNumber || '',
+        invoiceDate: (orderForEdit as any).invoiceDate || '',
+        transportCharges: (orderForEdit as any).transportCharges || 0,
+        restockInventory: (orderForEdit as any).restockRequested ?? true,
+      })
+      setContactPersons((orderForEdit as any).contactPersons || [])
+
+      // Convert order to items format
+      if (orderForEdit!.items && orderForEdit!.items.length > 0) {
+        setItems(orderForEdit!.items.map(item => ({
+          productName: item.productName,
+          category: item.category || '',
+          sizes: item.sizes || [],
+          fabricType: item.fabricType || '',
+          quantity: item.quantity,
+          pricePerPiece: item.pricePerPiece,
+          totalAmount: item.totalAmount,
+          productImages: item.productImages || [],
+        })))
+      } else {
+        // Legacy format
+        setItems([{
+          productName: orderForEdit!.productName || '',
+          category: 'Custom',
+          sizes: orderForEdit!.sizes || [],
+          fabricType: orderForEdit!.fabricType || '',
+          quantity: orderForEdit!.quantity || 0,
+          pricePerPiece: orderForEdit!.pricePerPiece || 0,
+          totalAmount: orderForEdit!.totalAmount || 0,
+          productImages: orderForEdit!.productImage ? [orderForEdit!.productImage] : [],
+        }])
+      }
+
+      setShowModal(true)
+    }
+  }
+
+  const handleProductsSelected = (products: PurchaseOrderItem[]) => {
+    setSelectedProducts(products)
+    setShowProductSelector(false)
+    setShowSelectiveEditForm(true)
+  }
+
+  const handleSelectiveEditComplete = () => {
+    setShowSelectiveEditForm(false)
+    setSelectedProducts([])
+    setOrderForEdit(null)
+    loadOrders() // Refresh the list
+  }
+
+  const handleCancelWorkflow = () => {
+    setShowWorkflowModal(false)
+    setShowProductSelector(false)
+    setShowSelectiveEditForm(false)
+    setSelectedProducts([])
+    setOrderForEdit(null)
+  }
+
+  const handleEditOriginal = (order: PurchaseOrder) => {
     setEditingOrder(order)
     setFormData({
       date: order.date,
@@ -969,7 +1068,7 @@ export default function PurchasesPage() {
       }
 
       const data = await response.json()
-      
+
       if (data.success && data.html) {
         // Open HTML in new window for printing
         const printWindow = window.open('', '_blank')
@@ -1078,7 +1177,7 @@ export default function PurchasesPage() {
 
   return (
     <AdminLayout>
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-6"
@@ -1088,7 +1187,7 @@ export default function PurchasesPage() {
           {/* Background Decorative Elements */}
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
-          
+
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -1136,7 +1235,7 @@ export default function PurchasesPage() {
               <div key={idx} className="bg-slate-800/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl hover:border-white/10 transition-all group">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 bg-${stat.color}-500/10 rounded-lg group-hover:scale-110 transition-transform`}>
-                     <stat.icon className={`w-4 h-4 text-${stat.color}-400`} />
+                    <stat.icon className={`w-4 h-4 text-${stat.color}-400`} />
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{stat.label}</p>
@@ -1215,10 +1314,10 @@ export default function PurchasesPage() {
                     {orders.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="p-12 text-center text-slate-500">
-                           <div className="flex flex-col items-center gap-3">
-                              <ShoppingCart className="w-8 h-8 opacity-20" />
-                              <p className="text-sm font-medium">No purchase orders found</p>
-                           </div>
+                          <div className="flex flex-col items-center gap-3">
+                            <ShoppingCart className="w-8 h-8 opacity-20" />
+                            <p className="text-sm font-medium">No purchase orders found</p>
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -1256,55 +1355,55 @@ export default function PurchasesPage() {
                             </div>
                           </td>
                           <td className="p-4 sm:p-6 align-top">
-                             <div className="flex flex-col gap-1">
-                                <div className="flex items-end gap-2">
-                                   <span className="text-lg font-black tracking-tight text-white">
-                                     ₹{(order.grandTotal || order.totalAmount || 0).toLocaleString()}
-                                   </span>
-                                </div>
-                                {(order.gstAmount || 0) > 0 && (
-                                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                                    INCL. GST ₹{(order.gstAmount || 0).toLocaleString()}
-                                  </span>
-                                )}
-                             </div>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-end gap-2">
+                                <span className="text-lg font-black tracking-tight text-white">
+                                  ₹{(order.grandTotal || order.totalAmount || 0).toLocaleString()}
+                                </span>
+                              </div>
+                              {(order.gstAmount || 0) > 0 && (
+                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                  INCL. GST ₹{(order.gstAmount || 0).toLocaleString()}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4 sm:p-6 align-top">
-                            <StatusBadge 
+                            <StatusBadge
                               status={order.status === 'open' ? 'Approved' : order.status === 'rejected' ? 'Rejected' : 'Pending'}
                               variant={order.status === 'open' ? 'success' : order.status === 'rejected' ? 'danger' : 'warning'}
                             />
                           </td>
                           <td className="p-4 sm:p-6 align-top">
                             <div className="flex flex-wrap gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
-                                <ActionButton 
-                                  icon={DownloadCloud} 
-                                  onClick={(e) => { e?.stopPropagation(); downloadOrderAsPDF(order); }}
-                                  variant="primary" 
-                                >
-                                  PDF
-                                </ActionButton>
-                                <ActionButton 
-                                  icon={Link} 
-                                  onClick={(e) => { e?.stopPropagation(); downloadOrderAsExcel(order); }}
-                                  variant="secondary" 
-                                >
-                                  Excel
-                                </ActionButton>
-                                <ActionButton 
-                                  icon={Activity} 
-                                  onClick={(e) => { e?.stopPropagation(); handleEdit(order); }}
-                                  variant="ghost" 
-                                >
-                                  Edit
-                                </ActionButton>
-                                <ActionButton 
-                                  icon={XCircle} 
-                                  onClick={(e) => { e?.stopPropagation(); handleDelete(order.id); }}
-                                  variant="danger" 
-                                >
-                                  Erase
-                                </ActionButton>
+                              <ActionButton
+                                icon={DownloadCloud}
+                                onClick={(e) => { e?.stopPropagation(); downloadOrderAsPDF(order); }}
+                                variant="primary"
+                              >
+                                PDF
+                              </ActionButton>
+                              <ActionButton
+                                icon={Link}
+                                onClick={(e) => { e?.stopPropagation(); downloadOrderAsExcel(order); }}
+                                variant="secondary"
+                              >
+                                Excel
+                              </ActionButton>
+                              <ActionButton
+                                icon={Activity}
+                                onClick={(e) => { e?.stopPropagation(); handleEdit(order); }}
+                                variant="ghost"
+                              >
+                                Edit
+                              </ActionButton>
+                              <ActionButton
+                                icon={XCircle}
+                                onClick={(e) => { e?.stopPropagation(); handleDelete(order.id); }}
+                                variant="danger"
+                              >
+                                Erase
+                              </ActionButton>
                             </div>
                           </td>
                         </motion.tr>
@@ -1316,9 +1415,9 @@ export default function PurchasesPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Modal */}
-{/* Modal */}
+        {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-8 max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -2567,6 +2666,32 @@ export default function PurchasesPage() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* Selective Update Workflow Modals */}
+        {showWorkflowModal && orderForEdit && (
+          <EditWorkflowModal
+            purchaseOrder={orderForEdit}
+            onClose={handleCancelWorkflow}
+            onSelectWorkflow={handleWorkflowSelection}
+          />
+        )}
+
+        {showProductSelector && orderForEdit && (
+          <ProductSelector
+            purchaseOrderId={orderForEdit.id}
+            onComplete={handleProductsSelected}
+            onCancel={handleCancelWorkflow}
+          />
+        )}
+
+        {showSelectiveEditForm && orderForEdit && selectedProducts.length > 0 && (
+          <SelectiveEditForm
+            purchaseOrderId={orderForEdit.id}
+            selectedProducts={selectedProducts}
+            onSubmit={handleSelectiveEditComplete}
+            onCancel={handleCancelWorkflow}
+          />
         )}
       </motion.div>
 

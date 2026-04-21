@@ -16,10 +16,10 @@ export async function GET(request: NextRequest) {
         const userType = parts[0] // 'tenant' | 'superadmin' | 'admin' | 'user'
         const adminId = parseInt(parts[1])
         const tenantId = parts.length > 3 ? parts[3] : null
-        
+
         // Get tenant context for tenant users
         const tenantContext = getTenantContext(request)
-        
+
         // For tenant users, we need to get their role differently
         let role = null
         if (userType === 'tenant' || userType === 'admin') {
@@ -58,33 +58,33 @@ export async function GET(request: NextRequest) {
                 ORDER BY ar.created_at ASC
             `, [entityType, entityId])
 
-            return NextResponse.json({ 
-                success: true, 
-                history: historyResult.rows 
+            return NextResponse.json({
+                success: true,
+                history: historyResult.rows
             })
         }
 
         let approvals: any[] = []
-        
+
         // If status=all is provided, fetch all approvals (no role filter for history view)
         if (statusFilter === 'all') {
-        let sql = `
+            let sql = `
             SELECT ar.*, a.name as requester_name
             FROM approval_requests ar
             LEFT JOIN admins a ON ar.requester_id = a.id
         `
-        const params: any[] = []
-        
-        // For tenants, filter by tenant_id if the column exists
-        if ((userType === 'tenant' || userType === 'admin') && tenantId) {
-            sql += ` WHERE ar.tenant_id = $1`
-            params.push(tenantId)
-        }
-        
-        sql += ` ORDER BY ar.created_at DESC`
-        
-        const allResult = await query(sql, params)
-        approvals = allResult.rows
+            const params: any[] = []
+
+            // For tenants, filter by tenant_id if the column exists
+            if ((userType === 'tenant' || userType === 'admin') && tenantId) {
+                sql += ` WHERE ar.tenant_id = $1`
+                params.push(tenantId)
+            }
+
+            sql += ` ORDER BY ar.created_at DESC`
+
+            const allResult = await query(sql, params)
+            approvals = allResult.rows
         } else {
             // Otherwise fetch only pending approvals for current user's role
             approvals = await getPendingApprovals(role.id)
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
         const statsTotal = await query(`SELECT COUNT(*) as count FROM approval_requests ${statsSql}`, statsParams)
         const statsApproved = await query(`SELECT COUNT(*) as count FROM approval_requests ${statsSql} AND status = 'approved'`, statsParams)
         const statsRejected = await query(`SELECT COUNT(*) as count FROM approval_requests ${statsSql} AND status = 'rejected'`, statsParams)
-        
+
         // Pending count should specifically reflect what the user CAN actually approve (matching the sidebar badge)
         let pendingStatsSql = statsSql + ` AND status = 'pending'`
         const pendingStatsParams = [...statsParams]
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
             pendingStatsParams.push(role.id)
         }
         const statsPendingQuery = await query(`SELECT COUNT(*) as count FROM approval_requests ${pendingStatsSql}`, pendingStatsParams)
-        
+
         const stats = {
             total: parseInt(statsTotal.rows[0].count) || 0,
             approved: parseInt(statsApproved.rows[0].count) || 0,
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
             if (appr.entity_type === 'purchase_order' && !appr.payload) {
                 const poId = parseInt(appr.entity_id)
                 const poResult = await query(`SELECT supplier_name, subtotal, grand_total, restock_requested, pending_inventory_updates FROM purchase_orders WHERE id = $1`, [poId])
-                
+
                 if (poResult.rows.length > 0) {
                     const po = poResult.rows[0]
                     const pendingUpdatesStr = po.pending_inventory_updates
@@ -142,12 +142,12 @@ export async function GET(request: NextRequest) {
                 if (invResult.rows.length > 0) {
                     const inv = invResult.rows[0]
                     const currentPayload = typeof appr.payload === 'string' ? JSON.parse(appr.payload) : (appr.payload || {})
-                    appr.payload = { 
-                        ...currentPayload, 
-                        productName: inv.dress_name, 
-                        dressCode: inv.dress_code, 
+                    appr.payload = {
+                        ...currentPayload,
+                        productName: inv.dress_name,
+                        dressCode: inv.dress_code,
                         category: inv.category,
-                        fabricTypeEnriched: inv.fabric_type 
+                        fabricTypeEnriched: inv.fabric_type
                     }
                 }
             }
@@ -198,17 +198,17 @@ export async function POST(request: NextRequest) {
             )
             return NextResponse.json({ success: true, request: updatedRequest, message: 'Approval chain escalated to Super Admin' })
         }
-        
+
         // Execution of the fully approved request
         if (status === 'approved' && updatedRequest.entity_type === 'purchase_order') {
             const poId = parseInt(updatedRequest.entity_id)
-            
+
             // 1. Update PO status to open
             await query(`UPDATE purchase_orders SET status = 'open' WHERE id = $1`, [poId])
-            
+
             // 2. Fetch the PO details
             const poResult = await query(
-                `SELECT supplier_name, tenant_id, restock_requested, pending_inventory_updates FROM purchase_orders WHERE id = $1`, 
+                `SELECT supplier_name, tenant_id, restock_requested, pending_inventory_updates FROM purchase_orders WHERE id = $1`,
                 [poId]
             )
             if (poResult.rows.length === 0) {
@@ -218,14 +218,14 @@ export async function POST(request: NextRequest) {
             const tenantId = poResult.rows[0].tenant_id
             const restockRequested = poResult.rows[0].restock_requested ?? true
             const pendingUpdatesRaw = poResult.rows[0].pending_inventory_updates
-            const pendingUpdates = typeof pendingUpdatesRaw === 'string' 
-                ? JSON.parse(pendingUpdatesRaw) 
+            const pendingUpdates = typeof pendingUpdatesRaw === 'string'
+                ? JSON.parse(pendingUpdatesRaw)
                 : pendingUpdatesRaw
 
             // 3. Apply items to inventory ONLY IF restock was requested
             if (restockRequested) {
                 let itemsToProcess = []
-                
+
                 if (pendingUpdates && Array.isArray(pendingUpdates) && pendingUpdates.length > 0) {
                     // This is an EDIT, process the exact stock deltas
                     itemsToProcess = pendingUpdates.map((item: any) => ({
@@ -242,120 +242,193 @@ export async function POST(request: NextRequest) {
                     const itemsResult = await query(`SELECT * FROM purchase_order_items WHERE purchase_order_id = $1`, [poId])
                     itemsToProcess = itemsResult.rows
                 }
-            
-            for (const item of itemsToProcess) {
-                const purchaseQuantity = parseInt(item.quantity) || 0
-                if (purchaseQuantity === 0) continue // Skip items with no delta changes
-                
-                const normalizedProductName = item.product_name.trim().replace(/\s+/g, ' ')
-                const fabricType = item.fabric_type || 'standard'
-                const dressCode = `${normalizedProductName}_${fabricType}`.replace(/\s+/g, '_').toUpperCase()
-                
-                // Find existing inventory
-                let existingInventoryQuery = 'SELECT * FROM inventory WHERE dress_code = $1'
-                const inventoryParams: any[] = [dressCode]
-                if (tenantId) {
-                  existingInventoryQuery += ' AND tenant_id = $2'
-                  inventoryParams.push(tenantId)
-                } else {
-                  existingInventoryQuery += ' AND tenant_id IS NULL'
-                }
-                
-                let existingInventory = await query(existingInventoryQuery, inventoryParams)
-                
-                if (existingInventory.rows.length === 0) {
-                  const normalizedNameLower = normalizedProductName.toLowerCase()
-                  let nameMatchQuery = `SELECT * FROM inventory 
+
+                for (const item of itemsToProcess) {
+                    const purchaseQuantity = parseInt(item.quantity) || 0
+                    if (purchaseQuantity === 0) continue // Skip items with no delta changes
+
+                    const normalizedProductName = item.product_name.trim().replace(/\s+/g, ' ')
+                    const fabricType = item.fabric_type || 'standard'
+                    const dressCode = `${normalizedProductName}_${fabricType}`.replace(/\s+/g, '_').toUpperCase()
+
+                    // Find existing inventory
+                    let existingInventoryQuery = 'SELECT * FROM inventory WHERE dress_code = $1'
+                    const inventoryParams: any[] = [dressCode]
+                    if (tenantId) {
+                        existingInventoryQuery += ' AND tenant_id = $2'
+                        inventoryParams.push(tenantId)
+                    } else {
+                        existingInventoryQuery += ' AND tenant_id IS NULL'
+                    }
+
+                    let existingInventory = await query(existingInventoryQuery, inventoryParams)
+
+                    if (existingInventory.rows.length === 0) {
+                        const normalizedNameLower = normalizedProductName.toLowerCase()
+                        let nameMatchQuery = `SELECT * FROM inventory 
                      WHERE LOWER(TRIM(REPLACE(dress_name, '  ', ' '))) = $1
                      AND (fabric_type = $2 OR (fabric_type IS NULL AND $2 = 'standard'))`
-                  const nameParams: any[] = [normalizedNameLower, fabricType]
-                  if (tenantId) {
-                    nameMatchQuery += ' AND tenant_id = $3'
-                    nameParams.push(tenantId)
-                  } else {
-                    nameMatchQuery += ' AND tenant_id IS NULL'
-                  }
-                  nameMatchQuery += ' LIMIT 1'
-                  existingInventory = await query(nameMatchQuery, nameParams)
-                }
-                
-                if (existingInventory.rows.length === 0) {
-                  const searchPattern = `%${normalizedProductName.replace(/\s+/g, '_').toUpperCase()}%`
-                  let partialMatchQuery = `SELECT * FROM inventory 
+                        const nameParams: any[] = [normalizedNameLower, fabricType]
+                        if (tenantId) {
+                            nameMatchQuery += ' AND tenant_id = $3'
+                            nameParams.push(tenantId)
+                        } else {
+                            nameMatchQuery += ' AND tenant_id IS NULL'
+                        }
+                        nameMatchQuery += ' LIMIT 1'
+                        existingInventory = await query(nameMatchQuery, nameParams)
+                    }
+
+                    if (existingInventory.rows.length === 0) {
+                        const searchPattern = `%${normalizedProductName.replace(/\s+/g, '_').toUpperCase()}%`
+                        let partialMatchQuery = `SELECT * FROM inventory 
                      WHERE LOWER(dress_code) LIKE LOWER($1)`
-                  const partialParams: any[] = [searchPattern]
-                  if (tenantId) {
-                    partialMatchQuery += ' AND tenant_id = $2'
-                    partialParams.push(tenantId)
-                  } else {
-                    partialMatchQuery += ' AND tenant_id IS NULL'
-                  }
-                  partialMatchQuery += ' LIMIT 1'
-                  existingInventory = await query(partialMatchQuery, partialParams)
-                }
-                
-                if (existingInventory.rows.length > 0) {
-                  const existing = existingInventory.rows[0]
-                  const existingSizes = existing.sizes || []
-                  const newSizes = typeof item.sizes === 'string' ? JSON.parse(item.sizes) : (item.sizes || [])
-                  const mergedSizes = Array.from(new Set([...existingSizes, ...newSizes]))
-                  
-                  const currentQuantityIn = parseInt(existing.quantity_in) || 0
-                  const currentQuantityOut = parseInt(existing.quantity_out) || 0
-                  const newQuantityIn = currentQuantityIn + purchaseQuantity
-                  const newCurrentStock = newQuantityIn - currentQuantityOut
-                  
-                  const updateDressCode = existing.dress_code !== dressCode ? dressCode : existing.dress_code
-                  
-                  await query(
-                    `UPDATE inventory 
+                        const partialParams: any[] = [searchPattern]
+                        if (tenantId) {
+                            partialMatchQuery += ' AND tenant_id = $2'
+                            partialParams.push(tenantId)
+                        } else {
+                            partialMatchQuery += ' AND tenant_id IS NULL'
+                        }
+                        partialMatchQuery += ' LIMIT 1'
+                        existingInventory = await query(partialMatchQuery, partialParams)
+                    }
+
+                    if (existingInventory.rows.length > 0) {
+                        const existing = existingInventory.rows[0]
+                        const existingSizes = existing.sizes || []
+                        const newSizes = typeof item.sizes === 'string' ? JSON.parse(item.sizes) : (item.sizes || [])
+                        const mergedSizes = Array.from(new Set([...existingSizes, ...newSizes]))
+
+                        const currentQuantityIn = parseInt(existing.quantity_in) || 0
+                        const currentQuantityOut = parseInt(existing.quantity_out) || 0
+                        const newQuantityIn = currentQuantityIn + purchaseQuantity
+                        const newCurrentStock = newQuantityIn - currentQuantityOut
+
+                        const updateDressCode = existing.dress_code !== dressCode ? dressCode : existing.dress_code
+
+                        await query(
+                            `UPDATE inventory 
                      SET sizes = $1, dress_code = $2, dress_type = COALESCE($3, dress_type),
                          wholesale_price = $4, selling_price = $5, fabric_type = COALESCE($6, fabric_type),
                          supplier_name = COALESCE($7, supplier_name), quantity_in = $8, current_stock = $9,
                          updated_at = CURRENT_TIMESTAMP
                      WHERE id = $10`,
-                    [
-                      mergedSizes, updateDressCode, item.category || existing.dress_type,
-                      item.price_per_piece, (parseFloat(item.price_per_piece) * 2).toFixed(2),
-                      fabricType, supplierName, newQuantityIn, newCurrentStock, existing.id
-                    ]
-                  )
-                } else {
-                  const itemSizes = typeof item.sizes === 'string' ? JSON.parse(item.sizes) : (item.sizes || [])
-                  const productImages = typeof item.product_images === 'string' ? JSON.parse(item.product_images) : (item.product_images || [])
-                  
-                  await query(
-                    `INSERT INTO inventory 
+                            [
+                                mergedSizes, updateDressCode, item.category || existing.dress_type,
+                                item.price_per_piece, (parseFloat(item.price_per_piece) * 2).toFixed(2),
+                                fabricType, supplierName, newQuantityIn, newCurrentStock, existing.id
+                            ]
+                        )
+                    } else {
+                        const itemSizes = typeof item.sizes === 'string' ? JSON.parse(item.sizes) : (item.sizes || [])
+                        const productImages = typeof item.product_images === 'string' ? JSON.parse(item.product_images) : (item.product_images || [])
+
+                        await query(
+                            `INSERT INTO inventory 
                      (dress_name, dress_type, dress_code, sizes, wholesale_price, selling_price,
                       image_url, fabric_type, supplier_name, quantity_in, quantity_out, current_stock, tenant_id)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-                    [
-                      normalizedProductName, item.category || 'Custom', dressCode, itemSizes,
-                      item.price_per_piece, (parseFloat(item.price_per_piece) * 2).toFixed(2),
-                      productImages.length > 0 ? productImages[0] : null,
-                      fabricType, supplierName, purchaseQuantity, 0, purchaseQuantity, tenantId
-                    ]
-                  )
+                            [
+                                normalizedProductName, item.category || 'Custom', dressCode, itemSizes,
+                                item.price_per_piece, (parseFloat(item.price_per_piece) * 2).toFixed(2),
+                                productImages.length > 0 ? productImages[0] : null,
+                                fabricType, supplierName, purchaseQuantity, 0, purchaseQuantity, tenantId
+                            ]
+                        )
+                    }
                 }
-              }
 
-              // Clear pending updates since they are applied
-              await query(`UPDATE purchase_orders SET pending_inventory_updates = NULL WHERE id = $1`, [poId])
+                // Clear pending updates since they are applied
+                await query(`UPDATE purchase_orders SET pending_inventory_updates = NULL WHERE id = $1`, [poId])
             } // End of restockRequested
 
         } else if (status === 'rejected' && updatedRequest.entity_type === 'purchase_order') {
             const poId = parseInt(updatedRequest.entity_id)
             await query(`UPDATE purchase_orders SET status = 'rejected' WHERE id = $1`, [poId])
+        } else if (status === 'approved' && updatedRequest.entity_type === 'purchase_order_selective') {
+            // Handle selective purchase order updates
+            const { getStagedChangesByApprovalId, applyStagedChanges } = await import('@/lib/services/staged-changes-service')
+            const { syncToInventory } = await import('@/lib/services/inventory-sync-service')
+            const { unlockProducts } = await import('@/lib/services/product-lock-service')
+
+            // Get staged changes
+            const stagedChange = await getStagedChangesByApprovalId(updatedRequest.id)
+
+            if (stagedChange) {
+                const { changePayload, purchaseOrderId, tenantId: stageTenantId } = stagedChange
+                const { modifiedData } = changePayload
+
+                // Apply changes to purchase order
+                const poResult = await query(
+                    `SELECT items FROM purchase_orders WHERE id = $1`,
+                    [purchaseOrderId]
+                )
+
+                if (poResult.rows.length > 0) {
+                    const currentItems = poResult.rows[0].items || []
+
+                    // Apply modifications to items
+                    const updatedItems = currentItems.map((item: any) => {
+                        if (modifiedData[item.id]) {
+                            return { ...item, ...modifiedData[item.id] }
+                        }
+                        return item
+                    })
+
+                    // Recalculate subtotal
+                    const subtotal = updatedItems.reduce((sum: number, item: any) =>
+                        sum + (item.quantity * item.pricePerPiece), 0
+                    )
+
+                    // Update purchase order
+                    await query(
+                        `UPDATE purchase_orders 
+                         SET items = $1, subtotal = $2, updated_at = CURRENT_TIMESTAMP
+                         WHERE id = $3`,
+                        [JSON.stringify(updatedItems), subtotal, purchaseOrderId]
+                    )
+
+                    // Sync to inventory
+                    try {
+                        await syncToInventory(
+                            updatedRequest.id,
+                            purchaseOrderId,
+                            modifiedData,
+                            stageTenantId
+                        )
+                    } catch (syncError) {
+                        console.error('Inventory sync error:', syncError)
+                        // Continue - sync errors are logged but don't fail the approval
+                    }
+
+                    // Mark staged changes as applied
+                    await applyStagedChanges(stagedChange.id)
+                }
+
+                // Unlock products
+                await unlockProducts(updatedRequest.id)
+            }
+        } else if (status === 'rejected' && updatedRequest.entity_type === 'purchase_order_selective') {
+            // Handle rejection of selective updates
+            const { cancelStagedChangesByApprovalId } = await import('@/lib/services/staged-changes-service')
+            const { unlockProducts } = await import('@/lib/services/product-lock-service')
+
+            // Cancel staged changes
+            await cancelStagedChangesByApprovalId(updatedRequest.id)
+
+            // Unlock products
+            await unlockProducts(updatedRequest.id)
         } else if (status === 'approved' && updatedRequest.entity_type === 'inventory_stock_update') {
             const invId = parseInt(updatedRequest.entity_id)
             const payload = typeof updatedRequest.payload === 'string' ? JSON.parse(updatedRequest.payload) : updatedRequest.payload
-            
+
             if (payload && payload.newQuantityIn !== undefined && payload.newCurrentStock !== undefined) {
                 await query(
-                  `UPDATE inventory 
+                    `UPDATE inventory 
                    SET quantity_in = $1, quantity_out = $2, current_stock = $3, updated_at = CURRENT_TIMESTAMP
                    WHERE id = $4`,
-                  [payload.newQuantityIn, payload.newQuantityOut, payload.newCurrentStock, invId]
+                    [payload.newQuantityIn, payload.newQuantityOut, payload.newCurrentStock, invId]
                 )
             }
         }
