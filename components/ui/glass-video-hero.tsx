@@ -2,6 +2,13 @@ import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { Maximize2, Minimize2, Play, Pause, Lock } from "lucide-react";
 
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
 export const HeroSection = ({ setPage, showLalitaModal }: any) => {
   const [fullBleed, setFullBleed] = useState(true);
   const [videoWatched, setVideoWatched] = useState(false);
