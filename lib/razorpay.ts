@@ -1,3 +1,9 @@
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
+
 export const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') {
