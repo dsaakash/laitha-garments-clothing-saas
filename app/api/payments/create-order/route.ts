@@ -1,13 +1,30 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { query } from '@/lib/db'
-import { auth } from '@/lib/auth'
+import { decodeBase64 } from '@/lib/utils'
 import Razorpay from 'razorpay'
 
 export async function POST(request: Request) {
   try {
-    const session = await auth()
-    if (!session) {
+    const cookieStore = cookies()
+    const sessionCookie = cookieStore.get('admin_session')
+
+    if (!sessionCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const decoded = decodeBase64(sessionCookie.value)
+    const parts = decoded.split(':')
+    const userType = parts[0]
+    const userId = parts[1]
+    const tenantId = parts.length > 3 ? parts[3] : null
+
+    const session = {
+      user: {
+        id: userId,
+        type: userType,
+        tenantId: tenantId
+      }
     }
 
     const body = await request.json()
