@@ -30,29 +30,18 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { planId, billingCycle, amount } = body
 
-    // Fetch Razorpay credentials from platform_settings
-    const { rows } = await query(
-      `SELECT key, value FROM platform_settings WHERE key IN ('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET')`
-    )
+    // Use Razorpay credentials from environment variables
+    const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID
+    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET
 
-    const settings = {
-      RAZORPAY_KEY_ID: '',
-      RAZORPAY_KEY_SECRET: ''
-    }
-
-    rows.forEach(row => {
-      if (row.key in settings) {
-        settings[row.key as keyof typeof settings] = row.value
-      }
-    })
-
-    if (!settings.RAZORPAY_KEY_ID || !settings.RAZORPAY_KEY_SECRET) {
-      return NextResponse.json({ error: 'Payment gateway is not configured by the admin yet.' }, { status: 400 })
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      console.error('RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is missing in environment variables')
+      return NextResponse.json({ error: 'Payment gateway is not configured properly.' }, { status: 500 })
     }
 
     const razorpay = new Razorpay({
-      key_id: settings.RAZORPAY_KEY_ID,
-      key_secret: settings.RAZORPAY_KEY_SECRET,
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
     })
 
     // Create a new order
@@ -73,7 +62,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: true, 
       orderId: order.id, 
-      keyId: settings.RAZORPAY_KEY_ID 
+      keyId: RAZORPAY_KEY_ID 
     })
 
   } catch (error: any) {

@@ -432,7 +432,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       { href: '/admin/users', label: 'User Management', icon: UserCog, resource: 'users', module: 'users' },
       { href: '/admin/roles', label: 'Roles & Permissions', icon: ShieldCheck, resource: 'roles', module: 'roles' },
       { href: '/admin/theme', label: 'Platform Theme', icon: Palette, resource: 'theme', action: 'manage' },
-      { href: '/admin/settings/payment-gateway', label: 'Payment Gateway', icon: CreditCard, resource: 'tenants', action: 'manage' },
       { href: '/admin/appearance', label: 'Appearance', icon: Paintbrush, resource: 'appearance' },
     ]
 
@@ -466,7 +465,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     if (userRole === 'admin') {
       items = items.filter(item => {
         // Explicitly hide Tenants list, Trial Leads, and Platform Theme from non-superadmins
-        if (item.href === '/admin/tenants' || item.href === '/admin/theme' || item.href === '/admin/leads' || item.href === '/admin/settings/payment-gateway') {
+        if (item.href === '/admin/tenants' || item.href === '/admin/theme' || item.href === '/admin/leads') {
           return false
         }
 

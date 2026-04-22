@@ -11,15 +11,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing Razorpay signature' }, { status: 400 })
     }
 
-    // Fetch Webhook Secret from platform_settings
-    const { rows } = await query(
-      `SELECT value FROM platform_settings WHERE key = 'RAZORPAY_WEBHOOK_SECRET'`
-    )
-
-    const webhookSecret = rows[0]?.value
+    // Use Webhook Secret from environment variables
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET
 
     if (!webhookSecret) {
-      console.error('Webhook received but RAZORPAY_WEBHOOK_SECRET is not configured.')
+      console.error('Webhook received but RAZORPAY_WEBHOOK_SECRET is not configured in environment variables.')
       return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
     }
 
