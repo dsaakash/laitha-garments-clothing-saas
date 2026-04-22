@@ -21,7 +21,7 @@ export async function GET() {
     }
 
     const { rows } = await query(
-      `SELECT key, value FROM platform_settings WHERE key IN ('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET')`
+      `SELECT key_name, key_value FROM platform_settings WHERE key_name IN ('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET')`
     )
 
     const settings = {
@@ -31,8 +31,8 @@ export async function GET() {
     }
 
     rows.forEach(row => {
-      if (row.key in settings) {
-        settings[row.key as keyof typeof settings] = row.value
+      if (row.key_name in settings) {
+        settings[row.key_name as keyof typeof settings] = row.key_value
       }
     })
 
@@ -72,11 +72,11 @@ export async function POST(request: Request) {
     for (const item of updates) {
       if (item.value !== undefined) {
         // Upsert logic
-        const check = await query(`SELECT 1 FROM platform_settings WHERE key = $1`, [item.key])
+        const check = await query(`SELECT 1 FROM platform_settings WHERE key_name = $1`, [item.key])
         if (check.rowCount && check.rowCount > 0) {
-          await query(`UPDATE platform_settings SET value = $1, updated_at = NOW() WHERE key = $2`, [item.value, item.key])
+          await query(`UPDATE platform_settings SET key_value = $1, updated_at = NOW() WHERE key_name = $2`, [item.value, item.key])
         } else {
-          await query(`INSERT INTO platform_settings (key, value) VALUES ($1, $2)`, [item.key, item.value])
+          await query(`INSERT INTO platform_settings (key_name, key_value) VALUES ($1, $2)`, [item.key, item.value])
         }
       }
     }
