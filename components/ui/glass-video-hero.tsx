@@ -41,7 +41,7 @@ export const HeroSection = ({ setPage, showLalitaModal }: any) => {
             Retail Control Architect
           </span>
           <span className="font-sans font-medium text-sm text-[#FDF8EF] tracking-wide">
-            India's #1 Stock System for Garment Stores
+            India&apos;s #1 Stock System for Garment Stores
           </span>
         </div>
 
@@ -54,7 +54,7 @@ export const HeroSection = ({ setPage, showLalitaModal }: any) => {
 
         {/* Subtext */}
         <p className="font-sans font-normal text-lg text-[rgba(253,248,239,0.8)] mt-6 max-w-[662px] leading-relaxed drop-shadow">
-          80% kapde ki dukaan walon ko apna actual, live stock pata hi nahi hota. Aur ye "pata nahi" — silently lakhs drain kar raha hai. Har mahine.
+          80% kapde ki dukaan walon ko apna actual, live stock pata hi nahi hota. Aur ye &quot;pata nahi&quot; — silently lakhs drain kar raha hai. Har mahine.
         </p>
 
         <p className="font-sans font-medium text-base text-[#BA7517] mt-4 max-w-[662px] italic">
