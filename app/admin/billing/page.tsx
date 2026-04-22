@@ -345,7 +345,7 @@ export default function BillingPage() {
                   "Multi-user Access",
                   "Priority Support"
                 ],
-                onAction: (isYearly) => handleCheckout({ name: "Growth", price: 99, yearlyPrice: 990, id: 'growth' }, isYearly)
+                onAction: (isYearly) => handleCheckout({ name: "Growth", price: 2999, yearlyPrice: 29990, id: 'growth' }, isYearly)
               },
               {
                 name: "Scale",

@@ -160,7 +160,7 @@ export default function SubscriptionPage() {
         body: JSON.stringify({
           planId: plan.id,
           billingCycle: isYearly ? 'yearly' : 'monthly',
-          amount: isYearly ? parseInt(plan.price.toString().replace(/\D/g, '')) * 10 : parseInt(plan.price.toString().replace(/\D/g, ''))
+          amount: isYearly ? plan.yearlyPrice : plan.monthlyPrice
         })
       })
       const data = await res.json()
