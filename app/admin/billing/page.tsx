@@ -176,7 +176,7 @@ export default function BillingPage() {
         key: data.keyId,
         amount: (isYearly ? plan.yearlyPrice : plan.price) * 100,
         currency: "INR",
-        name: "Lalitha Garments",
+        name: "Nirvriksh",
         description: `${plan.name} Plan (${isYearly ? 'Yearly' : 'Monthly'})`,
         order_id: data.orderId,
         handler: function (response: any) {
