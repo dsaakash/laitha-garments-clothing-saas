@@ -95,19 +95,22 @@ export async function POST(request: Request) {
 
     for (const item of updates) {
       if (item.value !== undefined) {
-        // Upsert logic
-        const check = await query(`SELECT 1 FROM platform_settings WHERE key_name = $1`, [item.key])
-        if (check.rowCount && check.rowCount > 0) {
-          await query(`UPDATE platform_settings SET key_value = $1, updated_at = NOW() WHERE key_name = $2`, [item.value, item.key])
-        } else {
-          await query(`INSERT INTO platform_settings (key_name, key_value) VALUES ($1, $2)`, [item.key, item.value])
-        }
+        await query(
+          `INSERT INTO platform_settings (key_name, key_value) 
+           VALUES ($1, $2) 
+           ON CONFLICT (key_name) 
+           DO UPDATE SET key_value = EXCLUDED.key_value, updated_at = NOW()`,
+          [item.key, item.value]
+        )
       }
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating settings:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal Server Error', 
+      details: error.message || 'Unknown error'
+    }, { status: 500 })
   }
 }

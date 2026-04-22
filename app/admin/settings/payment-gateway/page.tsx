@@ -59,7 +59,10 @@ export default function PaymentGatewaySettings() {
       if (data.success) {
         setStatus({ type: 'success', message: 'Settings saved successfully!' })
       } else {
-        setStatus({ type: 'error', message: data.error || 'Failed to save settings' })
+        setStatus({ 
+          type: 'error', 
+          message: data.details ? `${data.error}: ${data.details}` : (data.error || 'Failed to save settings') 
+        })
       }
     } catch (err) {
       setStatus({ type: 'error', message: 'An unexpected error occurred' })
