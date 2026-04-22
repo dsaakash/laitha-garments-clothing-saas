@@ -2,6 +2,8 @@
 
 import './rca-landing.css'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { HeroSection } from '@/components/ui/glass-video-hero'
+import { Component as MorphingCardStack } from '@/components/ui/morphing-card-stack'
 
 // ─── BRAND TOKENS ────────────────────────────────────────────────
 const BRAND = {
@@ -328,114 +330,7 @@ const PainCard = ({ icon, title, desc }: any) => (
 const HomePage = ({ setPage, showLalitaModal }: any) => (
   <div>
     {/* ══ HERO ══════════════════════════════════════════════════════ */}
-    <section className="rca-hero-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden', padding: '120px 40px 80px' }}>
-      {/* Background orbs */}
-      <div className="rca-orb rca-orb-1" />
-      <div className="rca-orb rca-orb-2" />
-      <div className="rca-orb rca-orb-3" />
-      <div className="rca-mesh" />
-
-      <div style={{ maxWidth: '1180px', margin: '0 auto', position: 'relative', zIndex: 2, width: '100%', display: 'grid', gridTemplateColumns: '1fr auto', gap: '60px', alignItems: 'center' }}>
-        {/* Left: Copy */}
-        <div>
-          <div className="rca-fade-up-1" style={{ marginBottom: '24px' }}>
-            <Tag>Retail Control Architect — India&apos;s #1 Stock System for Garment Stores</Tag>
-          </div>
-
-          <h1
-            className="rca-fade-up-2"
-            style={{ fontFamily: "'Playfair Display', serif", fontSize: 'clamp(40px, 6vw, 76px)', fontWeight: 900, lineHeight: 1.08, marginBottom: '28px', maxWidth: '860px' }}
-          >
-            Tumhari Dukaan Mein{' '}
-            <span className="rca-shimmer-text">Kitna Stock</span>{' '}
-            Hai — Sach Mein?
-          </h1>
-
-          <p
-            className="rca-fade-up-3"
-            style={{ fontFamily: "'Kalam', cursive", fontSize: 'clamp(17px, 2vw, 21px)', color: 'rgba(253,248,239,0.68)', maxWidth: '600px', lineHeight: 1.8, marginBottom: '16px' }}
-          >
-            80% kapde ki dukaan walon ko apna actual, live stock pata hi nahi hota. Aur ye &quot;pata nahi&quot; — silently lakhs drain kar raha hai. Har mahine.
-          </p>
-
-          <p className="rca-fade-up-3" style={{ fontFamily: "'Kalam', cursive", fontSize: '15px', color: BRAND.gold, marginBottom: '44px', fontStyle: 'italic' }}>
-            ✦ Vadodara mein ek store ne 45 din mein ₹3.2 lakh recover kiye — sirf system change karke.
-          </p>
-
-          <div className="rca-fade-up-4" style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-            <GoldBtn onClick={() => setPage('trial')} size="lg" id="hero-trial-btn">
-              🚀 7 Din Free Try Karo
-            </GoldBtn>
-            <button
-              onClick={showLalitaModal}
-              style={{
-                background: 'rgba(253,248,239,0.05)',
-                border: '1.5px solid rgba(253,248,239,0.15)',
-                color: BRAND.cream,
-                fontFamily: "'Kalam', cursive",
-                fontSize: '16px',
-                padding: '17px 30px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                transition: 'all 0.25s ease',
-                backdropFilter: 'blur(8px)',
-              }}
-              onMouseEnter={(e: any) => { e.currentTarget.style.borderColor = 'rgba(186,117,23,0.6)'; e.currentTarget.style.color = BRAND.gold; e.currentTarget.style.background = 'rgba(186,117,23,0.06)' }}
-              onMouseLeave={(e: any) => { e.currentTarget.style.borderColor = 'rgba(253,248,239,0.15)'; e.currentTarget.style.color = BRAND.cream; e.currentTarget.style.background = 'rgba(253,248,239,0.05)' }}
-            >
-              📖 Lalita Garments Case Study
-            </button>
-          </div>
-        </div>
-
-        {/* Right: 3D floating widget */}
-        <div className="rca-hide-mobile" style={{ flexShrink: 0, position: 'relative', width: '280px' }}>
-          {/* Main Floating Card */}
-          <div
-            className="rca-float rca-glass rca-glow"
-            style={{ borderRadius: '20px', padding: '28px', border: '1px solid rgba(186,117,23,0.3)', position: 'relative', zIndex: 2 }}
-          >
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: BRAND.gold, letterSpacing: '2px', marginBottom: '16px' }}>STOCK MISMATCH · LIVE</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '16px' }}>
-              <div>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '44px', fontWeight: 900, color: BRAND.accent, lineHeight: 1 }}>17%</div>
-                <div style={{ fontFamily: "'Kalam', cursive", fontSize: '12px', color: BRAND.muted, marginTop: '4px' }}>Before RCA</div>
-              </div>
-              <div style={{ fontSize: '24px' }}>→</div>
-              <div>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '44px', fontWeight: 900, color: BRAND.greenLight, lineHeight: 1 }}>2%</div>
-                <div style={{ fontFamily: "'Kalam', cursive", fontSize: '12px', color: BRAND.muted, marginTop: '4px' }}>After 30 Days</div>
-              </div>
-            </div>
-            <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: '88%', background: `linear-gradient(90deg, ${BRAND.greenLight}, ${BRAND.gold})`, borderRadius: '10px', transition: 'width 1s ease' }} />
-            </div>
-            <div style={{ fontFamily: "'Kalam', cursive", fontSize: '12px', color: BRAND.muted, marginTop: '8px', textAlign: 'right' }}>88% improvement</div>
-          </div>
-
-          {/* Sub-badge 1 */}
-          <div
-            className="rca-float-rev"
-            style={{ position: 'absolute', top: '-40px', right: '-30px', background: 'linear-gradient(135deg, #1E3A18, #2A4F22)', border: `1px solid ${BRAND.green}`, borderRadius: '12px', padding: '12px 16px', zIndex: 3 }}
-          >
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '18px', fontWeight: 900, color: BRAND.greenLight }}>₹3.2L</div>
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '8px', color: BRAND.muted, letterSpacing: '1px' }}>RECOVERED</div>
-          </div>
-
-          {/* Sub-badge 2 */}
-          <div
-            className="rca-float"
-            style={{ position: 'absolute', bottom: '-35px', left: '-35px', background: 'linear-gradient(135deg, #2A1E0A, #3D2C0E)', border: `1px solid ${BRAND.gold}`, borderRadius: '12px', padding: '12px 16px', animationDelay: '-2s', zIndex: 3 }}
-          >
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '18px', fontWeight: 900, color: BRAND.gold }}>45 Days</div>
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '8px', color: BRAND.muted, letterSpacing: '1px' }}>TO CERTAINTY</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom fade */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '120px', background: 'linear-gradient(to top, #0D1B2E, transparent)', zIndex: 3 }} />
-    </section>
+    <HeroSection setPage={setPage} showLalitaModal={showLalitaModal} />
 
     {/* ══ STATS STRIP ══════════════════════════════════════════════ */}
     <section style={{ padding: '80px 40px', position: 'relative' }}>
@@ -471,17 +366,18 @@ const HomePage = ({ setPage, showLalitaModal }: any) => (
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '16px' }}>
-          {[
-            { icon: '📦', title: 'Stock Ka Andaza', desc: 'Billing software mein numbers hain — physical shelf pe kuch aur milta hai. Dono kabhi match nahi karte.' },
-            { icon: '👕', title: 'Variant-less Billing', desc: '"Shirt — 2 pcs." Colour kya? Size? "Baad mein dekhenge." Lekin baad mein aata hi nahi.' },
-            { icon: '🔄', title: 'Return Record Nahi', desc: 'Customer ne return kiya — system mein 3 din baad update hua. Tab tak stock wrong ho chuka.' },
-            { icon: '💸', title: 'Dead Stock Problem', desc: 'Wohi size ki 40 pieces hain jo bikti hi nahi. Jo bikti hai woh hamesha khatam. Buying = blind.' },
-            { icon: '👥', title: 'Staff Accountability Zero', desc: 'Kaun ne kya nikala, kab nikala, wapas kab aaya — kuch pata nahi. Ye bahut mehnga padta hai.' },
-            { icon: '😰', title: 'Season End Shock', desc: 'Saal end mein audit karo — aur jo numbers aate hain woh dekhke bistar pe baith jaate ho.' },
-          ].map((card, i) => (
-            <PainCard key={i} icon={card.icon} title={card.title} desc={card.desc} />
-          ))}
+        <div style={{ marginTop: '40px' }}>
+          <MorphingCardStack
+            defaultLayout="grid"
+            cards={[
+              { id: '1', icon: <span>📦</span>, title: 'Stock Ka Andaza', description: 'Billing software mein numbers hain — physical shelf pe kuch aur milta hai. Dono kabhi match nahi karte.' },
+              { id: '2', icon: <span>👕</span>, title: 'Variant-less Billing', description: '"Shirt — 2 pcs." Colour kya? Size? "Baad mein dekhenge." Lekin baad mein aata hi nahi.' },
+              { id: '3', icon: <span>🔄</span>, title: 'Return Record Nahi', description: 'Customer ne return kiya — system mein 3 din baad update hua. Tab tak stock wrong ho chuka.' },
+              { id: '4', icon: <span>💸</span>, title: 'Dead Stock Problem', description: 'Wohi size ki 40 pieces hain jo bikti hi nahi. Jo bikti hai woh hamesha khatam. Buying = blind.' },
+              { id: '5', icon: <span>👥</span>, title: 'Staff Accountability Zero', description: 'Kaun ne kya nikala, kab nikala, wapas kab aaya — kuch pata nahi. Ye bahut mehnga padta hai.' },
+              { id: '6', icon: <span>😰</span>, title: 'Season End Shock', description: 'Saal end mein audit karo — aur jo numbers aate hain woh dekhke bistar pe baith jaate ho.' },
+            ]}
+          />
         </div>
       </div>
     </section>

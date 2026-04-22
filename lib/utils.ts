@@ -1,3 +1,6 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
 // Utility functions for encoding/decoding
 export function encodeBase64(str: string): string {
   if (typeof Buffer !== 'undefined') {
@@ -25,3 +28,6 @@ export function getNodeEnv(): string {
   return 'development'
 }
 
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}

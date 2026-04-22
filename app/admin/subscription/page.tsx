@@ -18,6 +18,9 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { format } from 'date-fns'
+import ModernPricingSection, { PlanData } from '@/components/ui/pricing-new'
+import { loadRazorpayScript } from '@/lib/razorpay'
+import { useRouter } from 'next/navigation'
 
 interface TenantData {
   id: string
@@ -38,7 +41,7 @@ const plans = [
   {
     name: 'Foundation',
     id: 'basic',
-    price: '₹2,999',
+    price: '₹599',
     period: '/month',
     description: 'Perfect for small retail shops getting started.',
     icon: Shield,
@@ -56,7 +59,7 @@ const plans = [
   {
     name: 'Growth',
     id: 'professional',
-    price: '₹7,499',
+    price: '₹2,999',
     period: '/month',
     description: 'The complete toolkit for growing garment brands.',
     icon: Zap,
@@ -74,8 +77,8 @@ const plans = [
   {
     name: 'Scale',
     id: 'enterprise',
-    price: 'Custom',
-    period: '',
+    price: '₹5,999',
+    period: '/month',
     description: 'Enterprise-grade power for large organizations.',
     icon: Globe,
     color: 'from-amber-500 to-orange-500',
@@ -94,6 +97,8 @@ const plans = [
 export default function SubscriptionPage() {
   const [tenant, setTenant] = useState<TenantData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [processingPlan, setProcessingPlan] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     const fetchTenantData = async () => {
@@ -139,6 +144,68 @@ export default function SubscriptionPage() {
         </div>
       </AdminLayout>
     )
+  }
+
+  const handleCheckout = async (plan: any, isYearly: boolean) => {
+    if (plan.id === 'enterprise' || plan.price === 'Custom') {
+      window.open('https://wa.me/919353083597?text=Hi, I want to discuss the Scale plan', '_blank')
+      return
+    }
+
+    try {
+      setProcessingPlan(plan.id)
+      const res = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: plan.id,
+          billingCycle: isYearly ? 'yearly' : 'monthly',
+          amount: isYearly ? parseInt(plan.price.toString().replace(/\D/g, '')) * 10 : parseInt(plan.price.toString().replace(/\D/g, ''))
+        })
+      })
+      const data = await res.json()
+
+      if (!data.success) {
+        alert('Failed to create order: ' + (data.error || 'Please configure Razorpay Keys in Settings first.'))
+        setProcessingPlan(null)
+        return
+      }
+
+      const scriptLoaded = await loadRazorpayScript()
+      if (!scriptLoaded) {
+        alert('Failed to load Razorpay SDK.')
+        setProcessingPlan(null)
+        return
+      }
+
+      const options = {
+        key: data.keyId,
+        amount: (isYearly ? parseInt(plan.price.toString().replace(/\D/g, '')) * 10 : parseInt(plan.price.toString().replace(/\D/g, ''))) * 100,
+        currency: "INR",
+        name: "Lalitha Garments",
+        description: `${plan.name} Plan (${isYearly ? 'Yearly' : 'Monthly'})`,
+        order_id: data.orderId,
+        handler: function (response: any) {
+          alert('Payment successful! Your subscription will be updated shortly.')
+          window.location.reload()
+        },
+        prefill: {
+          name: tenant?.businessName || '',
+        },
+        theme: {
+          color: "#3b82f6"
+        }
+      };
+
+      // @ts-ignore
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      setProcessingPlan(null)
+    } catch (error) {
+      console.error(error)
+      alert('An error occurred during checkout')
+      setProcessingPlan(null)
+    }
   }
 
   const isExpired = tenant?.subscriptionStatus === 'expired' || 
@@ -207,82 +274,28 @@ export default function SubscriptionPage() {
         )}
 
         {/* Pricing Grid */}
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {plans.map((plan) => {
-            const isCurrentPlan = tenant?.plan === plan.id
-            return (
-            <div 
-              key={plan.id}
-              className={`relative rounded-3xl p-8 flex flex-col h-full transition-all duration-500 hover:scale-[1.02] border focus-within:ring-2 focus-within:ring-purple-500
-                ${isCurrentPlan 
-                  ? 'bg-white shadow-xl border-emerald-200 ring-2 ring-emerald-50'
-                  : plan.popular 
-                    ? 'bg-white shadow-2xl border-purple-200 ring-2 ring-purple-100' 
-                    : 'bg-white shadow-lg border-gray-100 hover:border-purple-100 hover:shadow-xl'
-                }`}
-            >
-              {plan.popular && !isCurrentPlan && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-lg uppercase tracking-widest whitespace-nowrap">
-                  Most Popular
-                </div>
-              )}
-              
-              {isCurrentPlan && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-500 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-lg uppercase tracking-widest whitespace-nowrap flex items-center gap-1.5">
-                  <Check className="w-3 h-3" />
-                  Your Current Plan
-                </div>
-              )}
-
-              <div className="mb-8">
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${plan.color} flex items-center justify-center mb-6 shadow-lg shadow-purple-200/50`}>
-                  <plan.icon className="w-7 h-7 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                <p className="text-sm text-gray-500 mb-6 min-h-[40px] leading-relaxed">
-                  {plan.description}
-                </p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-extrabold text-gray-900">{plan.price}</span>
-                  <span className="text-gray-400 font-medium">{plan.period}</span>
-                </div>
-              </div>
-
-              <div className="space-y-4 mb-10 flex-grow">
-                {plan.features.map((feature, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className="mt-1 bg-emerald-50 rounded-full p-0.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                    </div>
-                    <span className="text-sm text-gray-600 font-medium leading-snug">{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={() => {
-                  if (plan.id === 'enterprise' || plan.price === 'Custom') {
-                    window.open('https://wa.me/919353083597?text=Hi, I want to discuss the Scale plan', '_blank')
-                  } else {
-                    // Replace with your Razorpay Webstore URL
-                    window.open('https://pages.razorpay.com/pl_...', '_blank')
-                  }
-                }}
-                disabled={tenant?.plan === plan.id}
-                className={`w-full py-4 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 group
-                  ${tenant?.plan === plan.id
-                    ? 'bg-emerald-50 text-emerald-600 cursor-default border border-emerald-100'
-                    : plan.popular 
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-200 hover:shadow-purple-300 hover:opacity-90' 
-                      : 'bg-gray-50 text-gray-900 hover:bg-purple-50 hover:text-purple-600'
-                  }`}
-              >
-                {tenant?.plan === plan.id ? 'Your Active Plan' : plan.buttonText}
-                {tenant?.plan !== plan.id && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
-              </button>
-            </div>
-            )
-          })}
+        <motion.div variants={itemVariants} className="mt-12 bg-neutral-950 md:rounded-[3rem] overflow-hidden -mx-4 md:mx-0">
+          <ModernPricingSection 
+            plans={plans.map((plan, index) => {
+              const isCurrentPlan = tenant?.plan === plan.id
+              return {
+                name: plan.name,
+                description: plan.description,
+                price: parseInt(plan.price.replace(/\D/g, '')),
+                yearlyPrice: parseInt(plan.price.replace(/\D/g, '')) * 10,
+                buttonText: isCurrentPlan ? 'Your Active Plan' : plan.buttonText,
+                buttonVariant: isCurrentPlan ? 'outline' : (plan.popular ? 'default' : 'outline'),
+                popular: plan.popular && !isCurrentPlan,
+                disabled: isCurrentPlan,
+                features: [],
+                includes: [
+                  `${plan.name} includes:`,
+                  ...plan.features
+                ],
+                onAction: (isYearly) => handleCheckout(plan, isYearly)
+              }
+            })} 
+          />
         </motion.div>
 
         {/* Trust/Social Proof Section (Optional) */}

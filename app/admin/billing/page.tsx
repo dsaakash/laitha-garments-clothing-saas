@@ -11,6 +11,9 @@ import {
   ShieldCheck,
   Clock
 } from 'lucide-react'
+import ModernPricingSection, { PlanData } from '@/components/ui/pricing-new'
+import { loadRazorpayScript } from '@/lib/razorpay'
+import { useRouter } from 'next/navigation'
 
 interface SubscriptionInfo {
   status: string
@@ -24,12 +27,12 @@ interface SubscriptionInfo {
 
 const PLAN_DISPLAY: Record<string, { name: string; price: string }> = {
   // DB values (Title-case)
-  foundation: { name: 'Starter Intelligence', price: '₹599' },
-  growth: { name: 'Growth Command', price: '₹2,499' },
-  scale: { name: 'Enterprise Matrix', price: '₹5,999' },
+  foundation: { name: 'Foundation', price: '₹599' },
+  growth: { name: 'Growth', price: '₹2,999' },
+  scale: { name: 'Scale', price: '₹5,999' },
   // Legacy / alternate keys
-  starter: { name: 'Starter Intelligence', price: '₹599' },
-  enterprise: { name: 'Enterprise Matrix', price: '₹5,999' },
+  starter: { name: 'Foundation', price: '₹599' },
+  enterprise: { name: 'Scale', price: '₹5,999' },
   free: { name: 'Free Trial', price: '₹0' },
 }
 
@@ -49,6 +52,8 @@ export default function BillingPage() {
     totalSales: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [processingPlan, setProcessingPlan] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -134,6 +139,70 @@ export default function BillingPage() {
       recommended: false
     }
   ]
+
+  const handleCheckout = async (plan: any, isYearly: boolean) => {
+    if (plan.id === 'enterprise' || plan.price === 5999) {
+      window.open('https://wa.me/919353083597?text=Hi, I want to discuss the Scale plan', '_blank')
+      return
+    }
+
+    try {
+      setProcessingPlan(plan.id || plan.name.toLowerCase())
+      const res = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: plan.id || plan.name.toLowerCase(),
+          billingCycle: isYearly ? 'yearly' : 'monthly',
+          amount: isYearly ? plan.yearlyPrice : plan.price
+        })
+      })
+      const data = await res.json()
+
+      if (!data.success) {
+        alert('Failed to create order: ' + (data.error || 'Please configure Razorpay Keys in Settings first.'))
+        setProcessingPlan(null)
+        return
+      }
+
+      const scriptLoaded = await loadRazorpayScript()
+      if (!scriptLoaded) {
+        alert('Failed to load Razorpay SDK.')
+        setProcessingPlan(null)
+        return
+      }
+
+      const options = {
+        key: data.keyId,
+        amount: (isYearly ? plan.yearlyPrice : plan.price) * 100,
+        currency: "INR",
+        name: "Lalitha Garments",
+        description: `${plan.name} Plan (${isYearly ? 'Yearly' : 'Monthly'})`,
+        order_id: data.orderId,
+        handler: function (response: any) {
+          alert('Payment successful! Your subscription will be updated shortly.')
+          window.location.reload()
+        },
+        prefill: {
+          name: '',
+          email: "",
+          contact: ""
+        },
+        theme: {
+          color: "#3b82f6"
+        }
+      };
+
+      // @ts-ignore
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      setProcessingPlan(null)
+    } catch (error) {
+      console.error(error)
+      alert('An error occurred during checkout')
+      setProcessingPlan(null)
+    }
+  }
 
   return (
     <AdminLayout>
@@ -242,54 +311,64 @@ export default function BillingPage() {
            </div>
         </div>
 
-        {/* Pricing Comparison */}
-        <div className="pt-12 space-y-12 text-center">
-            <div className="max-w-2xl mx-auto">
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Expand Your Intelligence</h2>
-                <p className="text-slate-500 font-medium mt-2">Choose the plan that fits the size and speed of your garment business.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {plans.map((plan, idx) => (
-                    <div 
-                        key={idx} 
-                        className={`relative rounded-[2.5rem] p-8 transition-all duration-500 hover:-translate-y-2 border ${
-                            plan.recommended 
-                            ? 'bg-white border-slate-200 shadow-2xl shadow-slate-200' 
-                            : 'bg-white border-slate-100 shadow-sm'
-                        }`}
-                        style={plan.recommended ? { borderTop: '4px solid var(--accent)' } : {}}
-                    >
-                        {plan.recommended && (
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">
-                                Recommended
-                            </div>
-                        )}
-                        <h3 className="text-xl font-black text-slate-900 tracking-tight">{plan.name}</h3>
-                        <div className="mt-4 flex items-baseline justify-center gap-1">
-                            <span className="text-4xl font-black text-slate-900">{plan.price}</span>
-                            <span className="text-slate-400 font-bold">{plan.period}</span>
-                        </div>
-                        <p className="mt-4 text-slate-500 text-sm leading-relaxed">{plan.description}</p>
-                        
-                        <div className="mt-8 space-y-4">
-                            {plan.features.map((feature, fidx) => (
-                                <div key={fidx} className="flex items-center gap-3 text-left">
-                                    <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--accent)' }} />
-                                    <span className="text-sm font-bold text-slate-700">{feature}</span>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="mt-10 p-4 rounded-2xl bg-slate-50 border border-slate-100 italic">
-                            <p className="text-xs font-bold text-slate-500 tracking-tight">
-                                Interested in this plan? <br/>
-                                <span className="text-slate-900 not-italic">Contact support to switch</span>
-                            </p>
-                        </div>
-                    </div>
-                ))}
-            </div>
+        <div className="mt-12 -mx-4 md:mx-0 bg-neutral-950 md:rounded-[3rem] overflow-hidden">
+            <ModernPricingSection plans={[
+              {
+                name: "Foundation",
+                description: "Perfect for small boutiques looking to digitize their day-to-day workflow.",
+                price: 599,
+                yearlyPrice: 5990,
+                buttonText: "Contact support to switch",
+                buttonVariant: "outline",
+                popular: false,
+                features: [],
+                includes: [
+                  "Foundation includes:",
+                  "Up to 500 Inventory Items",
+                  "Unlimited Sales Recording",
+                  "Basic Analytics",
+                  "WhatsApp Sharing"
+                ],
+                onAction: (isYearly) => handleCheckout({ name: "Foundation", price: 599, yearlyPrice: 5990, id: 'basic' }, isYearly)
+              },
+              {
+                name: "Growth",
+                description: "Scale your operations with advanced intelligence and storefronts.",
+                price: 2999,
+                yearlyPrice: 29990,
+                buttonText: "Contact support to switch",
+                buttonVariant: "default",
+                popular: true,
+                features: [],
+                includes: [
+                  "Everything in Foundation, plus:",
+                  "Unlimited Inventory",
+                  "Custom Digital Storefront",
+                  "Advanced Revenue Pulse",
+                  "Multi-user Access",
+                  "Priority Support"
+                ],
+                onAction: (isYearly) => handleCheckout({ name: "Growth", price: 2999, yearlyPrice: 29990, id: 'professional' }, isYearly)
+              },
+              {
+                name: "Scale",
+                description: "Full-scale solution for high-volume manufacturers and distributors.",
+                price: 5999,
+                yearlyPrice: 59990,
+                buttonText: "Contact support to switch",
+                buttonVariant: "outline",
+                popular: false,
+                features: [],
+                includes: [
+                  "Everything in Growth, plus:",
+                  "Custom Workflow Rules",
+                  "Dedicated Account Manager",
+                  "API Access",
+                  "White-labeling Options"
+                ],
+                onAction: (isYearly) => handleCheckout({ name: "Scale", price: 5999, yearlyPrice: 59990, id: 'enterprise' }, isYearly)
+              }
+            ]} />
         </div>
       </div>
     </AdminLayout>
