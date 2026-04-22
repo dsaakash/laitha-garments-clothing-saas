@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const context = getTenantContext(request)
 
-    if (!context.isAuthenticated) {
+    if (!context.userType) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
