@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       notes: {
         planId,
         billingCycle,
-        tenantId: session.user.id || session.user.tenantId || ''
+        tenantId: tenantId || userId || '' // Use tenant identifier specifically
       }
     }
 
