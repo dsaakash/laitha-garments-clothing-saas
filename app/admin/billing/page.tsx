@@ -27,9 +27,9 @@ interface SubscriptionInfo {
 }
 
 const PLAN_DISPLAY: Record<string, { name: string; price: string }> = {
-  foundation: { name: 'Foundation', price: '₹49' },
-  growth: { name: 'Growth', price: '₹99' },
-  scale: { name: 'Scale', price: '₹199' },
+  foundation: { name: 'Foundation', price: '₹599' },
+  growth: { name: 'Growth', price: '₹2,999' },
+  scale: { name: 'Scale', price: '₹5,999' },
   free: { name: 'Free Trial', price: '₹0' },
 }
 
@@ -49,6 +49,7 @@ export default function BillingPage() {
     totalSales: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'plans' | 'invoices'>('plans')
   const [processingPlan, setProcessingPlan] = useState<string | null>(null)
   const router = useRouter()
 
@@ -308,76 +309,117 @@ export default function BillingPage() {
            </div>
         </div>
 
-        <div className="mt-12 -mx-4 md:mx-0 bg-neutral-950 md:rounded-[3rem] overflow-hidden">
-            <ModernPricingSection plans={[
-              {
-                name: "Foundation",
-                description: "Essential features for growing boutiques and small labels.",
-                price: 599,
-                yearlyPrice: 5990,
-                buttonText: "Switch to Foundation",
-                buttonVariant: "outline",
-                popular: false,
-                features: [],
-                includes: [
-                  "Foundation includes:",
-                  "Up to 500 Inventory Items",
-                  "Unlimited Sales Recording",
-                  "Basic Analytics",
-                  "WhatsApp Sharing"
-                ],
-                onAction: (isYearly) => handleCheckout({ name: "Foundation", price: 599, yearlyPrice: 5990, id: 'foundation' }, isYearly)
-              },
-              {
-                name: "Growth",
-                description: "Advanced tools for established clothing brands and retailers.",
-                price: 2999,
-                yearlyPrice: 29990,
-                buttonText: "Upgrade to Growth",
-                buttonVariant: "default",
-                popular: true,
-                features: [],
-                includes: [
-                  "Everything in Foundation, plus:",
-                  "Unlimited Inventory",
-                  "Custom Digital Storefront",
-                  "Advanced Revenue Pulse",
-                  "Multi-user Access",
-                  "Priority Support"
-                ],
-                onAction: (isYearly) => handleCheckout({ name: "Growth", price: 2999, yearlyPrice: 29990, id: 'growth' }, isYearly)
-              },
-              {
-                name: "Scale",
-                description: "Full-scale solution for high-volume manufacturers and distributors.",
-                price: 5999,
-                yearlyPrice: 59990,
-                buttonText: "Contact support to switch",
-                buttonVariant: "outline",
-                popular: false,
-                features: [],
-                includes: [
-                  "Everything in Growth, plus:",
-                  "Custom Workflow Rules",
-                  "Dedicated Account Manager",
-                  "API Access",
-                  "White-labeling Options"
-                ],
-                onAction: (isYearly) => handleCheckout({ name: "Scale", price: 5999, yearlyPrice: 59990, id: 'scale' }, isYearly)
-              }
-            ]} />
+        {/* Tabs */}
+        <div className="flex items-center gap-8 border-b border-slate-100 pb-0">
+          <button
+            onClick={() => setActiveTab('plans')}
+            className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${
+              activeTab === 'plans' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Subscription Plans
+            {activeTab === 'plans' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-slate-900 rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('invoices')}
+            className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${
+              activeTab === 'invoices' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Billing History
+            {activeTab === 'invoices' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-slate-900 rounded-full" />
+            )}
+          </button>
         </div>
 
-        {/* Subscription History / Invoices */}
-        <div className="space-y-6 mt-16">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Platform Invoices</h2>
-              <p className="text-slate-500 text-sm font-medium">View and track your platform subscription payments.</p>
+        {activeTab === 'plans' ? (
+          <>
+            <div className="mt-12 -mx-4 md:mx-0 bg-neutral-950 md:rounded-[3rem] overflow-hidden">
+                <ModernPricingSection plans={[
+                  {
+                    name: "Foundation",
+                    description: "Essential features for growing boutiques and small labels.",
+                    price: 599,
+                    yearlyPrice: 5990,
+                    buttonText: subInfo?.plan?.toLowerCase() === 'foundation' ? "Current Plan" : "Switch to Foundation",
+                    buttonVariant: subInfo?.plan?.toLowerCase() === 'foundation' ? "default" : "outline",
+                    popular: false,
+                    features: [],
+                    includes: [
+                      "Foundation includes:",
+                      "Up to 500 Inventory Items",
+                      "Unlimited Sales Recording",
+                      "Basic Analytics",
+                      "WhatsApp Sharing"
+                    ],
+                    onAction: (isYearly) => {
+                      if (subInfo?.plan?.toLowerCase() !== 'foundation') {
+                        handleCheckout({ name: "Foundation", price: 599, yearlyPrice: 5990, id: 'foundation' }, isYearly)
+                      }
+                    }
+                  },
+                  {
+                    name: "Growth",
+                    description: "Advanced tools for established clothing brands and retailers.",
+                    price: 2999,
+                    yearlyPrice: 29990,
+                    buttonText: subInfo?.plan?.toLowerCase() === 'growth' ? "Current Plan" : "Upgrade to Growth",
+                    buttonVariant: subInfo?.plan?.toLowerCase() === 'growth' ? "default" : "default",
+                    popular: true,
+                    features: [],
+                    includes: [
+                      "Everything in Foundation, plus:",
+                      "Unlimited Inventory",
+                      "Custom Digital Storefront",
+                      "Advanced Revenue Pulse",
+                      "Multi-user Access",
+                      "Priority Support"
+                    ],
+                    onAction: (isYearly) => {
+                      if (subInfo?.plan?.toLowerCase() !== 'growth') {
+                        handleCheckout({ name: "Growth", price: 2999, yearlyPrice: 29990, id: 'growth' }, isYearly)
+                      }
+                    }
+                  },
+                  {
+                    name: "Scale",
+                    description: "Full-scale solution for high-volume manufacturers and distributors.",
+                    price: 5999,
+                    yearlyPrice: 59990,
+                    buttonText: subInfo?.plan?.toLowerCase() === 'scale' ? "Current Plan" : "Contact support to switch",
+                    buttonVariant: "outline",
+                    popular: false,
+                    features: [],
+                    includes: [
+                      "Everything in Growth, plus:",
+                      "Custom Workflow Rules",
+                      "Dedicated Account Manager",
+                      "API Access",
+                      "White-labeling Options"
+                    ],
+                    onAction: (isYearly) => {
+                      if (subInfo?.plan?.toLowerCase() !== 'scale') {
+                        handleCheckout({ name: "Scale", price: 5999, yearlyPrice: 59990, id: 'scale' }, isYearly)
+                      }
+                    }
+                  }
+                ]} />
             </div>
+          </>
+        ) : (
+          <div className="space-y-6 mt-12">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Platform Invoices</h2>
+                <p className="text-slate-500 text-sm font-medium">View and track your platform subscription payments.</p>
+              </div>
+            </div>
+            <SubscriptionInvoices />
           </div>
-          <SubscriptionInvoices />
-        </div>
+        )}
       </div>
     </AdminLayout>
   )
