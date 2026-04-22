@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { useState } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 
@@ -25,10 +26,12 @@ export const HeroSection = ({ setPage, showLalitaModal }: any) => {
 
       {/* Image Background */}
       <div className="absolute inset-0 w-full h-full z-0">
-        <img
+        <Image
           src={IMAGE_URL}
           alt="Lalitha Garments Store"
-          className="w-full h-full object-cover brightness-50"
+          fill
+          className="object-cover brightness-50"
+          priority
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0D1B2E]/80 via-transparent to-[#0D1B2E]/90" />
       </div>

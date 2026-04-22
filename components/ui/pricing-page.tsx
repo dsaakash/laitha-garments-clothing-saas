@@ -104,7 +104,7 @@ export function PricingCard({
   onClick,
   disabled,
 }: PricingCardProps) {
-  const cardStyle = {
+  const cardStyle: React.CSSProperties = {
     width: "100%",
     maxWidth: "19rem",
     backgroundColor: "hsla(240, 15%, 9%, 1)",
@@ -118,10 +118,10 @@ export function PricingCard({
     boxShadow: "0px -16px 24px 0px rgba(255, 255, 255, 0.25) inset",
   };
 
-  const borderContainerStyle = {
+  const borderContainerStyle: React.CSSProperties = {
     overflow: "hidden",
     pointerEvents: "none",
-    position: "absolute" as const,
+    position: "absolute",
     zIndex: "-10",
     top: "50%",
     left: "50%",
@@ -133,10 +133,10 @@ export function PricingCard({
     borderRadius: "1.5rem",
   };
 
-  const rotatingBorderStyle = {
+  const rotatingBorderStyle: React.CSSProperties = {
     content: '""',
     pointerEvents: "none",
-    position: "absolute" as const,
+    position: "absolute",
     zIndex: "200",
     top: "50%",
     left: "50%",
