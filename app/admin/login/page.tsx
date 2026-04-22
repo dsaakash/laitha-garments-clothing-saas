@@ -156,7 +156,7 @@ export default function AdminLogin() {
           >
             <span className="text-3xl">🌸</span>
           </motion.div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">Lalitha Garments</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">Nirvriksh Retail OS</h1>
           <p className="text-purple-200/70 text-sm">Business Management Platform</p>
         </div>
 
@@ -355,7 +355,7 @@ export default function AdminLogin() {
           </div>
           <div className="w-px h-4 bg-purple-200/20"></div>
           <p className="text-purple-200/40 text-xs">
-            © 2026 Lalitha Garments
+            © 2026 Nirvriksh Retail OS
           </p>
         </motion.div>
       </motion.div>

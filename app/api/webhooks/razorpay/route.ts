@@ -49,7 +49,8 @@ export async function POST(request: Request) {
           nextBillingDate.setMonth(nextBillingDate.getMonth() + 1)
         }
 
-        // Update the tenant's subscription status
+        // Update the tenant's subscription status (BUT DO NOT UPDATE MODULES AUTOMATICALLY)
+        // Superadmin will manually grant access to modules
         await query(
           `UPDATE tenants 
            SET subscription_status = 'active', 
@@ -58,10 +59,28 @@ export async function POST(request: Request) {
                next_billing_date = $3,
                updated_at = NOW()
            WHERE id = $4 OR slug = $4`,
-          [planId, billingCycle || 'monthly', nextBillingDate, tenantId]
+          [planId.toLowerCase(), billingCycle || 'monthly', nextBillingDate, tenantId]
         )
 
-        console.log(`✅ Subscription updated for tenant ${tenantId} to plan ${planId}`)
+        // Create an invoice record
+        await query(
+          `INSERT INTO invoices (
+            tenant_id, plan_id, amount, currency, billing_cycle, 
+            razorpay_order_id, razorpay_payment_id, razorpay_signature
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            tenantId, 
+            planId.toLowerCase(), 
+            paymentEntity.amount / 100, 
+            paymentEntity.currency, 
+            billingCycle || 'monthly',
+            paymentEntity.order_id,
+            paymentEntity.id,
+            signature
+          ]
+        )
+
+        console.log(`✅ Subscription and Invoice updated for tenant ${tenantId} to plan ${planId}. Modules must be assigned manually by Superadmin.`)
       }
     }
 

@@ -40,10 +40,10 @@ interface TenantData {
 const plans = [
   {
     name: 'Foundation',
-    id: 'basic',
-    price: '₹599',
-    period: '/month',
-    description: 'Perfect for small retail shops getting started.',
+    id: 'foundation',
+    monthlyPrice: 599,
+    yearlyPrice: 5990,
+    description: 'Essential features for growing boutiques',
     icon: Shield,
     color: 'from-blue-500 to-cyan-500',
     features: [
@@ -58,10 +58,10 @@ const plans = [
   },
   {
     name: 'Growth',
-    id: 'professional',
-    price: '₹2,999',
-    period: '/month',
-    description: 'The complete toolkit for growing garment brands.',
+    id: 'growth',
+    monthlyPrice: 2999,
+    yearlyPrice: 29990,
+    description: 'Advanced tools for established brands',
     icon: Zap,
     color: 'from-purple-500 to-pink-500',
     features: [
@@ -76,10 +76,10 @@ const plans = [
   },
   {
     name: 'Scale',
-    id: 'enterprise',
-    price: '₹5,999',
-    period: '/month',
-    description: 'Enterprise-grade power for large organizations.',
+    id: 'scale',
+    monthlyPrice: 5999,
+    yearlyPrice: 59990,
+    description: 'Enterprise solution for distributors',
     icon: Globe,
     color: 'from-amber-500 to-orange-500',
     features: [
@@ -180,9 +180,9 @@ export default function SubscriptionPage() {
 
       const options = {
         key: data.keyId,
-        amount: (isYearly ? parseInt(plan.price.toString().replace(/\D/g, '')) * 10 : parseInt(plan.price.toString().replace(/\D/g, ''))) * 100,
+        amount: (isYearly ? plan.yearlyPrice : plan.monthlyPrice) * 100,
         currency: "INR",
-        name: "Lalitha Garments",
+        name: "Nirvriksh Retail OS",
         description: `${plan.name} Plan (${isYearly ? 'Yearly' : 'Monthly'})`,
         order_id: data.orderId,
         handler: function (response: any) {
@@ -281,8 +281,8 @@ export default function SubscriptionPage() {
               return {
                 name: plan.name,
                 description: plan.description,
-                price: parseInt(plan.price.replace(/\D/g, '')),
-                yearlyPrice: parseInt(plan.price.replace(/\D/g, '')) * 10,
+                price: plan.monthlyPrice,
+                yearlyPrice: plan.yearlyPrice,
                 buttonText: isCurrentPlan ? 'Your Active Plan' : plan.buttonText,
                 buttonVariant: isCurrentPlan ? 'outline' : (plan.popular ? 'default' : 'outline'),
                 popular: plan.popular && !isCurrentPlan,

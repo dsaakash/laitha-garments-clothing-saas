@@ -55,7 +55,7 @@ export default function TenantDetailsPage() {
     const [showEditModal, setShowEditModal] = useState(false)
     const [showRenewModal, setShowRenewModal] = useState(false)
     const [renewing, setRenewing] = useState(false)
-    const [renewPlan, setRenewPlan] = useState<string>('basic')
+    const [renewPlan, setRenewPlan] = useState<string>('foundation')
     const [renewMode, setRenewMode] = useState<'monthly' | 'yearly' | 'custom'>('monthly')
     const [renewCustomDate, setRenewCustomDate] = useState<string>('')
     const [renewPrice, setRenewPrice] = useState<number>(0)
@@ -1216,7 +1216,7 @@ export default function TenantDetailsPage() {
                                                 <button
                                                     onClick={() => {
                                                         setShowSubscriptionModal(false)
-                                                        setRenewPlan(tenant.plan || 'basic')
+                                                        setRenewPlan(tenant.plan || 'foundation')
                                                         setRenewMode(tenant.billingCycle === 'yearly' ? 'yearly' : 'monthly')
                                                         setRenewCustomDate('')
                                                         setRenewPrice(tenant.monthlyRevenue || 0)
@@ -1235,7 +1235,7 @@ export default function TenantDetailsPage() {
                                     <div>
                                         <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Select Plan</h4>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                            {['free', 'basic', 'premium', 'enterprise'].map((plan) => (
+                                            {['free', 'foundation', 'growth', 'scale'].map((plan) => (
                                                 <div
                                                     key={plan}
                                                     onClick={() => handlePlanChange(plan)}
@@ -1446,7 +1446,7 @@ export default function TenantDetailsPage() {
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Plan</label>
                                         <div className="grid grid-cols-3 gap-2">
-                                            {['basic', 'premium', 'enterprise'].map((p) => (
+                                            {['foundation', 'growth', 'scale'].map((p) => (
                                                 <button
                                                     key={p}
                                                     onClick={() => setRenewPlan(p)}

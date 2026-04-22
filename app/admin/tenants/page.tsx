@@ -420,9 +420,9 @@ export default function TenantsPage() {
                                             onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
                                             className="w-full bg-black/40 border border-white/5 rounded-2xl py-3 px-4 text-white font-bold appearance-none"
                                         >
-                                            <option value="Foundation">FOUNDATION</option>
-                                            <option value="Growth">GROWTH</option>
-                                            <option value="Scale">SCALE</option>
+                                            <option value="foundation">FOUNDATION</option>
+                                            <option value="growth">GROWTH</option>
+                                            <option value="scale">SCALE</option>
                                         </select>
                                     </div>
                                 </div>

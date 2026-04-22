@@ -42,7 +42,8 @@ import {
   MessageCircle,
   Calendar,
   Target,
-  CreditCard
+  CreditCard,
+  Receipt
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -176,7 +177,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       setBusinessName(tenantData.data.businessName)
                     }
                   } else {
-                    setBusinessName('Lalitha Garments')
+                    setBusinessName('Nirvriksh Retail OS')
                   }
                   
                   // Also fetch pending approvals if admin or tenant
@@ -190,7 +191,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   
                 } catch (err) {
                   console.error('Error fetching business info:', err)
-                  setBusinessName('Lalitha Garments')
+                  setBusinessName('Nirvriksh Retail OS')
                 } finally {
                   // Only stop initializing once we have tried to fetch everything
                   setIsInitializing(false)
@@ -400,6 +401,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }[] = [
       { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, resource: 'dashboard' },
       { href: '/admin/leads', label: 'Trial Leads', icon: Target, resource: 'tenants', action: 'manage' }, // Superadmin only
+      { href: '/admin/platform-invoices', label: 'Platform Invoices', icon: Receipt, resource: 'tenants', action: 'manage' }, // Superadmin only
       { href: '/admin/approvals', label: 'Approvals', icon: ShieldCheck, resource: 'purchases', module: 'purchases', badge: pendingApprovalsCount },
       { href: '/admin/tenants', label: 'Tenants', icon: Building2, resource: 'tenants', action: 'manage' }, // Usually superadmin only
       { href: '/admin/research', label: 'Raw Research', icon: Search, resource: 'research', action: 'read', module: 'research' },

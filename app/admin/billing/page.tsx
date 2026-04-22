@@ -14,6 +14,7 @@ import {
 import ModernPricingSection, { PlanData } from '@/components/ui/pricing-new'
 import { loadRazorpayScript } from '@/lib/razorpay'
 import { useRouter } from 'next/navigation'
+import SubscriptionInvoices from '@/components/SubscriptionInvoices'
 
 interface SubscriptionInfo {
   status: string
@@ -26,13 +27,9 @@ interface SubscriptionInfo {
 }
 
 const PLAN_DISPLAY: Record<string, { name: string; price: string }> = {
-  // DB values (Title-case)
-  foundation: { name: 'Foundation', price: '₹599' },
-  growth: { name: 'Growth', price: '₹2,999' },
-  scale: { name: 'Scale', price: '₹5,999' },
-  // Legacy / alternate keys
-  starter: { name: 'Foundation', price: '₹599' },
-  enterprise: { name: 'Scale', price: '₹5,999' },
+  foundation: { name: 'Foundation', price: '₹49' },
+  growth: { name: 'Growth', price: '₹99' },
+  scale: { name: 'Scale', price: '₹199' },
   free: { name: 'Free Trial', price: '₹0' },
 }
 
@@ -141,7 +138,7 @@ export default function BillingPage() {
   ]
 
   const handleCheckout = async (plan: any, isYearly: boolean) => {
-    if (plan.id === 'enterprise' || plan.price === 5999) {
+    if (plan.id === 'scale' || plan.price === 199) {
       window.open('https://wa.me/919353083597?text=Hi, I want to discuss the Scale plan', '_blank')
       return
     }
@@ -176,7 +173,7 @@ export default function BillingPage() {
         key: data.keyId,
         amount: (isYearly ? plan.yearlyPrice : plan.price) * 100,
         currency: "INR",
-        name: "Nirvriksh",
+        name: "Nirvriksh Retail OS",
         description: `${plan.name} Plan (${isYearly ? 'Yearly' : 'Monthly'})`,
         order_id: data.orderId,
         handler: function (response: any) {
@@ -315,10 +312,10 @@ export default function BillingPage() {
             <ModernPricingSection plans={[
               {
                 name: "Foundation",
-                description: "Perfect for small boutiques looking to digitize their day-to-day workflow.",
+                description: "Essential features for growing boutiques and small labels.",
                 price: 599,
                 yearlyPrice: 5990,
-                buttonText: "Contact support to switch",
+                buttonText: "Switch to Foundation",
                 buttonVariant: "outline",
                 popular: false,
                 features: [],
@@ -329,14 +326,14 @@ export default function BillingPage() {
                   "Basic Analytics",
                   "WhatsApp Sharing"
                 ],
-                onAction: (isYearly) => handleCheckout({ name: "Foundation", price: 599, yearlyPrice: 5990, id: 'basic' }, isYearly)
+                onAction: (isYearly) => handleCheckout({ name: "Foundation", price: 599, yearlyPrice: 5990, id: 'foundation' }, isYearly)
               },
               {
                 name: "Growth",
-                description: "Scale your operations with advanced intelligence and storefronts.",
+                description: "Advanced tools for established clothing brands and retailers.",
                 price: 2999,
                 yearlyPrice: 29990,
-                buttonText: "Contact support to switch",
+                buttonText: "Upgrade to Growth",
                 buttonVariant: "default",
                 popular: true,
                 features: [],
@@ -348,7 +345,7 @@ export default function BillingPage() {
                   "Multi-user Access",
                   "Priority Support"
                 ],
-                onAction: (isYearly) => handleCheckout({ name: "Growth", price: 2999, yearlyPrice: 29990, id: 'professional' }, isYearly)
+                onAction: (isYearly) => handleCheckout({ name: "Growth", price: 99, yearlyPrice: 990, id: 'growth' }, isYearly)
               },
               {
                 name: "Scale",
@@ -366,9 +363,20 @@ export default function BillingPage() {
                   "API Access",
                   "White-labeling Options"
                 ],
-                onAction: (isYearly) => handleCheckout({ name: "Scale", price: 5999, yearlyPrice: 59990, id: 'enterprise' }, isYearly)
+                onAction: (isYearly) => handleCheckout({ name: "Scale", price: 5999, yearlyPrice: 59990, id: 'scale' }, isYearly)
               }
             ]} />
+        </div>
+
+        {/* Subscription History / Invoices */}
+        <div className="space-y-6 mt-16">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Platform Invoices</h2>
+              <p className="text-slate-500 text-sm font-medium">View and track your platform subscription payments.</p>
+            </div>
+          </div>
+          <SubscriptionInvoices />
         </div>
       </div>
     </AdminLayout>

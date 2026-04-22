@@ -22,7 +22,7 @@ export default function NewTenantPage() {
         whatsapp: '',
         address: '',
         gstNumber: '',
-        plan: 'free' as 'free' | 'basic' | 'premium' | 'enterprise',
+        plan: 'free' as 'free' | 'foundation' | 'growth' | 'scale',
         workflowEnabled: true,
     })
     const [selectedModules, setSelectedModules] = useState<string[]>(['inventory', 'products', 'catalogues', 'sales', 'customers', 'business', 'setup'])
@@ -228,7 +228,7 @@ export default function NewTenantPage() {
                             <h3 className="text-lg font-bold text-gray-900 mb-4">Subscription Plan</h3>
 
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                {(['free', 'basic', 'premium', 'enterprise'] as const).map((plan) => {
+                                {(['free', 'foundation', 'growth', 'scale'] as const).map((plan) => {
                                     const pricing = getPlanPricing(plan)
                                     return (
                                         <div

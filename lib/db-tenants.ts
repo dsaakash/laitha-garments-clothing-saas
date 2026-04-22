@@ -16,7 +16,7 @@ export interface TenantDB {
     address: string
     gst_number?: string
     status: 'trial' | 'active' | 'suspended' | 'cancelled'
-    plan: 'free' | 'basic' | 'premium' | 'enterprise'
+    plan: 'free' | 'foundation' | 'growth' | 'scale'
     trial_start_date: string
     trial_end_date: string
     subscription_status: 'trialing' | 'active' | 'past_due' | 'cancelled'

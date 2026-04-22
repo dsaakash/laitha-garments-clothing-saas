@@ -2,7 +2,7 @@
 // Defines tenant structure and provides CRUD operations for managing business customers
 
 export type TenantStatus = 'trial' | 'active' | 'suspended' | 'cancelled'
-export type TenantPlan = 'free' | 'basic' | 'premium' | 'enterprise'
+export type TenantPlan = 'free' | 'foundation' | 'growth' | 'scale'
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'cancelled'
 export type BillingCycle = 'monthly' | 'yearly'
 
@@ -177,11 +177,21 @@ export function calculateTrialEndDate(startDate: Date = new Date()): string {
 
 // Helper to get plan pricing
 export function getPlanPricing(plan: TenantPlan): number {
-    switch (plan) {
-        case 'free': return 0
-        case 'basic': return 49
-        case 'premium': return 99
-        case 'enterprise': return 199
-        default: return 0
+    const pricing = {
+        foundation: 599,
+        growth: 2999,
+        scale: 5999,
+        free: 0
     }
+    return pricing[plan] || 0
+}
+
+export const getYearlyPlanPricing = (plan: TenantPlan): number => {
+    const pricing = {
+        foundation: 5990,
+        growth: 29990,
+        scale: 59990,
+        free: 0
+    }
+    return pricing[plan] || 0
 }
