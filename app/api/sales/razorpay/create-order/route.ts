@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getTenantContext } from '@/lib/tenant-context'
 import Razorpay from 'razorpay'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const context = getTenantContext(request)
     if (!context.tenantId && !context.isSuperAdmin) {
