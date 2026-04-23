@@ -88,21 +88,32 @@ jobs:
       - name: Generate version tag and changelog
         id: version
         run: |
-          # Read version from package.json
-          PKG_VERSION=$(node -p "require('./package.json').version")
+          # Get the latest tag matching v*.*.*
+          LATEST_TAG=$(git tag -l "v*.*.*" --sort=-v:refname | head -n 1)
           
-          # Create a unique release tag using package version + short SHA
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          DATE_TAG=$(date -u '+%Y%m%d')
-          RELEASE_TAG="v${PKG_VERSION}-${DATE_TAG}.${SHORT_SHA}"
-          RELEASE_NAME="Release ${PKG_VERSION} (${DATE_TAG})"
+          if [ -z "$LATEST_TAG" ]; then
+            # If no tags exist, start at v1.0.0
+            NEW_TAG="v1.0.0"
+          else
+            # Extract version numbers
+            VERSION=${LATEST_TAG#v}
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            PATCH=$(echo $VERSION | cut -d. -f3)
+            
+            # Increment patch
+            NEW_PATCH=$((PATCH + 1))
+            NEW_TAG="v$MAJOR.$MINOR.$NEW_PATCH"
+          fi
+          
+          RELEASE_NAME="Release ${NEW_TAG#v}"
 
-          echo "tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
           echo "name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
-          echo "version=${PKG_VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${NEW_TAG#v}" >> $GITHUB_OUTPUT
 
           # Generate changelog from last release tag (if any)
-          PREV_TAG=$(git tag --sort=-v:refname | head -n 1 2>/dev/null || echo "")
+          PREV_TAG=$LATEST_TAG
 
           {
             echo "## 🚀 ${RELEASE_NAME}"
