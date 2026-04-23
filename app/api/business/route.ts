@@ -61,7 +61,10 @@ export async function GET(request: NextRequest) {
           gstNumber: profile.gst_number || '',
           whatsappNumber: profile.whatsapp_number,
           slug: slug,
-          websiteBuilderEnabled: websiteBuilderEnabled
+          websiteBuilderEnabled: websiteBuilderEnabled,
+          razorpayEnabled: profile.razorpay_enabled || false,
+          razorpayKeyId: profile.razorpay_key_id || '',
+          razorpayKeySecret: profile.razorpay_key_secret || ''
         }
       })
     }
@@ -124,8 +127,9 @@ export async function PUT(request: NextRequest) {
         `UPDATE business_profile 
          SET business_name = $1, owner_name = $2, email = $3, phone = $4, 
              address = $5, gst_number = $6, whatsapp_number = $7, 
+             razorpay_enabled = $8, razorpay_key_id = $9, razorpay_key_secret = $10,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $8
+         WHERE id = $11
          RETURNING *`,
         [
           body.businessName,
@@ -135,6 +139,9 @@ export async function PUT(request: NextRequest) {
           body.address,
           body.gstNumber || null,
           body.whatsappNumber,
+          body.razorpayEnabled || false,
+          body.razorpayKeyId || null,
+          body.razorpayKeySecret || null,
           existing.rows[0].id
         ]
       )
@@ -184,7 +191,10 @@ export async function PUT(request: NextRequest) {
           gstNumber: profile.gst_number || '',
           whatsappNumber: profile.whatsapp_number,
           slug: latestSlug,
-          websiteBuilderEnabled: latestWebsiteEnabled
+          websiteBuilderEnabled: latestWebsiteEnabled,
+          razorpayEnabled: profile.razorpay_enabled || false,
+          razorpayKeyId: profile.razorpay_key_id || '',
+          razorpayKeySecret: profile.razorpay_key_secret || ''
         }
       })
     } else {
@@ -194,8 +204,8 @@ export async function PUT(request: NextRequest) {
 
       if (hasTenantIdColumn) {
         insertQuery = `INSERT INTO business_profile 
-         (business_name, owner_name, email, phone, address, gst_number, whatsapp_number, tenant_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (business_name, owner_name, email, phone, address, gst_number, whatsapp_number, tenant_id, razorpay_enabled, razorpay_key_id, razorpay_key_secret)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`
         insertParams = [
           body.businessName,
@@ -205,23 +215,30 @@ export async function PUT(request: NextRequest) {
           body.address,
           body.gstNumber || null,
           body.whatsappNumber,
-          tenantId
+          tenantId,
+          body.razorpayEnabled || false,
+          body.razorpayKeyId || null,
+          body.razorpayKeySecret || null
         ]
       } else {
         // Legacy insert without tenant_id
-        insertQuery = `INSERT INTO business_profile 
-         (business_name, owner_name, email, phone, address, gst_number, whatsapp_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`
-        insertParams = [
-          body.businessName,
-          body.ownerName,
-          body.email,
-          body.phone,
-          body.address,
-          body.gstNumber || null,
-          body.whatsappNumber
-        ]
+         insertQuery = `INSERT INTO business_profile 
+          (business_name, owner_name, email, phone, address, gst_number, whatsapp_number, 
+           razorpay_enabled, razorpay_key_id, razorpay_key_secret)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *`
+         insertParams = [
+           body.businessName,
+           body.ownerName,
+           body.email,
+           body.phone,
+           body.address,
+           body.gstNumber || null,
+           body.whatsappNumber,
+           body.razorpayEnabled || false,
+           body.razorpayKeyId || null,
+           body.razorpayKeySecret || null
+         ]
       }
 
       const result = await query(insertQuery, insertParams)
@@ -259,7 +276,10 @@ export async function PUT(request: NextRequest) {
           gstNumber: profile.gst_number || '',
           whatsappNumber: profile.whatsapp_number,
           slug: body.slug || '',
-          websiteBuilderEnabled: body.websiteBuilderEnabled || false
+          websiteBuilderEnabled: body.websiteBuilderEnabled || false,
+          razorpayEnabled: profile.razorpay_enabled || false,
+          razorpayKeyId: profile.razorpay_key_id || '',
+          razorpayKeySecret: profile.razorpay_key_secret || ''
         }
       })
     }

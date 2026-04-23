@@ -8,6 +8,7 @@ import { Tenant } from '@/lib/tenantStorage'
 import { Plus, Search, Building2, Users, DollarSign, Clock, Edit2, LayoutDashboard, MonitorSmartphone, X, Check, Save, User, Trash2, Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import { AVAILABLE_MODULES } from '@/lib/modules'
 
 export default function TenantsPage() {
     const router = useRouter()
@@ -433,26 +434,26 @@ export default function TenantsPage() {
                                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Modules</h3>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {['Inventory', 'Sales', 'Purchase Order', 'Setup Wizard', 'Research'].map(module => (
+                                        {AVAILABLE_MODULES.map(module => (
                                             <button
-                                                key={module}
+                                                key={module.id}
                                                 onClick={() => {
-                                                    const exists = editForm.modules.includes(module)
+                                                    const exists = editForm.modules.includes(module.id)
                                                     setEditForm({
                                                         ...editForm,
                                                         modules: exists 
-                                                            ? editForm.modules.filter(m => m !== module)
-                                                            : [...editForm.modules, module]
+                                                            ? editForm.modules.filter(m => m !== module.id)
+                                                            : [...editForm.modules, module.id]
                                                     })
                                                 }}
                                                 className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase transition-all flex items-center justify-between ${
-                                                    editForm.modules.includes(module)
+                                                    editForm.modules.includes(module.id)
                                                     ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400'
                                                     : 'bg-black/40 border-white/5 text-slate-600'
                                                 }`}
                                             >
-                                                {module}
-                                                {editForm.modules.includes(module) && <Check size={12} />}
+                                                {module.label}
+                                                {editForm.modules.includes(module.id) && <Check size={12} />}
                                             </button>
                                         ))}
                                     </div>

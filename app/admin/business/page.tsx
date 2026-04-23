@@ -15,13 +15,16 @@ export default function BusinessPage() {
     whatsappNumber: '',
     slug: '',
     websiteBuilderEnabled: false,
+    razorpayEnabled: false,
+    razorpayKeyId: '',
+    razorpayKeySecret: '',
   })
+  const [razorpayModuleEnabled, setRazorpayModuleEnabled] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Fetch existing business profile from API
     const fetchProfile = async () => {
       try {
         const response = await fetch('/api/business')
@@ -29,8 +32,21 @@ export default function BusinessPage() {
         if (result.success && result.data) {
           setFormData(result.data)
         }
+
+        // Check if Razorpay module is enabled for this tenant
+        const authRes = await fetch('/api/auth/check')
+        const authData = await authRes.json()
+        if (authData.admin?.tenant_id) {
+          const tenantRes = await fetch(`/api/tenants/${authData.admin.tenant_id}`)
+          const tenantData = await tenantRes.json()
+          if (tenantData.success && tenantData.data?.modules?.includes('razorpay_gateway')) {
+            setRazorpayModuleEnabled(true)
+          }
+        } else if (authData.admin?.role === 'superadmin') {
+          setRazorpayModuleEnabled(true)
+        }
       } catch (err) {
-        console.error('Failed to fetch business profile:', err)
+        console.error('Failed to fetch data:', err)
       }
     }
     fetchProfile()
@@ -240,6 +256,60 @@ export default function BusinessPage() {
                 )}
               </div>
             </div>
+
+            {razorpayModuleEnabled && (
+              <div className="pt-6 border-t border-gray-100">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Razorpay Payment Gateway</h2>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                    <div>
+                      <h3 className="font-semibold text-blue-900">Enable Razorpay Checkout</h3>
+                      <p className="text-sm text-blue-700">Allow customers to pay via Razorpay during sales recording.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={formData.razorpayEnabled}
+                        onChange={(e) => setFormData({ ...formData, razorpayEnabled: e.target.checked })}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  {formData.razorpayEnabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Razorpay Key ID *</label>
+                        <input
+                          type="text"
+                          required={formData.razorpayEnabled}
+                          value={formData.razorpayKeyId}
+                          onChange={(e) => setFormData({ ...formData, razorpayKeyId: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="rzp_test_..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Razorpay Key Secret *</label>
+                        <input
+                          type="password"
+                          required={formData.razorpayEnabled}
+                          value={formData.razorpayKeySecret}
+                          onChange={(e) => setFormData({ ...formData, razorpayKeySecret: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="••••••••••••••••"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 md:col-span-2">
+                        Get your API keys from the <a href="https://dashboard.razorpay.com/app/website-app-settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Razorpay Dashboard</a>.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end pt-4">
               <button

@@ -26,4 +26,5 @@ export const AVAILABLE_MODULES: ModuleDefinition[] = [
     { id: 'roles', label: 'Roles & Permissions' },
     { id: 'whatsapp_community', label: 'WhatsApp Community' },
     { id: 'ai-purchase-order', label: 'AI Purchase Order Agent' },
+    { id: 'razorpay_gateway', label: 'Razorpay Payment Gateway' },
 ];

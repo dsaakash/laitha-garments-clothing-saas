@@ -79,6 +79,9 @@ export interface BusinessProfile {
   whatsappNumber: string
   slug: string
   websiteBuilderEnabled: boolean
+  razorpayEnabled?: boolean
+  razorpayKeyId?: string
+  razorpayKeySecret?: string
 }
 
 export interface Customer {

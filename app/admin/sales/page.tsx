@@ -10,10 +10,11 @@ import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Plus, Search, Filter, Calendar, TrendingUp, DollarSign, 
-  Users, ShoppingBag, Edit, Trash2, CreditCard, ChevronDown, CheckCircle, XCircle, Link, ScanBarcode
+  Users, ShoppingBag, Edit, Trash2, CreditCard, ChevronDown, CheckCircle, XCircle, Link, ScanBarcode, Zap
 } from 'lucide-react'
 import StatusBadge from '@/components/StatusBadge'
 import ActionButton from '@/components/ActionButton'
+import { loadRazorpayScript } from '@/lib/razorpay'
 
 function SalesPageContent() {
   const searchParams = useSearchParams()
@@ -80,6 +81,9 @@ function SalesPageContent() {
   const [barcodeInput, setBarcodeInput] = useState('')
   const [barcodeError, setBarcodeError] = useState('')
   const barcodeInputRef = React.useRef<HTMLInputElement>(null)
+  const [razorpayModuleEnabled, setRazorpayModuleEnabled] = useState(false)
+  const [razorpayConfigured, setRazorpayConfigured] = useState(false)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
   // ── Loyalty Points ────────────────────────────────────────
   const [loyaltyData, setLoyaltyData] = useState<{
@@ -103,17 +107,37 @@ function SalesPageContent() {
     fetch('/api/auth/check')
       .then(res => res.json())
       .then(data => {
-        if (data.admin && data.admin.tenant_id) {
-          fetch(`/api/tenants/${data.admin.tenant_id}`)
+        if (data.admin) {
+          const isSuperAdmin = data.admin.role === 'superadmin'
+          
+          if (data.admin.tenant_id) {
+            fetch(`/api/tenants/${data.admin.tenant_id}`)
+              .then(res => res.json())
+              .then(tenantData => {
+                if (tenantData.success) {
+                  if (tenantData.data?.modules?.includes('rack_number')) {
+                    setRackModuleEnabled(true)
+                  }
+                  if (tenantData.data?.modules?.includes('razorpay_gateway')) {
+                    setRazorpayModuleEnabled(true)
+                  }
+                }
+              })
+              .catch(console.error)
+          } else if (isSuperAdmin) {
+            setRackModuleEnabled(true)
+            setRazorpayModuleEnabled(true) // Super admin has access to all modules
+          }
+
+          // Always check business profile for Razorpay configuration if module could be enabled
+          fetch('/api/business')
             .then(res => res.json())
-            .then(tenantData => {
-              if (tenantData.success && tenantData.data?.modules?.includes('rack_number')) {
-                setRackModuleEnabled(true)
+            .then(bizData => {
+              if (bizData.success && bizData.data?.razorpayEnabled && bizData.data?.razorpayKeyId) {
+                setRazorpayConfigured(true)
               }
             })
             .catch(console.error)
-        } else if (data.admin && data.admin.role === 'superadmin') {
-          setRackModuleEnabled(true)
         }
       })
       .catch(console.error)
@@ -591,6 +615,75 @@ function SalesPageContent() {
     }
   }
 
+  const initiateRazorpayPayment = async (amount: number, billNumber: string) => {
+    setIsProcessingPayment(true)
+    try {
+      const res = await loadRazorpayScript()
+      if (!res) {
+        alert('Failed to load Razorpay SDK. Please check your internet connection.')
+        setIsProcessingPayment(false)
+        return null
+      }
+
+      const response = await fetch('/api/sales/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, billNumber }),
+      })
+
+      const data = await response.json()
+      if (!data.success) {
+        alert(data.error || 'Failed to create Razorpay order')
+        setIsProcessingPayment(false)
+        return null
+      }
+
+      // Fetch business profile for checkout branding
+      const profileRes = await fetch('/api/business')
+      const profileData = await profileRes.json()
+      const businessName = profileData.data?.businessName || 'Nirvriksh Retail OS'
+
+      return new Promise((resolve) => {
+        const options = {
+          key: data.keyId,
+          amount: Math.round(amount * 100),
+          currency: 'INR',
+          name: businessName,
+          description: `Bill #${billNumber}`,
+          order_id: data.orderId,
+          handler: function (response: any) {
+            resolve({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            })
+          },
+          prefill: {
+            name: formData.partyName,
+            contact: '', // Could add customer phone if available
+          },
+          theme: {
+            color: '#7c3aed',
+          },
+          modal: {
+            ondismiss: function () {
+              setIsProcessingPayment(false)
+              resolve(null)
+            },
+          },
+        }
+
+        const rzp = new (window as any).Razorpay(options)
+        rzp.open()
+      })
+    } catch (error) {
+      console.error('Razorpay payment error:', error)
+      alert('An error occurred while initiating payment.')
+      setIsProcessingPayment(false)
+      return null
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -658,9 +751,17 @@ function SalesPageContent() {
         gstAmount = formData.gstAmount
       }
 
-      // Calculate final total (including loyalty discount)
       const loyaltyDeduction = applyLoyalty ? loyaltyDiscount : 0
       const finalTotal = amountAfterDiscount + gstAmount - loyaltyDeduction
+
+      let razorpayDetails = null
+      if (formData.paymentMode === 'Razorpay (Online)') {
+        razorpayDetails = await initiateRazorpayPayment(finalTotal, formData.billNumber)
+        if (!razorpayDetails) {
+          // Payment was cancelled or failed
+          return
+        }
+      }
 
       const url = editingSale ? `/api/sales/${editingSale.id}` : '/api/sales'
       const method = editingSale ? 'PUT' : 'POST'
@@ -685,13 +786,13 @@ function SalesPageContent() {
           finalTotal,
           loyaltyDiscount: loyaltyDeduction || undefined,
           loyaltyPointsEarned: 10,
-          paymentMode: formData.paymentMode,
-          upiTransactionId: formData.upiTransactionId || undefined,
-          upiId: formData.upiId || undefined,
-          paymentStatus: formData.paymentStatus || 'paid',
-          saleImage: formData.saleImage || undefined,
-        }),
-      })
+           paymentMode: formData.paymentMode,
+           upiTransactionId: formData.upiTransactionId || (razorpayDetails as any)?.razorpay_payment_id || undefined,
+           upiId: formData.upiId || undefined,
+           paymentStatus: formData.paymentMode === 'Razorpay (Online)' ? 'paid' : (formData.paymentStatus || 'paid'),
+           saleImage: formData.saleImage || undefined,
+         }),
+       })
 
       const result = await response.json()
       if (!result.success) {
@@ -722,6 +823,8 @@ function SalesPageContent() {
     } catch (error) {
       console.error('Failed to save sale:', error)
       alert('Failed to save sale')
+    } finally {
+      setIsProcessingPayment(false)
     }
   }
 
@@ -1700,7 +1803,6 @@ function SalesPageContent() {
                         required
                         value={formData.paymentMode}
                         onChange={handlePaymentModeChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       >
                         <option value="Cash">Cash</option>
                         <option value="UPI">UPI</option>
@@ -1708,6 +1810,7 @@ function SalesPageContent() {
                         <option value="UPI - PhonePe">UPI - PhonePe</option>
                         <option value="UPI - Paytm">UPI - Paytm</option>
                         <option value="Bank Transfer">Bank Transfer</option>
+                        {razorpayModuleEnabled && razorpayConfigured && <option value="Razorpay (Online)">⚡ Razorpay (Online)</option>}
                       </select>
                     </div>
                     <div>
@@ -2448,13 +2551,23 @@ function SalesPageContent() {
                     </button>
                     <button
                       type="submit"
-                      disabled={formData.items.length === 0}
+                      disabled={formData.items.length === 0 || isProcessingPayment}
                       className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-2"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {editingSale ? 'Update Sale' : 'Record Sale'}
+                      {isProcessingPayment ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {isProcessingPayment 
+                        ? 'Processing...' 
+                        : (editingSale 
+                          ? 'Update Sale' 
+                          : (formData.paymentMode === 'Razorpay (Online)' ? 'Pay & Record Sale' : 'Record Sale')
+                        )
+                      }
                     </button>
                   </div>
                 </form>
