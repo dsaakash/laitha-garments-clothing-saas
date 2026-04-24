@@ -99,7 +99,7 @@ jobs:
             VERSION=${LATEST_TAG#v}
             MAJOR=$(echo $VERSION | cut -d. -f1)
             MINOR=$(echo $VERSION | cut -d. -f2)
-            PATCH=$(echo $VERSION | cut -d. -f3)
+            PATCH=$(echo $VERSION | cut -d. -f3 | sed 's/-.*//')
             
             # Increment patch
             NEW_PATCH=$((PATCH + 1))
