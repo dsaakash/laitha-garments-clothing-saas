@@ -102,7 +102,7 @@ export async function getAdminById(id: number): Promise<Admin | null> {
 
 export async function getUserById(id: number): Promise<User | null> {
   const result = await query(
-    `SELECT u.id, u.email, u.name, u.role, u.role_id, u.created_at, u.updated_at,
+    `SELECT u.id, u.email, u.name, u.role, u.role_id, u.tenant_id, u.created_at, u.updated_at,
             r.name as role_name, r.permissions as role_permissions
      FROM users u
      LEFT JOIN roles r ON u.role_id = r.id

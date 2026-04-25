@@ -19,7 +19,11 @@ export async function POST(request: NextRequest) {
 
     // Fetch tenant's Razorpay credentials
     const profileResult = await query(
-      'SELECT razorpay_enabled, razorpay_key_id, razorpay_key_secret FROM business_profile WHERE tenant_id = $1 OR (tenant_id IS NULL AND $2 = TRUE) LIMIT 1',
+      `SELECT razorpay_enabled, razorpay_key_id, razorpay_key_secret 
+       FROM business_profile 
+       WHERE (tenant_id = $1) OR (tenant_id IS NULL AND ($1 IS NULL OR $2 = TRUE))
+       ORDER BY CASE WHEN LOWER(business_name) LIKE '%lalitha%' THEN 0 ELSE 1 END, id DESC 
+       LIMIT 1`,
       [context.tenantId, context.isSuperAdmin]
     )
 

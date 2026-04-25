@@ -124,9 +124,10 @@ function SalesPageContent() {
                 }
               })
               .catch(console.error)
-          } else if (isSuperAdmin) {
+          } else {
+            // Main business (Lalitha Garments) - Superadmin or Staff
             setRackModuleEnabled(true)
-            setRazorpayModuleEnabled(true) // Super admin has access to all modules
+            setRazorpayModuleEnabled(true)
           }
 
           // Always check business profile for Razorpay configuration if module could be enabled

@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         admin = await getUserById(userIdNum)
         if (admin) {
           admin.type = 'user'
-          admin.tenant_id = null
+          admin.tenant_id = admin.tenant_id || null
           admin.permissions = admin.role_permissions || {}
           if (admin.role_name) {
             admin.role = admin.role_name.toLowerCase().replace(' ', '')
